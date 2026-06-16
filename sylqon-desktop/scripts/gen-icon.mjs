@@ -8,7 +8,7 @@
 //   build/icon.png   (1024×1024, transparent corners)
 //   build/icon.ico   (16…256 px frames for Windows)
 
-import { writeFile } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
@@ -110,6 +110,9 @@ const png = new Resvg(svg, {
   .render()
   .asPng();
 
+// Ensure the output dir exists (it isn't committed, so it's absent on a fresh
+// checkout / in CI).
+await mkdir(path.join(root, "build"), { recursive: true });
 await writeFile(path.join(root, "build", "icon.png"), png);
 const ico = await pngToIco(png);
 await writeFile(path.join(root, "build", "icon.ico"), ico);
