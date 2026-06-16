@@ -222,6 +222,11 @@ __marimo__/
 node_modules/
 release/
 
+# The desktop backend's PyInstaller spec is a hand-maintained build INPUT, not a
+# generated artifact — keep it tracked despite the generic *.spec ignore above
+# (CI needs it for `npm run build:backend`).
+!sylqon-desktop/backend/sylqon-server.spec
+
 # Databases (generated at runtime)
 *.db
 
