@@ -92,6 +92,12 @@ jobs:
           pip install -r ../requirements.txt
           pip install -r backend/requirements-build.txt
 
+      # Generate the app icon from vector (build/icon.{png,ico}). It isn't
+      # committed, and the PyInstaller spec hard-requires build/icon.ico, so
+      # regenerate it here before packaging.
+      - name: Generate app icon
+        run: npm run gen:icon
+
       - name: Build backend (PyInstaller) and UI
         run: npm run build:backend
 
