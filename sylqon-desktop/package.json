@@ -16,7 +16,12 @@
     "dev": "npm run build:main && electron .",
     "start": "electron .",
     "build": "npm run clean && npm run build:backend && npm run build:main && electron-builder",
-    "pack": "npm run clean && npm run build:backend && npm run build:main && electron-builder --dir"
+    "pack": "npm run clean && npm run build:backend && npm run build:main && electron-builder --dir",
+    "dist": "electron-builder --publish always",
+    "release": "standard-version",
+    "release:patch": "standard-version --release-as patch",
+    "release:minor": "standard-version --release-as minor",
+    "release:major": "standard-version --release-as major"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
@@ -25,6 +30,10 @@
     "electron-builder": "^24.13.3",
     "png-to-ico": "^3.0.1",
     "rimraf": "^5.0.7",
+    "standard-version": "^9.5.0",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

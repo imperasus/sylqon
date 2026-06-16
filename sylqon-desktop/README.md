@@ -170,7 +170,7 @@ npm run build
 1. **`build:backend`** — builds the React UI and packages the Python backend into
    `backend/dist/sylqon-server/` with PyInstaller.
 2. **`build:main`** — compiles the Electron TypeScript.
-3. **electron-builder** — produces `release/Sylqon Setup <version>.exe`, an NSIS
+3. **electron-builder** — produces `release/Sylqon-Setup-<version>.exe`, an NSIS
    installer (chooses install dir, desktop + Start menu shortcuts) with the
    backend embedded under `resources/backend/`.
 
@@ -190,6 +190,25 @@ npm run build:backend   # → backend/dist/sylqon-server/sylqon-server.exe
 ```
 
 Runs standalone (no Python needed). Useful to test the bundled server directly.
+
+## Releases & Updates
+
+Releases are automated. Push a `vX.Y.Z` tag and GitHub Actions builds and
+publishes the Windows installer to GitHub Releases.
+
+```powershell
+./scripts/release.ps1            # patch bump, then push tag (1.0.0 -> 1.0.1)
+./scripts/release.ps1 minor      # minor bump (1.0.0 -> 1.1.0)
+./scripts/release.ps1 major      # major bump (1.0.0 -> 2.0.0)
+```
+
+**For end users:** Sylqon checks for updates automatically on startup. When a new
+version is available, a banner appears in the app — click **Download**, then
+**Restart** to apply. Manual downloads:
+`https://github.com/imperasus/sylqon/releases`.
+
+Full details — the CI pipeline, the Conventional Commits guide, and how
+auto-update works — are in [`RELEASING.md`](RELEASING.md).
 
 ## App icon
 
@@ -233,6 +252,8 @@ Full details: [`build/ICON_README.md`](build/ICON_README.md).
 | `npm start` | Launch already-compiled `dist/` |
 | `npm run build` | Full NSIS installer (backend + main + electron-builder) |
 | `npm run pack` | Unpacked app folder (backend + main + electron-builder --dir) |
+| `npm run dist` | Package + publish to GitHub Releases (used by CI; needs `GH_TOKEN`) |
+| `npm run release[:patch\|minor\|major]` | Bump version + changelog + tag via standard-version |
 | `npm run gen:icon` | Re-render the vector app icon → `build/icon.{png,ico}` |
 | `npm run make:icon` | Pack a custom `build/icon.png` → `build/icon.ico` |
 | `npm run clean` | Remove `dist/` |

@@ -49,6 +49,37 @@ win:
       arch:
         - x64
 
+  # ---------------------------------------------------------------------------
+  # CODE-SIGNING SCAFFOLDING (currently DISABLED — builds are unsigned)
+  #
+  # Unsigned installers still build and auto-update via latest.yml, BUT Windows
+  # SmartScreen will warn users ("Windows protected your PC") on first run until
+  # the publisher reputation is established. Signing removes that warning.
+  #
+  # TWO WAYS TO ENABLE (pick one). Neither requires changing this file if you use
+  # the env-var route below — electron-builder auto-detects CSC_LINK.
+  #
+  #   OPTION A — env vars (recommended, no secrets in repo):
+  #     Set these in the shell / CI before `npm run dist`:
+  #       CSC_LINK            → path or base64 of your .pfx/.p12 cert
+  #       CSC_KEY_PASSWORD    → the certificate's password
+  #     electron-builder picks them up automatically. In GitHub Actions, store
+  #     them as repository secrets and expose them as env on the publish step.
+  #
+  #   OPTION B — explicit keys here (uncomment and reference env vars only —
+  #     NEVER hardcode a real path or password):
+  #     # certificateFile: ${env.CSC_LINK}
+  #     # certificatePassword: ${env.CSC_KEY_PASSWORD}
+  #
+  # TODO (when you obtain a cert): also set a timestamp server so signatures stay
+  # valid after the cert expires. Uncomment ONE:
+  #   # rfc3161TimeStampServer: http://timestamp.digicert.com
+  #   # timeStampServer: http://timestamp.digicert.com   # legacy Authenticode
+  #
+  # TODO: for an EV certificate on a hardware token, signing is interactive and
+  # generally cannot run in CI — sign on a machine with the token instead.
+  # ---------------------------------------------------------------------------
+
 nsis:
   oneClick: false
   perMachine: false
@@ -56,4 +87,20 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Sylqon
-  artifactName: Sylqon Setup ${version}.${ext}
+  # Installer file name: Sylqon-Setup-1.2.3.exe (no spaces, URL-friendly).
+  artifactName: Sylqon-Setup-${version}.${ext}
+
+# AUTO-UPDATE PUBLISH CONFIG
+# When a new version tag is pushed, GitHub Actions builds and uploads these files.
+# electron-updater checks latest.yml on startup to detect available updates.
+# To release a new version:
+#   1. Bump version in package.json (e.g. 1.0.0 -> 1.1.0)
+#   2. Commit: git commit -am "chore: bump version to 1.1.0"
+#   3. Tag:    git tag v1.1.0
+#   4. Push:   git push && git push --tags
+#   GitHub Actions will handle the rest automatically.
+publish:
+  provider: github
+  owner: imperasus
+  repo: sylqon
+  releaseType: release       # creates a proper release, not a draft

@@ -1,0 +1,106 @@
+name: Release
+
+# Build the Sylqon Windows installer and publish it to GitHub Releases
+# whenever a version tag (vX.Y.Z) is pushed.
+#
+# NOTE: sylqon-desktop is part of a monorepo. The Electron build depends on:
+#   - the React UI in  ../ui          (built by `npm run build:backend`)
+#   - the Python backend, bundled with PyInstaller into a standalone exe
+# So this workflow sets up BOTH Node.js and Python before building.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'          # only explicit version tags — never on main or PRs
+
+# electron-builder needs write access to create the GitHub Release and upload assets.
+permissions:
+  contents: write
+
+# Only one release build per tag at a time. Never cancel — a half-finished
+# release build could leave a partial/broken release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest      # required for NSIS installer generation
+    timeout-minutes: 20          # guard against runaway builds eating free-tier minutes
+
+    # All npm commands run inside the Electron app package.
+    defaults:
+      run:
+        working-directory: sylqon-desktop
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20        # matches @types/node ^20 and Electron 31's bundled Node
+          cache: npm
+          # Cache npm for both the desktop app and the UI it bundles.
+          cache-dependency-path: |
+            sylqon-desktop/package-lock.json
+            ui/package-lock.json
+
+      # Validate the tag with the `semver` package (not a hand-rolled regex) so
+      # a malformed tag fails fast, before the expensive Python/PyInstaller build.
+      # The package.json version drives which release electron-builder publishes,
+      # so it must equal the tag (minus the leading "v").
+      - name: Validate version tag
+        shell: pwsh
+        working-directory: .
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
+          # semver CLI prints the normalized version when valid, nothing when not.
+          $normalized = (npx --yes semver $version) | Select-Object -Last 1
+          if (-not $normalized) {
+            Write-Error "Tag '$tag' is not a valid semver version (expected vX.Y.Z)."
+            exit 1
+          }
+          $pkgVersion = (Get-Content sylqon-desktop/package.json -Raw | ConvertFrom-Json).version
+          if ($pkgVersion -ne $version) {
+            Write-Error "Tag version ($version) does not match package.json version ($pkgVersion). Bump package.json before tagging (use scripts/release.ps1)."
+            exit 1
+          }
+          Write-Host "Tag $tag is valid semver and matches package.json ($pkgVersion)."
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            sylqon-desktop/backend/requirements-build.txt
+
+      - name: Install desktop dependencies
+        run: npm ci          # reproducible install from package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci          # build:backend builds the React UI, which needs these
+
+      - name: Install Python build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ../requirements.txt
+          pip install -r backend/requirements-build.txt
+
+      - name: Build backend (PyInstaller) and UI
+        run: npm run build:backend
+
+      - name: Build Electron main process
+        run: npm run build:main
+
+      - name: Package installer and publish to GitHub Releases
+        run: npm run dist
+        env:
+          # Built-in token — no extra secret needed. electron-builder reads GH_TOKEN
+          # to create the release and upload Sylqon-Setup-x.x.x.exe + latest.yml.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

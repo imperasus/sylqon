@@ -16,6 +16,7 @@ import {
 import { startBackend, stopBackend } from "./backend";
 import { createTray, destroyTray, notifyTray } from "./tray";
 import { checkBackend } from "./health";
+import { setupAutoUpdates, attachUpdateBanner } from "./updater";
 
 // ---------------------------------------------------------------------------
 // Sylqon Desktop — main process
@@ -134,6 +135,9 @@ function createMainWindow(): void {
 
   mainWindow.once("ready-to-show", () => mainWindow?.show());
 
+  // Re-render the in-app update banner across navigations (splash → dashboard).
+  attachUpdateBanner(mainWindow);
+
   // Close-to-tray: closing the window hides it instead of quitting, unless the
   // user chose Quit (isQuitting). The app keeps running in the tray.
   mainWindow.on("close", (e) => {
@@ -224,6 +228,10 @@ if (!app.requestSingleInstanceLock()) {
     createOverlayWindow();
     registerHotkeys();
     createTray({ showMainWindow, quit: quitApp });
+
+    // Check for updates silently and surface an in-app banner if one is found
+    // (no-op when not packaged). Non-blocking — never gates the UI.
+    setupAutoUpdates(() => mainWindow);
 
     app.on("activate", () => showMainWindow());
   });

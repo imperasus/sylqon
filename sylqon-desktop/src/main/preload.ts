@@ -4,8 +4,10 @@ import { contextBridge, ipcRenderer } from "electron";
 // Nothing here touches the game or the OS — it only lets that static page ask
 // the main process to re-check the backend and read the configured URL.
 //
-// This preload is ONLY attached to the bundled backend-down.html. The real
-// Sylqon UI is served over HTTP and gets no preload / no privileged bridge.
+// The `sylqon` bridge below is meaningful to the bundled backend-down.html. The
+// `sylqonUpdater` bridge is consumed by the in-app update banner (injected by
+// updater.ts) and so must be available on every page the main window shows.
+// Both expose only send/invoke wrappers — no Node, no game/OS access.
 
 contextBridge.exposeInMainWorld("sylqon", {
   /** Ask the main process to re-check the backend and (re)load the dashboard. */
@@ -14,4 +16,12 @@ contextBridge.exposeInMainWorld("sylqon", {
   getBaseUrl: (): Promise<string> => ipcRenderer.invoke("sylqon:getBaseUrl"),
   /** Resolve the backend log file path (for troubleshooting display). */
   getLogPath: (): Promise<string> => ipcRenderer.invoke("sylqon:getLogPath"),
+});
+
+// Update banner buttons (Download / Restart) → main process (see updater.ts).
+contextBridge.exposeInMainWorld("sylqonUpdater", {
+  /** Start downloading the available update. */
+  download: (): void => ipcRenderer.send("sylqon:update-download"),
+  /** Quit and install the downloaded update. */
+  restart: (): void => ipcRenderer.send("sylqon:update-restart"),
 });
