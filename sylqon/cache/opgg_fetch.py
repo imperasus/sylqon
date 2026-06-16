@@ -1,0 +1,114 @@
+﻿"""Live OP.GG build fetch over op.gg's internal JSON API.
+
+This is the autonomous counterpart to the Claude/MCP-driven `/api/opgg-build`
+path: when the running pipeline hits a champion+role with no cached build, it
+fetches the current ranked build straight from op.gg and converts it through the
+same `opgg_to_build` pipeline, so the AI receives data in the usual shape.
+
+The endpoint is undocumented and may change without notice — every failure mode
+returns ``None`` so the caller falls back to the seed build.
+"""
+from __future__ import annotations
+
+import logging
+
+import requests
+
+from sylqon import config
+
+log = logging.getLogger(__name__)
+
+_BASE = "https://lol-api-champion.op.gg/api/{region}/champions/ranked/{cid}/{pos}"
+
+# Our internal role names -> op.gg position tokens.
+_POSITION = {
+    "top": "TOP",
+    "jungle": "JUNGLE",
+    "middle": "MID",
+    "bottom": "ADC",
+    "utility": "SUPPORT",
+}
+
+_HEADERS = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+
+
+def fetch_opgg_payload(champion_id: int, role: str,
+                       region: str | None = None) -> dict | None:
+    """Fetch the top ranked build for a champion+role and shape it into the
+    payload dict expected by ``cache.opgg.opgg_to_build``. Returns ``None`` on
+    any network/parse failure or unknown role."""
+    pos = _POSITION.get(role)
+    if not pos:
+        return None
+    region = region or config.OPGG_REGION
+    url = _BASE.format(region=region, cid=champion_id, pos=pos)
+    try:
+        resp = requests.get(url, headers=_HEADERS, timeout=config.OPGG_TIMEOUT_SECONDS)
+        resp.raise_for_status()
+        data = (resp.json() or {}).get("data")
+    except (requests.RequestException, ValueError) as exc:
+        log.warning("op.gg live fetch failed for %s %s: %s", champion_id, role, exc)
+        return None
+    if not isinstance(data, dict):
+        return None
+    return _shape_payload(data, role)
+
+
+def _top_ids(entries: list, key: str = "ids") -> list[int]:
+    """First (most-picked) id group from an op.gg ranked-list section."""
+    if entries and isinstance(entries[0], dict):
+        return list(entries[0].get(key, []))
+    return []
+
+
+def _shape_payload(data: dict, role: str) -> dict | None:
+    core = _top_ids(data.get("core_items", []))
+    boots = _top_ids(data.get("boots", []))
+    starters = _top_ids(data.get("starter_items", []))
+    spells = _top_ids(data.get("summoner_spells", []))
+
+    # Every summoner spell op.gg observes on this champion (across the top
+    # combos). This is the ONLY set the AI may pick spells from — so it can
+    # never suggest a spell nobody runs on the champion.
+    spell_options: list[int] = []
+    for combo in (data.get("summoner_spells") or [])[:4]:
+        if isinstance(combo, dict):
+            for sid in combo.get("ids", []):
+                if sid not in spell_options:
+                    spell_options.append(sid)
+
+    runes_list = data.get("runes") or []
+    runes = runes_list[0] if runes_list and isinstance(runes_list[0], dict) else {}
+
+    # last_items is a flat, pick-rate-ranked list of single completed items; use
+    # it as the situational pool (opgg_to_build dedupes against boots + core).
+    drop = set(core) | set(boots)
+    situational: list[int] = []
+    for entry in data.get("last_items", []):
+        for iid in (entry.get("ids", []) if isinstance(entry, dict) else []):
+            if iid not in drop and iid not in situational:
+                situational.append(iid)
+    situational = situational[:6]
+
+    if not core or not runes.get("primary_rune_ids"):
+        log.warning("op.gg payload missing core/runes for role %s", role)
+        return None
+
+    return {
+        "role": role,
+        "starter_item_ids": starters,
+        "boot_ids": boots,
+        "core_item_ids": core,
+        # spread the situational pool across the three slot keys the converter
+        # iterates; the split is cosmetic — they're unioned and deduped.
+        "fourth_item_ids": situational[:2],
+        "fifth_item_ids": situational[2:4],
+        "sixth_item_ids": situational[4:6],
+        "primary_page_id": runes.get("primary_page_id", 0),
+        "primary_rune_ids": runes.get("primary_rune_ids", []),
+        "secondary_page_id": runes.get("secondary_page_id", 0),
+        "secondary_rune_ids": runes.get("secondary_rune_ids", []),
+        "stat_mod_ids": runes.get("stat_mod_ids", []),
+        "summoner_spell_ids": spells,
+        "summoner_spell_options": spell_options,
+    }

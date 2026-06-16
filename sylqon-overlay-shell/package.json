@@ -1,0 +1,41 @@
+{
+  "name": "sylqon-overlay-shell",
+  "version": "0.1.0",
+  "description": "Thin, read-only Electron shell that frames the Sylqon /overlay web UI as an always-on-top desktop window.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build:ts": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json && electron .",
+    "start": "electron .",
+    "dist": "tsc -p tsconfig.json && electron-builder --win --x64",
+    "dist:dir": "tsc -p tsconfig.json && electron-builder --win --dir"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.11.0"
+  },
+  "build": {
+    "appId": "com.sylqon.overlay",
+    "productName": "SylqonOverlay",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "SylqonOverlay.exe"
+    }
+  }
+}

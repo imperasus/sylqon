@@ -216,3 +216,26 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Sylqon project-specific ---
+# Node
+node_modules/
+release/
+
+# Databases (generated at runtime)
+*.db
+
+# Runtime cache & reports (regenerated)
+/cache/
+
+# Local tooling / agent / editor state
+.claude/
+.playwright-mcp/
+/tmp/
+
+# Stray / scratch files
+/package-lock.json
+xy-icon.png
+debug_parser.py
+list_cache.py
+sylqon-overlay-shell/_smoke.*.txt

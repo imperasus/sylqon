@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+/* ============================================================ design tokens
+   "Frost Cobalt" — deep cobalt-navy base, teal/cyan accent, warm coral enemy.
+   Flat + subtle glass (no heavy glow). Tuned for a compact ~1280x720 companion
+   window. NOTE: the legacy `gold*` tokens are kept but REMAPPED to the teal
+   accent so any older component that still references them stays on-theme. */
+@theme {
+  --color-bg: #060a14;          /* app background (deep cobalt) */
+  --color-bg-2: #0a1020;        /* raised surface */
+  --color-panel: #0d162b;       /* card body (lifted a touch for layering) */
+  --color-elev: #131f3a;        /* hover / selected rows — reads above panel */
+  --color-line: #1b2740;        /* hairline borders */
+
+  --color-accent: #2fd6c6;      /* primary — teal */
+  --color-accent-bright: #7ff0e4;
+  --color-accent-2: #5fd0ff;    /* secondary — cyan */
+
+  /* legacy aliases remapped to the new accent (compat for kept components) */
+  --color-gold: #2fd6c6;
+  --color-gold-bright: #7ff0e4;
+  --color-amber: #ffc46b;       /* warm — AD / warnings */
+
+  --color-ally: #4aa8ff;        /* own team — cyan-blue */
+  --color-ally-deep: #1f6fd0;
+  --color-enemy: #ff6f8b;       /* enemy team — warm coral */
+  --color-enemy-deep: #c23f5e;
+  --color-mana: #5fd0ff;        /* cyan — info / runes */
+
+  --color-tier1: #5ff0dd;       /* S/S+ — teal */
+  --color-tier2: #8ef0a8;       /* A — green */
+  --color-good: #43e0a8;
+  --color-bad: #ff6b78;
+
+  --font-display: "Rajdhani", sans-serif;
+  --font-tech: "Rajdhani", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+html,
+body {
+  background:
+    radial-gradient(1200px 700px at 80% -10%, rgb(47 214 198 / 0.06), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgb(95 208 255 / 0.05), transparent 55%),
+    var(--color-bg);
+  color: #d0d6e0;
+  font-family: var(--font-tech);
+  overflow: hidden;
+}
+
+/* ============================================================ typography scale
+   Reusable text utilities so components stop hand-rolling text-[Npx]. */
+.t-h1 { font-size: 19px; line-height: 1.2; font-weight: 600; letter-spacing: 0.01em; color: #eef3fb; }
+.t-h2 { font-size: 15px; line-height: 1.25; font-weight: 600; color: #e3eaf5; }
+.t-body { font-size: 13px; line-height: 1.55; color: #d0d6e0; }
+.t-label { font-size: 11px; line-height: 1.3; font-weight: 700; letter-spacing: 0.14em;
+           text-transform: uppercase; color: rgb(208 214 224 / 0.55); }
+.t-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ============================================================ row states
+   Shared list-row helpers: zebra striping, hover lift, selected, in-pool. */
+.row { position: relative; transition: background-color 120ms ease, box-shadow 120ms ease; }
+.row-hover:hover { background: rgb(19 31 58 / 0.7); box-shadow: inset 2px 0 0 0 rgb(47 214 198 / 0.55); }
+.row-selected { background: rgb(19 31 58 / 0.9); box-shadow: inset 2px 0 0 0 var(--color-accent); }
+.row-pool { background: rgb(47 214 198 / 0.06); box-shadow: inset 3px 0 0 0 rgb(47 214 198 / 0.65); }
+
+/* ============================================================ frost surfaces
+   Subtle, flat-ish glass: a hint of cobalt tint, light hairline, minimal blur. */
+.frost {
+  background: linear-gradient(165deg, rgb(95 208 255 / 0.045), rgb(12 20 38 / 0.55));
+  backdrop-filter: blur(8px);
+  border: 1px solid rgb(120 170 220 / 0.12);
+  border-radius: 12px;
+}
+.frost-accent { border-color: rgb(47 214 198 / 0.45); }
+.frost-ally { border-color: rgb(74 168 255 / 0.35); }
+.frost-enemy { border-color: rgb(255 111 139 / 0.35); }
+
+/* thin top accent line for headers / active items */
+.edge-accent { box-shadow: inset 0 2px 0 -1px rgb(47 214 198 / 0.8); }
+.edge-ally { box-shadow: inset 0 2px 0 -1px rgb(74 168 255 / 0.8); }
+.edge-enemy { box-shadow: inset 0 2px 0 -1px rgb(255 111 139 / 0.8); }
+
+/* restrained accents (kept names; far softer than the old hextech glows) */
+.glow-accent { box-shadow: 0 0 0 1px rgb(47 214 198 / 0.35), 0 6px 24px rgb(47 214 198 / 0.10); }
+.glow-gold { box-shadow: 0 0 0 1px rgb(47 214 198 / 0.35), 0 6px 24px rgb(47 214 198 / 0.10); }
+.text-glow-accent { text-shadow: 0 0 12px rgb(127 240 228 / 0.45); }
+
+/* legacy .glass kept (used by the champion modal) — redefined to frost */
+.glass {
+  background: linear-gradient(165deg, rgb(95 208 255 / 0.045), rgb(12 20 38 / 0.55));
+  backdrop-filter: blur(8px);
+  border: 1px solid rgb(120 170 220 / 0.12);
+}
+.glass-gold { border-color: rgb(47 214 198 / 0.40); }
+
+/* ============================================================ scrollbars */
+.scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: rgb(47 214 198 / 0.30); border-radius: 3px; }
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: rgb(47 214 198 / 0.50); }
+.scroll-thin::-webkit-scrollbar-track { background: transparent; }
+
+/* ============================================================ motion (subtle) */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.pulse-soft { animation: pulse-soft 1.8s ease-in-out infinite; }
+
+@keyframes sweep {
+  to { transform: rotate(360deg); }
+}
+.sweep {
+  background: conic-gradient(from 0deg, transparent 0deg, rgb(47 214 198 / 0.30) 60deg, transparent 120deg);
+  animation: sweep 2.8s linear infinite;
+}

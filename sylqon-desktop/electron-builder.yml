@@ -1,0 +1,59 @@
+# electron-builder configuration for Sylqon Desktop (Windows-first).
+#
+# ICON INTEGRATION (your custom XY icon):
+#   directories.buildResources below is "build", and electron-builder
+#   AUTO-DETECTS  build/icon.ico  there. That single file becomes:
+#     • the packaged Sylqon.exe / app icon
+#     • the NSIS installer + uninstaller icon
+#   No explicit `win.icon` path is hard-coded on purpose: electron-builder
+#   ERRORS if a named icon file is missing, which would break the build before
+#   you supply the asset. With auto-detection, the build succeeds either way
+#   (default Electron icon until build/icon.ico exists). See build/ICON_README.md.
+#
+# The BrowserWindow / taskbar icon in DEV is set separately in code
+# (src/main/icon.ts → resolveAppIcon()), also reading build/icon.ico.
+
+appId: com.sylqon.desktop
+productName: Sylqon
+
+directories:
+  output: release
+  buildResources: build   # electron-builder auto-detects build/icon.ico here
+
+# Everything the packaged app needs at runtime. build/icon.ico is included so
+# the in-app BrowserWindow icon also resolves when packaged (the glob simply
+# matches nothing — no error — until you add the file).
+files:
+  - dist/**/*
+  - static/**/*
+  - build/icon.ico
+  - package.json
+
+# Bundle the standalone PyInstaller backend (built by `npm run build:backend`)
+# into resources/backend/. The app spawns resources/backend/sylqon-server.exe,
+# so no system Python is required on the user's machine.
+extraResources:
+  - from: backend/dist/sylqon-server
+    to: backend
+  # First-run data snapshot (champion universe, meta, builds). Copied into
+  # userData on first launch so a fresh install starts WITH data. Built by
+  # `npm run make:seed` (part of build:backend). Optional — absent = empty start.
+  - from: backend/seed
+    to: seed
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Sylqon
+  artifactName: Sylqon Setup ${version}.${ext}

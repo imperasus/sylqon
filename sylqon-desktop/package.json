@@ -1,0 +1,30 @@
+{
+  "name": "sylqon-desktop",
+  "version": "0.1.0",
+  "description": "Sylqon desktop shell — read-only Electron wrapper around the local Sylqon web UI, plus an always-on-top in-game overlay window.",
+  "author": "Sylqon",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "dist/main/main.js",
+  "scripts": {
+    "clean": "rimraf dist",
+    "gen:icon": "node scripts/gen-icon.mjs",
+    "make:icon": "node scripts/make-icon.mjs",
+    "build:backend": "node scripts/build-backend.mjs",
+    "make:seed": "node scripts/make-seed.mjs",
+    "build:main": "tsc -p tsconfig.json",
+    "dev": "npm run build:main && electron .",
+    "start": "electron .",
+    "build": "npm run clean && npm run build:backend && npm run build:main && electron-builder",
+    "pack": "npm run clean && npm run build:backend && npm run build:main && electron-builder --dir"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^20.11.0",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "png-to-ico": "^3.0.1",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.4.5"
+  }
+}

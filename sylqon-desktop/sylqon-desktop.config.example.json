@@ -1,0 +1,6 @@
+{
+  "baseUrl": "http://127.0.0.1:8077",
+  "toggleHotkey": "F10",
+  "clickThroughHotkey": "F9",
+  "clickThrough": false
+}

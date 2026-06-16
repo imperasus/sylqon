@@ -1,0 +1,19 @@
+node_modules/
+dist/
+release/
+
+# PyInstaller backend build artifacts
+backend/dist/
+backend/build/
+backend/seed/
+backend/__pycache__/
+*.spec.bak
+
+# Local runtime config (added in later phases)
+sylqon-desktop.config.json
+
+# The real icon is dropped in by hand; keep the placeholder docs tracked.
+# (Comment the next line out if you want to commit build/icon.ico to the repo.)
+# build/icon.ico
+
+*.log

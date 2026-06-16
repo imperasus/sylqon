@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';"
+    />
+    <title>Sylqon — engine didn't start</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #0d1117;
+        color: #e6edf3;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .card {
+        max-width: 620px;
+        padding: 40px 48px;
+        text-align: center;
+        border: 1px solid #30363d;
+        border-radius: 16px;
+        background: #161b22;
+      }
+      h1 { margin: 0 0 8px; font-size: 24px; }
+      .dot { color: #f0883e; }
+      p { color: #8b949e; line-height: 1.6; }
+      code {
+        color: #e6edf3;
+        background: #21262d;
+        border-radius: 6px;
+        padding: 2px 6px;
+        font-family: "Cascadia Code", Consolas, monospace;
+        word-break: break-all;
+      }
+      .row { margin-top: 24px; display: flex; gap: 12px; justify-content: center; }
+      button {
+        background: #238636; color: #fff; border: 0; border-radius: 8px;
+        padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer;
+      }
+      button:hover { background: #2ea043; }
+      .status { margin-top: 14px; font-size: 13px; color: #6e7681; min-height: 18px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1><span class="dot">●</span> Sylqon engine didn't start</h1>
+      <p>
+        The bundled backend starts automatically, but it hasn't responded at
+        <code id="url">…</code> yet. This is unusual.
+      </p>
+      <p>
+        Try <strong>Retry</strong> below, or fully quit Sylqon from the tray
+        (right-click → Quit) and reopen it. If it keeps happening, the startup
+        log has details:
+      </p>
+      <p><code id="log">…</code></p>
+      <div class="row">
+        <button id="retry" type="button">Retry now</button>
+      </div>
+      <div class="status" id="status">Auto-checking every few seconds…</div>
+    </div>
+
+    <script>
+      (function () {
+        var s = window.sylqon || {};
+        if (s.getBaseUrl) s.getBaseUrl().then(function (u) {
+          document.getElementById("url").textContent = u + "/";
+        });
+        if (s.getLogPath) s.getLogPath().then(function (p) {
+          document.getElementById("log").textContent = p;
+        });
+        document.getElementById("retry").addEventListener("click", function () {
+          document.getElementById("status").textContent = "Checking…";
+          if (s.retry) s.retry();
+        });
+      })();
+    </script>
+  </body>
+</html>

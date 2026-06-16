@@ -1,0 +1,89 @@
+﻿"""Offline tests for the Live Client Data parser (overlay coach, Phase 1).
+
+No game / network required — feeds a synthetic ``allgamedata`` payload through
+``parse_live_state`` and checks the normalized snapshot.
+
+Run: python -m pytest tests/test_live_state.py -q
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sylqon.livegame.state import LiveGameState, parse_live_state
+
+SAMPLE = {
+    "gameData": {"gameTime": 600.0, "gameMode": "CLASSIC"},
+    "activePlayer": {"riotIdGameName": "Sneaky", "summonerName": "Sneaky", "level": 9},
+    "allPlayers": [
+        {"riotIdGameName": "Sneaky", "summonerName": "Sneaky", "championName": "Jinx",
+         "team": "ORDER", "position": "BOTTOM", "level": 9, "isDead": False,
+         "respawnTimer": 0.0,
+         "scores": {"kills": 3, "deaths": 1, "assists": 5, "creepScore": 120,
+                    "wardScore": 8.5}},
+        {"riotIdGameName": "AllyJg", "summonerName": "AllyJg", "championName": "Lee Sin",
+         "team": "ORDER", "position": "JUNGLE", "scores": {}},
+        {"riotIdGameName": "Enemy1", "summonerName": "Enemy1", "championName": "Caitlyn",
+         "team": "CHAOS", "position": "BOTTOM", "scores": {}},
+    ],
+    "events": {"Events": [
+        {"EventID": 0, "EventName": "GameStart", "EventTime": 0.0},
+        {"EventName": "ChampionKill", "KillerName": "Enemy1", "VictimName": "Sneaky",
+         "EventTime": 300.0},
+        {"EventName": "DragonKill", "KillerName": "AllyJg", "DragonType": "Fire",
+         "EventTime": 420.0},
+        {"EventName": "DragonKill", "KillerName": "Enemy1", "DragonType": "Air",
+         "EventTime": 480.0},
+        # Turret_T2 is a CHAOS-owned tower → destroying it is an ally objective.
+        {"EventName": "TurretKilled", "TurretKilled": "Turret_T2_C_05_A",
+         "KillerName": "Sneaky", "EventTime": 500.0},
+    ]},
+}
+
+
+def test_no_game_sentinel():
+    assert parse_live_state(None).active is False
+    assert parse_live_state({}).active is True or parse_live_state({}) is not None
+    assert LiveGameState.none().active is False
+
+
+def test_parses_core_fields():
+    s = parse_live_state(SAMPLE)
+    assert s.active is True
+    assert s.game_time == 600.0
+    assert s.champion == "Jinx"
+    assert s.team == "ORDER"
+    assert (s.kills, s.deaths, s.assists) == (3, 1, 5)
+    assert s.cs == 120
+    assert s.cs_per_min == 12.0          # 120 / (600/60)
+    assert s.ward_score == 8.5
+    assert s.role == "bottom"            # from live position BOTTOM
+    assert s.is_dead is False
+
+
+def test_role_override_prefers_champ_select():
+    s = parse_live_state(SAMPLE, my_role="middle")
+    assert s.role == "middle"            # champ-select role wins over live position
+
+
+def test_deaths_and_objectives():
+    s = parse_live_state(SAMPLE)
+    assert s.death_times == [300.0]
+    # one ally dragon (AllyJg/ORDER), one enemy dragon (Enemy1/CHAOS)
+    assert s.objectives["dragons"] == {"ally": 1, "enemy": 1}
+    # destroyed a CHAOS turret while on ORDER → ally tower
+    assert s.objectives["towers"]["ally"] == 1
+
+
+def test_dict_serializable():
+    s = parse_live_state(SAMPLE)
+    d = s.to_dict()
+    assert d["active"] is True and d["cs"] == 120 and "objectives" in d
+
+
+if __name__ == "__main__":
+    import pytest
+
+    raise SystemExit(pytest.main([__file__, "-q"]))

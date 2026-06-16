@@ -1,0 +1,433 @@
+{
+  "_comment": "Hardcoded fallback builds. All entries use the structured format: boots + core_items (3) + situational_pool (with descriptions). items = [boots, core×3, situational picks]. ADC (bottom): 7 items (3 situational); all other roles: 6 items (2 situational). MetaCache opgg builds take precedence over these.",
+  "role_defaults": {
+    "top": {
+      "starting_items": [{"id": 1055, "name": "Doran's Blade"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3047, "name": "Plated Steelcaps"},
+      "core_items": [
+        {"id": 3074, "name": "Ravenous Hydra"},
+        {"id": 3071, "name": "Black Cleaver"},
+        {"id": 3053, "name": "Sterak's Gage"}
+      ],
+      "situational_pool": [
+        {"id": 3742, "name": "Dead Man's Plate", "description": "Armor and slow on charged hit"},
+        {"id": 3065, "name": "Spirit Visage", "description": "Magic resist and bonus healing"},
+        {"id": 3033, "name": "Mortal Reminder", "description": "Grievous wounds and armor pen"}
+      ],
+      "items": [
+        {"id": 3047, "name": "Plated Steelcaps"},
+        {"id": 3074, "name": "Ravenous Hydra"},
+        {"id": 3071, "name": "Black Cleaver"},
+        {"id": 3053, "name": "Sterak's Gage"},
+        {"id": 3742, "name": "Dead Man's Plate"},
+        {"id": 3065, "name": "Spirit Visage"}
+      ],
+      "keystone": "Conqueror",
+      "primary_runes": ["Triumph", "Legend: Alacrity", "Last Stand"],
+      "secondary_style": "Resolve",
+      "secondary_runes": ["Second Wind", "Overgrowth"],
+      "stat_shards": ["Adaptive Force", "Adaptive Force", "Health"],
+      "spell1": "Ghost"
+    },
+    "jungle": {
+      "starting_items": [{"id": 1102, "name": "Gustwalker Hatchling"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3111, "name": "Mercury's Treads"},
+      "core_items": [
+        {"id": 6610, "name": "Sundered Sky"},
+        {"id": 3071, "name": "Black Cleaver"},
+        {"id": 3053, "name": "Sterak's Gage"}
+      ],
+      "situational_pool": [
+        {"id": 3065, "name": "Spirit Visage", "description": "Magic resist and bonus healing"},
+        {"id": 3026, "name": "Guardian Angel", "description": "On-death revival shield"},
+        {"id": 3036, "name": "Lord Dominik's Regards", "description": "35% armor pen vs high HP"}
+      ],
+      "items": [
+        {"id": 3111, "name": "Mercury's Treads"},
+        {"id": 6610, "name": "Sundered Sky"},
+        {"id": 3071, "name": "Black Cleaver"},
+        {"id": 3053, "name": "Sterak's Gage"},
+        {"id": 3065, "name": "Spirit Visage"},
+        {"id": 3026, "name": "Guardian Angel"}
+      ],
+      "keystone": "Conqueror",
+      "primary_runes": ["Triumph", "Legend: Alacrity", "Last Stand"],
+      "secondary_style": "Domination",
+      "secondary_runes": ["Sudden Impact", "Treasure Hunter"],
+      "stat_shards": ["Attack Speed", "Adaptive Force", "Health"],
+      "spell1": "Ghost"
+    },
+    "middle": {
+      "starting_items": [{"id": 1056, "name": "Doran's Ring"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3020, "name": "Sorcerer's Shoes"},
+      "core_items": [
+        {"id": 6655, "name": "Luden's Companion"},
+        {"id": 4645, "name": "Shadowflame"},
+        {"id": 3089, "name": "Rabadon's Deathcap"}
+      ],
+      "situational_pool": [
+        {"id": 3157, "name": "Zhonya's Hourglass", "description": "Invulnerability active, armor"},
+        {"id": 3135, "name": "Void Staff", "description": "40% magic penetration"},
+        {"id": 3102, "name": "Banshee's Veil", "description": "Magic damage spell shield"}
+      ],
+      "items": [
+        {"id": 3020, "name": "Sorcerer's Shoes"},
+        {"id": 6655, "name": "Luden's Companion"},
+        {"id": 4645, "name": "Shadowflame"},
+        {"id": 3089, "name": "Rabadon's Deathcap"},
+        {"id": 3157, "name": "Zhonya's Hourglass"},
+        {"id": 3135, "name": "Void Staff"}
+      ],
+      "keystone": "Electrocute",
+      "primary_runes": ["Taste of Blood", "Eyeball Collection", "Ultimate Hunter"],
+      "secondary_style": "Sorcery",
+      "secondary_runes": ["Manaflow Band", "Gathering Storm"],
+      "stat_shards": ["Adaptive Force", "Adaptive Force", "Health"],
+      "spell1": "Heal"
+    },
+    "bottom": {
+      "starting_items": [{"id": 1055, "name": "Doran's Blade"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3006, "name": "Berserker's Greaves"},
+      "core_items": [
+        {"id": 6672, "name": "Kraken Slayer"},
+        {"id": 3031, "name": "Infinity Edge"},
+        {"id": 3036, "name": "Lord Dominik's Regards"}
+      ],
+      "situational_pool": [
+        {"id": 3072, "name": "Bloodthirster", "description": "Lifesteal and overheal shield"},
+        {"id": 3026, "name": "Guardian Angel", "description": "On-death revival shield"},
+        {"id": 3033, "name": "Mortal Reminder", "description": "Grievous wounds and armor pen"},
+        {"id": 3156, "name": "Maw of Malmortius", "description": "Magic damage shield, adaptive force"}
+      ],
+      "items": [
+        {"id": 3006, "name": "Berserker's Greaves"},
+        {"id": 6672, "name": "Kraken Slayer"},
+        {"id": 3031, "name": "Infinity Edge"},
+        {"id": 3036, "name": "Lord Dominik's Regards"},
+        {"id": 3072, "name": "Bloodthirster"},
+        {"id": 3026, "name": "Guardian Angel"},
+        {"id": 3033, "name": "Mortal Reminder"}
+      ],
+      "keystone": "Lethal Tempo",
+      "primary_runes": ["Triumph", "Legend: Alacrity", "Coup de Grace"],
+      "secondary_style": "Sorcery",
+      "secondary_runes": ["Absolute Focus", "Gathering Storm"],
+      "stat_shards": ["Attack Speed", "Adaptive Force", "Health"],
+      "spell1": "Heal"
+    },
+    "utility": {
+      "starting_items": [{"id": 3865, "name": "World Atlas"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3158, "name": "Ionian Boots of Lucidity"},
+      "core_items": [
+        {"id": 3190, "name": "Locket of the Iron Solari"},
+        {"id": 3107, "name": "Redemption"},
+        {"id": 3109, "name": "Knight's Vow"}
+      ],
+      "situational_pool": [
+        {"id": 3222, "name": "Mikael's Blessing", "description": "Removes CC from ally, heals"},
+        {"id": 3504, "name": "Ardent Censer", "description": "Empowers ally heals/shields with AS"},
+        {"id": 3190, "name": "Locket of the Iron Solari", "description": "Team shield active"}
+      ],
+      "items": [
+        {"id": 3158, "name": "Ionian Boots of Lucidity"},
+        {"id": 3190, "name": "Locket of the Iron Solari"},
+        {"id": 3107, "name": "Redemption"},
+        {"id": 3109, "name": "Knight's Vow"},
+        {"id": 3222, "name": "Mikael's Blessing"},
+        {"id": 3504, "name": "Ardent Censer"}
+      ],
+      "keystone": "Guardian",
+      "primary_runes": ["Font of Life", "Bone Plating", "Revitalize"],
+      "secondary_style": "Inspiration",
+      "secondary_runes": ["Biscuit Delivery", "Cosmic Insight"],
+      "stat_shards": ["Ability Haste", "Health Scaling", "Health"],
+      "spell1": "Heal"
+    }
+  },
+  "champions": {
+    "Aatrox|top": {
+      "starting_items": [{"id": 1055, "name": "Doran's Blade"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3047, "name": "Plated Steelcaps"},
+      "core_items": [
+        {"id": 6630, "name": "Eclipse"},
+        {"id": 3071, "name": "Black Cleaver"},
+        {"id": 3053, "name": "Sterak's Gage"}
+      ],
+      "situational_pool": [
+        {"id": 3065, "name": "Spirit Visage", "description": "Magic resist, amplifies Aatrox passive healing"},
+        {"id": 3026, "name": "Guardian Angel", "description": "On-death revival shield"},
+        {"id": 3033, "name": "Mortal Reminder", "description": "Grievous wounds vs heavy enemy healing"}
+      ],
+      "items": [
+        {"id": 3047, "name": "Plated Steelcaps"},
+        {"id": 6630, "name": "Eclipse"},
+        {"id": 3071, "name": "Black Cleaver"},
+        {"id": 3053, "name": "Sterak's Gage"},
+        {"id": 3065, "name": "Spirit Visage"},
+        {"id": 3026, "name": "Guardian Angel"}
+      ],
+      "keystone": "Conqueror",
+      "primary_runes": ["Triumph", "Legend: Alacrity", "Last Stand"],
+      "secondary_style": "Resolve",
+      "secondary_runes": ["Second Wind", "Revitalize"],
+      "stat_shards": ["Adaptive Force", "Adaptive Force", "Health"],
+      "spell1": "Ghost"
+    },
+    "Darius|top": {
+      "starting_items": [{"id": 1055, "name": "Doran's Blade"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3047, "name": "Plated Steelcaps"},
+      "core_items": [
+        {"id": 6631, "name": "Stridebreaker"},
+        {"id": 3053, "name": "Sterak's Gage"},
+        {"id": 3071, "name": "Black Cleaver"}
+      ],
+      "situational_pool": [
+        {"id": 3742, "name": "Dead Man's Plate", "description": "Armor and slow on charged hit"},
+        {"id": 3065, "name": "Spirit Visage", "description": "Magic resist and bonus healing"},
+        {"id": 3033, "name": "Mortal Reminder", "description": "Grievous wounds and armor pen"}
+      ],
+      "items": [
+        {"id": 3047, "name": "Plated Steelcaps"},
+        {"id": 6631, "name": "Stridebreaker"},
+        {"id": 3053, "name": "Sterak's Gage"},
+        {"id": 3071, "name": "Black Cleaver"},
+        {"id": 3742, "name": "Dead Man's Plate"},
+        {"id": 3065, "name": "Spirit Visage"}
+      ],
+      "keystone": "Conqueror",
+      "primary_runes": ["Triumph", "Legend: Alacrity", "Last Stand"],
+      "secondary_style": "Resolve",
+      "secondary_runes": ["Second Wind", "Unflinching"],
+      "stat_shards": ["Adaptive Force", "Adaptive Force", "Health"],
+      "spell1": "Ghost"
+    },
+    "Lee Sin|jungle": {
+      "starting_items": [{"id": 1103, "name": "Mosstomper Seedling"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3047, "name": "Plated Steelcaps"},
+      "core_items": [
+        {"id": 6630, "name": "Eclipse"},
+        {"id": 3071, "name": "Black Cleaver"},
+        {"id": 3053, "name": "Sterak's Gage"}
+      ],
+      "situational_pool": [
+        {"id": 3026, "name": "Guardian Angel", "description": "On-death revival shield"},
+        {"id": 3065, "name": "Spirit Visage", "description": "Magic resist and bonus healing"},
+        {"id": 3036, "name": "Lord Dominik's Regards", "description": "35% armor pen vs high HP"}
+      ],
+      "items": [
+        {"id": 3047, "name": "Plated Steelcaps"},
+        {"id": 6630, "name": "Eclipse"},
+        {"id": 3071, "name": "Black Cleaver"},
+        {"id": 3053, "name": "Sterak's Gage"},
+        {"id": 3026, "name": "Guardian Angel"},
+        {"id": 3065, "name": "Spirit Visage"}
+      ],
+      "keystone": "Conqueror",
+      "primary_runes": ["Triumph", "Legend: Alacrity", "Last Stand"],
+      "secondary_style": "Domination",
+      "secondary_runes": ["Sudden Impact", "Treasure Hunter"],
+      "stat_shards": ["Adaptive Force", "Adaptive Force", "Health"],
+      "spell1": "Ghost"
+    },
+    "Ahri|middle": {
+      "starting_items": [{"id": 1056, "name": "Doran's Ring"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3020, "name": "Sorcerer's Shoes"},
+      "core_items": [
+        {"id": 6653, "name": "Liandry's Torment"},
+        {"id": 4645, "name": "Shadowflame"},
+        {"id": 3089, "name": "Rabadon's Deathcap"}
+      ],
+      "situational_pool": [
+        {"id": 3157, "name": "Zhonya's Hourglass", "description": "Invulnerability active, armor"},
+        {"id": 3135, "name": "Void Staff", "description": "40% magic penetration"},
+        {"id": 3102, "name": "Banshee's Veil", "description": "Magic damage spell shield"}
+      ],
+      "items": [
+        {"id": 3020, "name": "Sorcerer's Shoes"},
+        {"id": 6653, "name": "Liandry's Torment"},
+        {"id": 4645, "name": "Shadowflame"},
+        {"id": 3089, "name": "Rabadon's Deathcap"},
+        {"id": 3157, "name": "Zhonya's Hourglass"},
+        {"id": 3135, "name": "Void Staff"}
+      ],
+      "keystone": "Electrocute",
+      "primary_runes": ["Taste of Blood", "Eyeball Collection", "Ultimate Hunter"],
+      "secondary_style": "Sorcery",
+      "secondary_runes": ["Manaflow Band", "Transcendence"],
+      "stat_shards": ["Adaptive Force", "Adaptive Force", "Health"],
+      "spell1": "Heal"
+    },
+    "Zed|middle": {
+      "starting_items": [{"id": 1055, "name": "Doran's Blade"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3158, "name": "Ionian Boots of Lucidity"},
+      "core_items": [
+        {"id": 6630, "name": "Eclipse"},
+        {"id": 3142, "name": "Youmuu's Ghostblade"},
+        {"id": 6694, "name": "Serylda's Grudge"}
+      ],
+      "situational_pool": [
+        {"id": 3814, "name": "Edge of Night", "description": "Magic damage barrier and lethality"},
+        {"id": 3026, "name": "Guardian Angel", "description": "On-death revival shield"},
+        {"id": 6695, "name": "Serpent's Fang", "description": "Reduces enemy shields"}
+      ],
+      "items": [
+        {"id": 3158, "name": "Ionian Boots of Lucidity"},
+        {"id": 6630, "name": "Eclipse"},
+        {"id": 3142, "name": "Youmuu's Ghostblade"},
+        {"id": 6694, "name": "Serylda's Grudge"},
+        {"id": 3814, "name": "Edge of Night"},
+        {"id": 3026, "name": "Guardian Angel"}
+      ],
+      "keystone": "Electrocute",
+      "primary_runes": ["Sudden Impact", "Eyeball Collection", "Ultimate Hunter"],
+      "secondary_style": "Precision",
+      "secondary_runes": ["Presence of Mind", "Coup de Grace"],
+      "stat_shards": ["Adaptive Force", "Adaptive Force", "Health"],
+      "spell1": "Heal"
+    },
+    "Jinx|bottom": {
+      "starting_items": [{"id": 1055, "name": "Doran's Blade"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3006, "name": "Berserker's Greaves"},
+      "core_items": [
+        {"id": 6672, "name": "Kraken Slayer"},
+        {"id": 3046, "name": "Phantom Dancer"},
+        {"id": 3031, "name": "Infinity Edge"}
+      ],
+      "situational_pool": [
+        {"id": 3036, "name": "Lord Dominik's Regards", "description": "35% armor pen vs high HP"},
+        {"id": 3072, "name": "Bloodthirster", "description": "Lifesteal and overheal shield"},
+        {"id": 3026, "name": "Guardian Angel", "description": "On-death revival shield"},
+        {"id": 3033, "name": "Mortal Reminder", "description": "Grievous wounds and armor pen"}
+      ],
+      "items": [
+        {"id": 3006, "name": "Berserker's Greaves"},
+        {"id": 6672, "name": "Kraken Slayer"},
+        {"id": 3046, "name": "Phantom Dancer"},
+        {"id": 3031, "name": "Infinity Edge"},
+        {"id": 3036, "name": "Lord Dominik's Regards"},
+        {"id": 3072, "name": "Bloodthirster"},
+        {"id": 3026, "name": "Guardian Angel"}
+      ],
+      "keystone": "Lethal Tempo",
+      "primary_runes": ["Triumph", "Legend: Alacrity", "Coup de Grace"],
+      "secondary_style": "Sorcery",
+      "secondary_runes": ["Celerity", "Gathering Storm"],
+      "stat_shards": ["Attack Speed", "Adaptive Force", "Health"],
+      "spell1": "Heal"
+    },
+    "Caitlyn|bottom": {
+      "starting_items": [{"id": 1055, "name": "Doran's Blade"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3006, "name": "Berserker's Greaves"},
+      "core_items": [
+        {"id": 3142, "name": "Youmuu's Ghostblade"},
+        {"id": 3031, "name": "Infinity Edge"},
+        {"id": 3036, "name": "Lord Dominik's Regards"}
+      ],
+      "situational_pool": [
+        {"id": 3033, "name": "Mortal Reminder", "description": "Grievous wounds and armor pen"},
+        {"id": 3026, "name": "Guardian Angel", "description": "On-death revival shield"},
+        {"id": 3072, "name": "Bloodthirster", "description": "Lifesteal and overheal shield"},
+        {"id": 3046, "name": "Phantom Dancer", "description": "Attack speed and extra MS for kiting"}
+      ],
+      "items": [
+        {"id": 3006, "name": "Berserker's Greaves"},
+        {"id": 3142, "name": "Youmuu's Ghostblade"},
+        {"id": 3031, "name": "Infinity Edge"},
+        {"id": 3036, "name": "Lord Dominik's Regards"},
+        {"id": 3033, "name": "Mortal Reminder"},
+        {"id": 3026, "name": "Guardian Angel"},
+        {"id": 3072, "name": "Bloodthirster"}
+      ],
+      "keystone": "Fleet Footwork",
+      "primary_runes": ["Presence of Mind", "Legend: Alacrity", "Cut Down"],
+      "secondary_style": "Inspiration",
+      "secondary_runes": ["Magical Footwear", "Biscuit Delivery"],
+      "stat_shards": ["Attack Speed", "Adaptive Force", "Health"],
+      "spell1": "Heal"
+    },
+    "Thresh|utility": {
+      "starting_items": [{"id": 3865, "name": "World Atlas"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3111, "name": "Mercury's Treads"},
+      "core_items": [
+        {"id": 3190, "name": "Locket of the Iron Solari"},
+        {"id": 3109, "name": "Knight's Vow"},
+        {"id": 3107, "name": "Redemption"}
+      ],
+      "situational_pool": [
+        {"id": 3050, "name": "Zeke's Convergence", "description": "Empowers nearby ally with slows on ult"},
+        {"id": 3075, "name": "Thornmail", "description": "Reflects damage, applies Grievous Wounds"},
+        {"id": 3222, "name": "Mikael's Blessing", "description": "Removes CC from ally, heals"}
+      ],
+      "items": [
+        {"id": 3111, "name": "Mercury's Treads"},
+        {"id": 3190, "name": "Locket of the Iron Solari"},
+        {"id": 3109, "name": "Knight's Vow"},
+        {"id": 3107, "name": "Redemption"},
+        {"id": 3050, "name": "Zeke's Convergence"},
+        {"id": 3075, "name": "Thornmail"}
+      ],
+      "keystone": "Aftershock",
+      "primary_runes": ["Font of Life", "Bone Plating", "Unflinching"],
+      "secondary_style": "Inspiration",
+      "secondary_runes": ["Biscuit Delivery", "Cosmic Insight"],
+      "stat_shards": ["Ability Haste", "Health Scaling", "Health"],
+      "spell1": "Exhaust"
+    },
+    "Lulu|utility": {
+      "starting_items": [{"id": 3865, "name": "World Atlas"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3158, "name": "Ionian Boots of Lucidity"},
+      "core_items": [
+        {"id": 6617, "name": "Moonstone Renewer"},
+        {"id": 3504, "name": "Ardent Censer"},
+        {"id": 3107, "name": "Redemption"}
+      ],
+      "situational_pool": [
+        {"id": 3222, "name": "Mikael's Blessing", "description": "Removes CC from ally, heals"},
+        {"id": 3190, "name": "Locket of the Iron Solari", "description": "Team shield active"},
+        {"id": 3157, "name": "Zhonya's Hourglass", "description": "Invulnerability active to survive dives"}
+      ],
+      "items": [
+        {"id": 3158, "name": "Ionian Boots of Lucidity"},
+        {"id": 6617, "name": "Moonstone Renewer"},
+        {"id": 3504, "name": "Ardent Censer"},
+        {"id": 3107, "name": "Redemption"},
+        {"id": 3222, "name": "Mikael's Blessing"},
+        {"id": 3190, "name": "Locket of the Iron Solari"}
+      ],
+      "keystone": "Summon Aery",
+      "primary_runes": ["Manaflow Band", "Transcendence", "Scorch"],
+      "secondary_style": "Resolve",
+      "secondary_runes": ["Font of Life", "Revitalize"],
+      "stat_shards": ["Ability Haste", "Health Scaling", "Health"],
+      "spell1": "Exhaust"
+    },
+    "Garen|top": {
+      "starting_items": [{"id": 1055, "name": "Doran's Blade"}, {"id": 2003, "name": "Health Potion"}],
+      "boots": {"id": 3047, "name": "Plated Steelcaps"},
+      "core_items": [
+        {"id": 6631, "name": "Stridebreaker"},
+        {"id": 3053, "name": "Sterak's Gage"},
+        {"id": 3065, "name": "Spirit Visage"}
+      ],
+      "situational_pool": [
+        {"id": 3742, "name": "Dead Man's Plate", "description": "Armor and slow on charged hit"},
+        {"id": 3033, "name": "Mortal Reminder", "description": "Grievous wounds and armor pen"},
+        {"id": 3071, "name": "Black Cleaver", "description": "Armor shred on repeated hits"}
+      ],
+      "items": [
+        {"id": 3047, "name": "Plated Steelcaps"},
+        {"id": 6631, "name": "Stridebreaker"},
+        {"id": 3053, "name": "Sterak's Gage"},
+        {"id": 3065, "name": "Spirit Visage"},
+        {"id": 3742, "name": "Dead Man's Plate"},
+        {"id": 3033, "name": "Mortal Reminder"}
+      ],
+      "keystone": "Conqueror",
+      "primary_runes": ["Triumph", "Legend: Alacrity", "Last Stand"],
+      "secondary_style": "Sorcery",
+      "secondary_runes": ["Nimbus Cloak", "Celerity"],
+      "stat_shards": ["Adaptive Force", "Adaptive Force", "Health"],
+      "spell1": "Ghost"
+    }
+  }
+}

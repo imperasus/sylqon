@@ -1,0 +1,20 @@
+# Build-time dependencies for packaging the Sylqon backend into a standalone
+# executable. Install into the Python env used for `npm run build:backend`:
+#
+#   pip install -r sylqon-desktop/backend/requirements-build.txt
+#
+# Pinned to the versions verified during development.
+
+# Base runtime (mirrors ../../requirements.txt)
+requests>=2.31
+urllib3>=2.0
+websocket-client>=1.7
+SQLAlchemy>=2.0
+
+# Web server stack (not pinned in the base requirements.txt, but required)
+fastapi==0.115.12
+uvicorn[standard]==0.34.3
+pydantic==2.8.2
+
+# Packaging tool
+pyinstaller==6.12.0
