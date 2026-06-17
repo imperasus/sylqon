@@ -58,6 +58,8 @@ class MatchContext:
     allies: list[ChampPick]            # team-mates excluding the local player
     fingerprint: str
     bans: list[int] = field(default_factory=list)   # champion ids banned by both teams
+    # Per-team ban slots in draft order, display-ready (see ``parse_bans``).
+    ban_slots: dict = field(default_factory=lambda: {"ally": [], "enemy": []})
     enemy_picks_after_me: int = 0      # enemy pick actions still to come after ours
     ally_picks_after_me: int = 0       # ally pick actions still to come after ours
     is_last_pick: bool = False         # our pick is the last one in the draft order
@@ -80,19 +82,40 @@ class MatchContext:
         ])
 
     def team_threat_summary(self) -> dict:
-        ad = sum(1 for e in self.enemies if e.damage_type == "AD")
-        ap = sum(1 for e in self.enemies if e.damage_type == "AP")
-        return {
-            "physical_threats": ad,
-            "magic_threats": ap,
-            "mixed_threats": len(self.enemies) - ad - ap,
-            "heavy_cc_count": sum(1 for e in self.enemies if "heavy_cc" in e.threats),
-            "suppression": any("suppression" in e.threats for e in self.enemies),
-            "burst_ad": any("burst_ad" in e.threats for e in self.enemies),
-            "burst_ap": any("burst_ap" in e.threats for e in self.enemies),
-            "heavy_healing": any("heavy_healing" in e.threats for e in self.enemies),
-            "tanks": sum(1 for e in self.enemies if "tank" in e.threats),
-        }
+        return summarize_team(self.enemies)
+
+
+def summarize_team(picks) -> dict:
+    """Aggregate the damage / threat profile of a list of picks. Accepts either
+    ``ChampPick`` instances or the plain dict shape ``{tags, threats,
+    damage_type}`` so a synthesised pick (e.g. the local player) can be folded
+    in. Superset of the original enemy threat summary — adds a ``frontline``
+    count that drives the live-draft structure warnings."""
+    picks = [p for p in picks if p]
+
+    def tags_of(p) -> set:
+        return set(p["tags"] if isinstance(p, dict) else p.tags)
+
+    def threats_of(p) -> set:
+        return set(p["threats"] if isinstance(p, dict) else p.threats)
+
+    def dmg_of(p) -> str:
+        return p["damage_type"] if isinstance(p, dict) else p.damage_type
+
+    ad = sum(1 for p in picks if dmg_of(p) == "AD")
+    ap = sum(1 for p in picks if dmg_of(p) == "AP")
+    return {
+        "physical_threats": ad,
+        "magic_threats": ap,
+        "mixed_threats": len(picks) - ad - ap,
+        "heavy_cc_count": sum(1 for p in picks if "heavy_cc" in threats_of(p)),
+        "suppression": any("suppression" in threats_of(p) for p in picks),
+        "burst_ad": any("burst_ad" in threats_of(p) for p in picks),
+        "burst_ap": any("burst_ap" in threats_of(p) for p in picks),
+        "heavy_healing": any("heavy_healing" in threats_of(p) for p in picks),
+        "tanks": sum(1 for p in picks if "tank" in threats_of(p)),
+        "frontline": sum(1 for p in picks if tags_of(p) & {"Tank", "Fighter"}),
+    }
 
 
 def _damage_type(info: dict | None) -> str:
@@ -176,6 +199,43 @@ def _banned_champions(session: dict) -> list[int]:
     return out
 
 
+def _action_team(action: dict, ally_cells: set[int]) -> str:
+    """Which side an action belongs to. Prefer the client's own ``isAllyAction``
+    flag; fall back to mapping the actor cell onto our team."""
+    if "isAllyAction" in action:
+        return "ally" if action.get("isAllyAction") else "enemy"
+    return "ally" if action.get("actorCellId") in ally_cells else "enemy"
+
+
+def parse_bans(session: dict, catalog: Catalog) -> dict:
+    """Per-team ban slots in draft order, ready for the dashboard.
+
+    Returns ``{"ally": [...], "enemy": [...]}`` where each slot is either a
+    revealed ban ``{champion_id, name, slug, revealed: True}`` or a placeholder
+    ``{revealed: False}`` for a pending or hidden (hovered) ban. The slot count
+    per team is whatever the queue exposes via its ban actions, so non-draft
+    modes simply yield empty lists — no hard-coded ban count."""
+    ally_cells = {p.get("cellId") for p in session.get("myTeam", [])}
+    out: dict[str, list[dict]] = {"ally": [], "enemy": []}
+    for group in session.get("actions", []):
+        for a in group:
+            if a.get("type") != "ban":
+                continue
+            team = _action_team(a, ally_cells)
+            cid = a.get("championId") or 0
+            if a.get("completed") and cid:
+                info = catalog.champion_by_key(cid) or {}
+                out[team].append({
+                    "champion_id": cid,
+                    "name": info.get("name", ""),
+                    "slug": info.get("id", ""),
+                    "revealed": True,
+                })
+            else:
+                out[team].append({"revealed": False})
+    return out
+
+
 def _pick_timing(session: dict, cell_id: int) -> tuple[int, int, bool]:
     """How many enemy / ally pick actions still come *after* ours in draft order,
     and whether ours is the very last pick. Drives counter-pick advice: a last
@@ -230,6 +290,12 @@ def display_signature(session: dict) -> str:
                 parts.append(f'{a.get("actorCellId")}='
                              f'{int(bool(a.get("completed")))}'
                              f'{int(bool(a.get("isInProgress")))}')
+            elif a.get("type") == "ban":
+                # Bans must move the signature too, otherwise a completed ban is
+                # discarded as a timer tick and never reaches the live board.
+                parts.append(f'b{a.get("actorCellId")}='
+                             f'{a.get("championId", 0)}:'
+                             f'{int(bool(a.get("completed")))}')
     parts.append(str(int(bool(((session.get("timer") or {})
                                .get("phase")) == "FINALIZATION"))))
     return "|".join(parts)
@@ -290,6 +356,7 @@ def read_match_context(client: LCUClient, catalog: Catalog,
     all_locked = _all_players_locked(session)
     my_turn = _is_my_turn(session, cell_id)
     bans = _banned_champions(session)
+    ban_slots = parse_bans(session, catalog)
     enemy_after, ally_after, is_last = _pick_timing(session, cell_id)
     fp_raw = (f'{session.get("gameId", 0)}|{my_champion_id}|{my_role}|'
               f'{int(all_locked)}|'
@@ -307,6 +374,7 @@ def read_match_context(client: LCUClient, catalog: Catalog,
         allies=allies,
         fingerprint=hashlib.sha1(fp_raw.encode()).hexdigest(),
         bans=bans,
+        ban_slots=ban_slots,
         enemy_picks_after_me=enemy_after,
         ally_picks_after_me=ally_after,
         is_last_pick=is_last,
