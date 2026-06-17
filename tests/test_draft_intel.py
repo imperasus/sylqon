@@ -15,7 +15,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sylqon.analysis import draft_intel
 from sylqon.lcu.lobby import (
     ChampPick, MatchContext, _banned_champions, _pick_timing,
+    display_signature, parse_bans,
 )
+
+
+class _Catalog:
+    """Minimal catalog stub: champion id -> {name, id(slug)}."""
+
+    def __init__(self, by_key):
+        self._by_key = by_key
+
+    def champion_by_key(self, cid):
+        return self._by_key.get(cid)
 
 
 def _pick(name, *, side="enemy", role="middle", dmg="AP", tags=(), threats=()):
@@ -128,3 +139,56 @@ def test_pick_timing_last_pick():
     enemy_after, _, is_last = _pick_timing(session, cell_id=0)
     assert enemy_after == 0
     assert is_last is True
+
+
+# -- bans (per-team, slot/placeholder aware) ---------------------------------
+def _ban_session():
+    return {
+        "myTeam": [{"cellId": 0}, {"cellId": 1}],
+        "actions": [
+            [{"type": "ban", "completed": True, "championId": 21, "isAllyAction": True}],
+            [{"type": "ban", "completed": True, "championId": 54, "isAllyAction": False}],
+            [{"type": "ban", "completed": False, "championId": 0, "isAllyAction": True}],   # pending
+            [{"type": "ban", "completed": False, "championId": 0, "isAllyAction": False}],  # hidden hover
+        ],
+    }
+
+
+def test_parse_bans_splits_teams_and_reveals():
+    catalog = _Catalog({21: {"name": "Miss Fortune", "id": "MissFortune"},
+                        54: {"name": "Malphite", "id": "Malphite"}})
+    bans = parse_bans(_ban_session(), catalog)
+    assert [b.get("name") for b in bans["ally"] if b["revealed"]] == ["Miss Fortune"]
+    assert [b.get("name") for b in bans["enemy"] if b["revealed"]] == ["Malphite"]
+    # one revealed + one placeholder per team, in draft order
+    assert [b["revealed"] for b in bans["ally"]] == [True, False]
+    assert [b["revealed"] for b in bans["enemy"]] == [True, False]
+
+
+def test_parse_bans_falls_back_to_cell_mapping():
+    """Without isAllyAction, actor cells decide the side."""
+    session = {
+        "myTeam": [{"cellId": 0}],
+        "actions": [[{"type": "ban", "completed": True, "championId": 7, "actorCellId": 0}]],
+    }
+    bans = parse_bans(session, _Catalog({7: {"name": "LeBlanc", "id": "Leblanc"}}))
+    assert bans["ally"][0]["name"] == "LeBlanc"
+    assert bans["enemy"] == []
+
+
+def test_parse_bans_empty_when_no_bans():
+    assert parse_bans({"myTeam": [], "actions": []}, _Catalog({})) == {"ally": [], "enemy": []}
+
+
+# -- display signature must react to bans (real-time gate) -------------------
+def test_display_signature_moves_when_ban_completes():
+    base = {
+        "localPlayerCellId": 0,
+        "myTeam": [{"cellId": 0, "championId": 0}],
+        "theirTeam": [],
+        "actions": [[{"type": "ban", "actorCellId": 5, "championId": 0, "completed": False}]],
+    }
+    before = display_signature(base)
+    after = dict(base)
+    after["actions"] = [[{"type": "ban", "actorCellId": 5, "championId": 54, "completed": True}]]
+    assert display_signature(after) != before

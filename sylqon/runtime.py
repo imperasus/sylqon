@@ -106,6 +106,25 @@ def _spell_brief(name: str) -> dict | None:
     return {"name": name, "category": info[0], "description": info[1]}
 
 
+def _archetypes(pick) -> list[str]:
+    """Quick role-archetype tags for a pick (reusing the recommender's
+    predicates) — a glanceable read of what the champion brings to the comp."""
+    from sylqon.ai.pick_prompt import _is_enchanter, _is_engage, _is_frontline
+    threats = set(pick.threats)
+    out: list[str] = []
+    if _is_engage(pick):
+        out.append("Engage")
+    elif _is_frontline(pick):
+        out.append("Frontline")
+    if _is_enchanter(pick):
+        out.append("Enchanter")
+    if "poke" in threats:
+        out.append("Poke")
+    if (threats & {"burst_ad", "burst_ap"}) and not _is_frontline(pick):
+        out.append("Burst")
+    return out[:2]
+
+
 def serialize_enemy(e: EnemyProfile, catalog: Catalog) -> dict:
     info = catalog.champion_by_key(e.champion_id) or {}
     return {
@@ -118,6 +137,7 @@ def serialize_enemy(e: EnemyProfile, catalog: Catalog) -> dict:
         "damage_type": e.damage_type,
         "tags": e.tags,
         "threats": e.threats,
+        "archetypes": _archetypes(e),
         "spells": [s for s in (_spell_brief(e.spell1), _spell_brief(e.spell2)) if s],
     }
 
@@ -590,6 +610,19 @@ class PipelineRunner:
     # ------------------------------------------------------------- compile
     def _publish_lobby(self, ctx: MatchContext, demo: bool) -> None:
         my_info = self.catalog.champion_by_key(ctx.my_champion_id) or {}
+        counters, synergies = self._pick_intel(ctx)
+        enemies = []
+        for e in ctx.enemies:
+            d = serialize_enemy(e, self.catalog)
+            if e.locked and counters.get(e.champion_id):
+                d["counters"] = counters[e.champion_id]
+            enemies.append(d)
+        allies = []
+        for a in ctx.allies:
+            d = serialize_enemy(a, self.catalog)
+            if a.locked and synergies.get(a.champion_id):
+                d["synergies"] = synergies[a.champion_id]
+            allies.append(d)
         self.state.set("lobby", {
             "my_champion": ctx.my_champion,
             "my_slug": my_info.get("id", ""),
@@ -597,9 +630,11 @@ class PipelineRunner:
             "locked": ctx.locked,
             "all_locked": ctx.all_locked,
             "my_turn": ctx.my_turn,
-            "enemies": [serialize_enemy(e, self.catalog) for e in ctx.enemies],
-            "allies": [serialize_enemy(a, self.catalog) for a in ctx.allies],
+            "enemies": enemies,
+            "allies": allies,
+            "bans": ctx.ban_slots,
             "threat_summary": ctx.team_threat_summary(),
+            "ally_summary": self._ally_summary(ctx),
         })
         self.state.set("demo", demo)
         self.last_ctx = ctx
@@ -608,6 +643,65 @@ class PipelineRunner:
         except Exception:
             log.debug("Draft-intel computation failed", exc_info=True)
             self.state.set("draft_intel", None)
+
+    def _pick_intel(self, ctx: MatchContext) -> tuple[dict, dict]:
+        """Per-locked-pick Top-3 lists: counters for each revealed enemy and
+        synergies for each locked ally, drawn from the player's role pool. Tag
+        heuristic floor + optional op.gg DB booster (same pool the recommender
+        uses, minus anything already taken or banned). Returns
+        ``({enemy_id: [...]}, {ally_id: [...]})``; best-effort, never raises."""
+        try:
+            from sylqon.ai.pick_prompt import build_candidates
+            from sylqon.analysis import pairwise
+            pool = self.store.champions_for_role(ctx.my_role)
+            candidates = build_candidates(ctx, pool, self.catalog)
+            excluded = ({ctx.my_champion}
+                        | {self.catalog.champion_name(cid) for cid in ctx.bans})
+            candidates = [c for c in candidates if c["name"] not in excluded]
+            for c in candidates:
+                c["slug"] = (self.catalog.champion_by_name(c["name"]) or {}).get("id", "")
+            if not candidates:
+                return {}, {}
+        except Exception:
+            log.debug("pick-intel candidate build failed", exc_info=True)
+            return {}, {}
+
+        session = None
+        try:
+            from sylqon.db.session import get_session
+            session = get_session()
+        except Exception:
+            session = None
+        try:
+            counters = {
+                e.champion_id: pairwise.rank_counters_for_enemy(
+                    e, candidates, session=session, role=ctx.my_role)
+                for e in ctx.enemies if e.locked
+            }
+            synergies = {
+                a.champion_id: pairwise.rank_synergies_for_ally(
+                    a, candidates, session=session, role=ctx.my_role)
+                for a in ctx.allies if a.locked
+            }
+        except Exception:
+            log.debug("pick-intel ranking failed", exc_info=True)
+            counters, synergies = {}, {}
+        finally:
+            if session is not None:
+                session.close()
+        return counters, synergies
+
+    def _ally_summary(self, ctx: MatchContext) -> dict:
+        """Damage / threat profile of the player's own team (allies + the local
+        champion), mirroring the enemy threat summary for an at-a-glance read."""
+        from sylqon.lcu.lobby import _damage_type, _threats, summarize_team
+        team = list(ctx.allies)
+        if ctx.my_champion_id:
+            mi = self.catalog.champion_by_key(ctx.my_champion_id) or {}
+            team.append({"damage_type": _damage_type(mi),
+                         "threats": _threats(ctx.my_champion),
+                         "tags": mi.get("tags", [])})
+        return summarize_team(team)
 
     # --------------------------------------------------------- draft intel
     def _draft_intel(self, ctx: MatchContext) -> dict:

@@ -35,6 +35,17 @@ def ids_for_names(session: Session, names: list) -> list[int]:
     return out
 
 
+def champion_ids_by_name(session: Session, names: list) -> dict[str, int]:
+    """``{display_name: champion_id}`` for the given names (unknowns dropped).
+    Unlike :func:`ids_for_names` this preserves the name → id mapping the
+    pairwise rankers need to attribute DB scores back to candidates."""
+    wanted = [str(n) for n in names if n]
+    if not wanted:
+        return {}
+    rows = session.query(Champion).filter(Champion.name.in_(wanted)).all()
+    return {c.name: c.id for c in rows}
+
+
 def champions_for_role(session: Session, role: str) -> list[Champion]:
     """Every champion that can play ``role`` (per op.gg lane-meta, stored in
     ``Champion.roles``)."""
@@ -75,6 +86,44 @@ def synergy_map(session: Session, champion_id: int, role: str,
         .all()
     )
     return {r.synergy_id: r.synergy_score for r in rows}
+
+
+def counters_against(session: Session, enemy_id: int, role: str,
+                     champion_ids: list[int]) -> dict[int, float]:
+    """``{champion_id: advantage_score}`` — how each of ``champion_ids`` fares vs
+    ``enemy_id`` in ``role`` (positive = beats the enemy). The inverse view of
+    :func:`counter_map`: fix the enemy, rank a set of would-be counters. Missing
+    pairs are simply absent (callers treat them as neutral)."""
+    if not enemy_id or not champion_ids:
+        return {}
+    rows = (
+        session.query(ChampionCounter)
+        .filter(
+            ChampionCounter.role == role,
+            ChampionCounter.counter_id == enemy_id,
+            ChampionCounter.champion_id.in_(list(champion_ids)),
+        )
+        .all()
+    )
+    return {r.champion_id: r.advantage_score for r in rows}
+
+
+def synergies_with(session: Session, ally_id: int, role: str,
+                   champion_ids: list[int]) -> dict[int, float]:
+    """``{champion_id: synergy_score}`` — synergy of each of ``champion_ids`` with
+    ``ally_id`` in ``role`` (0..10). The inverse view of :func:`synergy_map`."""
+    if not ally_id or not champion_ids:
+        return {}
+    rows = (
+        session.query(ChampionSynergy)
+        .filter(
+            ChampionSynergy.role == role,
+            ChampionSynergy.synergy_id == ally_id,
+            ChampionSynergy.champion_id.in_(list(champion_ids)),
+        )
+        .all()
+    )
+    return {r.champion_id: r.synergy_score for r in rows}
 
 
 def build_for(session: Session, champion_id: int, role: str) -> ChampionBuild | None:
