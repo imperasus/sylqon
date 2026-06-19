@@ -152,12 +152,53 @@ Respond with raw JSON only, exactly this shape:
 {json.dumps(schema)}"""
 
 
-def compile_universe_pick_prompt(ctx: MatchContext, candidates: list[dict]) -> str:
+def _scout_line(p: dict) -> str:
+    """One compact, deterministic line describing a scouted teammate."""
+    who = p.get("position") or p.get("main_role") or "flex"
+    name = p.get("name") or "ally"
+    bits = [f"- {who} {name}"]
+    tags = p.get("playstyle_tags") or []
+    if tags:
+        bits.append(", ".join(tags))
+    comfort = p.get("comfort")
+    if comfort and comfort.get("champion"):
+        bits.append(f"mains {comfort['champion']} "
+                    f"({round(comfort.get('share', 0) * 100)}% of games)")
+    form = p.get("recent_form") or {}
+    if form.get("games"):
+        streak = form.get("streak", 0)
+        run = (f", {abs(streak)}{'W' if streak > 0 else 'L'} streak"
+               if abs(streak) >= 3 else "")
+        bits.append(f"recent {round(form.get('win_rate', 0) * 100)}% "
+                    f"over {form['games']}{run}")
+    return ": ".join([bits[0], "; ".join(bits[1:])]) if len(bits) > 1 else bits[0]
+
+
+def format_scout_block(scout_players: list[dict] | None) -> str:
+    """A 'TEAM SCOUT' block for teammates with a usable fingerprint, or '' when
+    there's nothing to show (no scout data / Ollama-independent — the prompt is
+    valid without it). Excludes the local player and anonymized/empty players."""
+    if not scout_players:
+        return ""
+    lines = [
+        _scout_line(p) for p in scout_players
+        if not p.get("hidden") and not p.get("is_self")
+        and p.get("games_analyzed")
+    ]
+    if not lines:
+        return ""
+    return ("\nTEAMMATE SCOUT (recent-form read of your allies — factor their "
+            "comfort and playstyle into synergy):\n" + "\n".join(lines) + "\n")
+
+
+def compile_universe_pick_prompt(ctx: MatchContext, candidates: list[dict],
+                                 scout_players: list[dict] | None = None) -> str:
     """Prompt Ollama to pick the single best champion for the role from the
     *whole available pool* (every pickable champion for the lane, not just the
     player's own pool), using the pre-computed 0-100 component scores. Each
     candidate is flagged in-pool / off-pool so the model can weigh the player's
-    comfort against a raw draft advantage."""
+    comfort against a raw draft advantage. ``scout_players`` (optional) adds a
+    teammate playstyle read; it is omitted entirely when unavailable."""
     cand_lines = []
     for c in candidates:
         ch = c["champion"]
@@ -180,7 +221,7 @@ def compile_universe_pick_prompt(ctx: MatchContext, candidates: list[dict]) -> s
 
 ALLIES ALREADY LOCKED (synergy):
 {ally_lines}
-
+{format_scout_block(scout_players)}
 ENEMIES REVEALED (counter these):
 {enemy_lines}
 

@@ -329,6 +329,14 @@ def scout(role: str = "bottom") -> dict:
     return runner.scout(role)
 
 
+@app.get("/api/scout/lobby")
+def scout_lobby() -> dict:
+    """Pre-game lobby scouting: per-teammate playstyle fingerprints (role,
+    champion pool, recent form, playstyle tags). ``ready`` is false until the
+    first roster is profiled; anonymized players appear as hidden cards."""
+    return runner.state.snapshot().get("scout") or {"players": [], "ready": False}
+
+
 @app.get("/api/champions")
 def list_champions() -> dict:
     """All champions (name/slug/tags) for the pool editor's picker."""

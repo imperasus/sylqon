@@ -26,8 +26,9 @@ from sylqon.analysis.scoring import ChampionScorer
 from sylqon.cache.store import MetaCache
 from sylqon.data import static
 from sylqon.data.catalog import Catalog
+from sylqon.lcu import scout as scout_mod
 from sylqon.lcu.client import LCUClient
-from sylqon.lcu.events import ChampSelectListener
+from sylqon.lcu.events import CHAMP_SELECT_TOPIC, LOBBY_TOPIC, LcuEventBus
 from sylqon.lcu.history import champion_stats
 from sylqon.lcu.injector import Injector, merge_stat_shards
 from sylqon.lcu.lobby import (
@@ -64,6 +65,7 @@ class AppState:
             "demo": False,
             "live": {"active": False},
             "overlay": {"active": False, "role": "", "missions": [], "game": {}},
+            "scout": {"players": [], "ready": False, "at": None},
         }
 
     def update(self, section: str, **fields) -> None:
@@ -169,7 +171,7 @@ class PipelineRunner:
         self.store = MetaCache()
         self.engine = OllamaEngine()
         self.client: LCUClient | None = None
-        self._listener: ChampSelectListener | None = None
+        self._event_bus: LcuEventBus | None = None
         self._summoner_id: int = 0
         self._compile_lock = threading.Lock()
         self._inject_lock = threading.Lock()
@@ -200,7 +202,12 @@ class PipelineRunner:
         self._last_display_sig: str | None = None
         self._last_trigger_sig: str | None = None
         self._champ_stats: dict[str, dict] = {}     # champion name -> {games, wins, win_rate}
-        self._scout_cache: dict[str, dict] = {}     # role -> scout result
+        self._scout_cache: dict[str, dict] = {}     # role -> scout result (meta scout)
+        # Pre-game lobby scouting: per-puuid playstyle fingerprints + a dedup
+        # signature so a static lobby/draft is only scouted once.
+        self._player_scout_cache: dict[str, dict] = {}   # puuid -> enriched fingerprint
+        self._last_scout_sig: str | None = None
+        self._scout_lock = threading.Lock()
         self._last_role_top: list[dict] = []        # universal role top-N for live draft
         logging.getLogger("sylqon").addHandler(StateLogHandler(self.state))
         self._bootstrap_if_empty()
@@ -231,7 +238,7 @@ class PipelineRunner:
 
     def stop(self) -> None:
         self._stop.set()
-        self._stop_listener()
+        self._stop_event_bus()
         self._stop_live_poller()
         self.stop_live_demo()
 
@@ -244,7 +251,7 @@ class PipelineRunner:
 
         if self.client is None or not self.client.is_alive():
             was_connected = self.client is not None
-            self._stop_listener()
+            self._stop_event_bus()
             self.client = LCUClient.connect()
             if self.client is None:
                 if was_connected:
@@ -277,52 +284,159 @@ class PipelineRunner:
             self._stop_live_poller()
 
         if phase == "InProgress":
+            self._stop_event_bus()
             self._ensure_live_poller()
         elif phase == "ChampSelect":
-            self._ensure_listener()
+            self._ensure_event_bus()
             # Resilience: the WebSocket only pushes *deltas*, so when it isn't
             # running (older client / blocked port) OR nothing has been published
             # yet this champ select, poll the current state so the dashboard
             # switches to Live Draft immediately — without waiting for a hover.
-            listener_ok = self._listener and self._listener.is_running()
-            if not listener_ok or self.state.snapshot().get("lobby") is None:
+            bus_ok = self._event_bus and self._event_bus.is_running()
+            if not bus_ok or self.state.snapshot().get("lobby") is None:
                 ctx = read_match_context(self.client, self.catalog,
                                          summoner_id=self._summoner_id)
                 if ctx:
                     self._publish_lobby(ctx, demo=False)
                     self._maybe_recommend(ctx)
             self._retry_injection_if_pending()
-        elif phase in ("Lobby", "Matchmaking", "None", "EndOfGame", "PreEndOfGame"):
-            self._stop_listener()
+        elif phase == "Lobby":
+            # Pre-game: keep the event bus up so lobby-scouting fires the moment
+            # the premade roster changes; the draft views stay cleared.
+            self._ensure_event_bus()
             self._reset_draft_state()
             if not self.state.snapshot().get("demo"):
                 self.state.set("lobby", None)
                 self.state.set("draft_intel", None)
                 self.state.set("recommendation", None)
+        elif phase in ("Matchmaking", "None", "EndOfGame", "PreEndOfGame"):
+            self._stop_event_bus()
+            self._reset_draft_state()
+            self._clear_scout()
+            if not self.state.snapshot().get("demo"):
+                self.state.set("lobby", None)
+                self.state.set("draft_intel", None)
+                self.state.set("recommendation", None)
 
-    # ------------------------------------------------- champ-select listener
-    def _ensure_listener(self) -> None:
-        """Start the champ-select WebSocket listener if it isn't already up."""
-        if self._listener and self._listener.is_running():
+    # ------------------------------------------------- LCU event bus
+    def _ensure_event_bus(self) -> None:
+        """Start the multiplexed LCU event bus if it isn't already up, subscribed
+        to both the champ-select session and the pre-game lobby topics over one
+        connection. Idempotent across the Lobby → ChampSelect transition."""
+        if self._event_bus and self._event_bus.is_running():
             return
         if self.client is None:
             return
-        self._listener = ChampSelectListener(self.client.creds, self._on_session)
-        self._listener.start()
+        bus = LcuEventBus(self.client.creds)
+        bus.subscribe(CHAMP_SELECT_TOPIC, self._on_session)
+        bus.subscribe(LOBBY_TOPIC, self._on_lobby)
+        bus.start()
+        self._event_bus = bus
         # The WS only delivers changes from here on, so seed the CURRENT champ
-        # select state right now — otherwise the dashboard wouldn't switch to
-        # Live Draft until the first hover/ban generated an event.
+        # select / lobby state right now — otherwise the dashboard wouldn't
+        # switch to Live Draft (or scout the premade) until the first event.
         try:
             session = self.client.get_json("/lol-champ-select/v1/session")
             if isinstance(session, dict):
                 self._on_session(session, "Create")
         except Exception:
             log.debug("Initial champ-select seed failed", exc_info=True)
+        try:
+            lobby = self.client.get_json("/lol-lobby/v1/lobby")
+            if isinstance(lobby, dict):
+                self._on_lobby(lobby, "Create")
+        except Exception:
+            log.debug("Initial lobby seed failed", exc_info=True)
 
-    def _stop_listener(self) -> None:
-        if self._listener is not None:
-            self._listener.stop()
-            self._listener = None
+    def _stop_event_bus(self) -> None:
+        if self._event_bus is not None:
+            self._event_bus.stop()
+            self._event_bus = None
+
+    # --------------------------------------------------- pre-game lobby scout
+    def _on_lobby(self, data: dict | None, event_type: str) -> None:
+        """Event-bus callback (bus thread): the premade lobby roster changed.
+        Scout every member whose puuid we can resolve. Best-effort."""
+        if event_type == "Delete" or not isinstance(data, dict):
+            return
+        players = _scout_players_from_lobby(data)
+        if players:
+            self._maybe_scout(players)
+
+    def _maybe_scout(self, players: list[dict]) -> None:
+        """Dedup on the resolvable-puuid set and kick scouting off-thread. A
+        static roster (no new puuids) is scouted only once; anonymized players
+        (no puuid) never gate the signature, so they don't suppress a refresh."""
+        resolvable = sorted(p["puuid"] for p in players if p.get("puuid"))
+        if not resolvable:
+            return  # nothing identifiable to scout (e.g. fully anonymized)
+        sig = "|".join(resolvable)
+        if sig == self._last_scout_sig:
+            return
+        self._last_scout_sig = sig
+        threading.Thread(target=self._run_scout, args=(players,),
+                         name="ag-lobby-scout", daemon=True).start()
+
+    def _run_scout(self, players: list[dict]) -> None:
+        """Fetch + fingerprint each resolvable player (cached per puuid) and
+        publish the enriched scout roster. Runs on its own thread so a slow LCU
+        history fetch never stalls the event bus."""
+        if not self._scout_lock.acquire(blocking=False):
+            return  # a scout pass is already in flight
+        try:
+            if self.client is None:
+                return
+            out: list[dict] = []
+            for p in players:
+                puuid = p.get("puuid")
+                if not puuid:
+                    out.append(self._hidden_card(p))
+                    continue
+                enriched = self._player_scout_cache.get(puuid)
+                if enriched is None:
+                    try:
+                        games = scout_mod.recent_games_for_puuid(self.client, puuid)
+                        fp = scout_mod.fingerprint(games)
+                    except Exception:
+                        log.debug("Scout fetch failed for a player", exc_info=True)
+                        fp = scout_mod.PlayerFingerprint()
+                    enriched = self._enrich_fingerprint(fp)
+                    self._player_scout_cache[puuid] = enriched
+                out.append({**enriched, **self._player_meta(p)})
+            self.state.set("scout", {"players": out, "ready": True, "at": time.time()})
+            scouted = sum(1 for p in out if not p.get("hidden"))
+            log.info("Lobby scout: %d player(s) profiled (%d hidden)",
+                     scouted, len(out) - scouted)
+        finally:
+            self._scout_lock.release()
+
+    def _hidden_card(self, p: dict) -> dict:
+        return {"hidden": True, "games_analyzed": 0, **self._player_meta(p)}
+
+    @staticmethod
+    def _player_meta(p: dict) -> dict:
+        return {"name": p.get("name", "") or "Hidden", "position": p.get("position", ""),
+                "side": p.get("side", "ally"), "is_self": bool(p.get("is_self"))}
+
+    def _enrich_fingerprint(self, fp: scout_mod.PlayerFingerprint) -> dict:
+        """Resolve the id-based fingerprint's champion ids to display name+slug
+        so the dashboard and the LLM prompt can read it directly."""
+        d = fp.to_dict()
+        for entry in d.get("champion_pool", []):
+            self._name_slug(entry)
+        if d.get("comfort"):
+            self._name_slug(d["comfort"])
+        return d
+
+    def _name_slug(self, entry: dict) -> None:
+        info = self.catalog.champion_by_key(entry.get("champion_id", 0)) or {}
+        entry["champion"] = info.get("name", "")
+        entry["slug"] = info.get("id", "")
+
+    def _clear_scout(self) -> None:
+        self._last_scout_sig = None
+        self._player_scout_cache.clear()
+        self.state.set("scout", {"players": [], "ready": False, "at": None})
 
     # ------------------------------------------------- live-game overlay poller
     def _ensure_live_poller(self) -> None:
@@ -545,6 +659,12 @@ class PipelineRunner:
         if not ctx:
             return
         self._publish_lobby(ctx, demo=False)  # UI follows every visible change
+
+        # Scout teammates whose identity champ select exposes (ranked solo
+        # anonymizes enemies, so this is realistically our own team).
+        players = _scout_players_from_session(data)
+        if players:
+            self._maybe_scout(players)
 
         trig = ctx.trigger_signature()
         if trig == self._last_trigger_sig:
@@ -977,8 +1097,10 @@ class PipelineRunner:
                          reco_fp: str) -> None:
         """Ollama refines the OPTIMAL pick over the scored universe top-N."""
         role_top = self._last_role_top
+        scout_players = (self.state.snapshot().get("scout") or {}).get("players")
         try:
-            ai = self.engine.evaluate(compile_universe_pick_prompt(ctx, role_top[:8]))
+            ai = self.engine.evaluate(
+                compile_universe_pick_prompt(ctx, role_top[:8], scout_players))
         except Exception:
             log.exception("Universe recommendation AI call failed")
             return
@@ -1427,6 +1549,47 @@ class PipelineRunner:
         self.last_ctx = None
         self._reset_draft_state()
         return {"ok": True, "detail": "demo cleared"}
+
+
+def _norm_position(raw: str) -> str:
+    """LCU position string ('TOP', 'utility', 'FILL', '') → role vocab or ''."""
+    val = (raw or "").lower()
+    if val in ("fill", "unselected", "none"):
+        return ""
+    from sylqon.data import static
+    return static.ROLE_ALIASES.get(val, "")
+
+
+def _scout_players_from_lobby(data: dict) -> list[dict]:
+    """Normalize a ``/lol-lobby/v1/lobby`` resource into scout player dicts. The
+    premade lobby always carries puuids, so every member is resolvable."""
+    out: list[dict] = []
+    for m in data.get("members", []) or []:
+        out.append({
+            "puuid": m.get("puuid", "") or "",
+            "name": (m.get("gameName") or m.get("summonerName") or "").strip(),
+            "position": _norm_position(m.get("firstPositionPreference", "")),
+            "side": "ally",
+            "is_self": bool(m.get("isLocalMember")),
+        })
+    return out
+
+
+def _scout_players_from_session(session: dict) -> list[dict]:
+    """Normalize a champ-select session's ``myTeam`` into scout player dicts.
+    Entries without a puuid (anonymized) are kept so the UI can show a hidden
+    card; ``_maybe_scout`` simply won't fetch history for them."""
+    cell_id = session.get("localPlayerCellId", -1)
+    out: list[dict] = []
+    for p in session.get("myTeam", []) or []:
+        out.append({
+            "puuid": p.get("puuid", "") or "",
+            "name": (p.get("gameName") or p.get("summonerName") or "").strip(),
+            "position": _norm_position(p.get("assignedPosition", "")),
+            "side": "ally",
+            "is_self": p.get("cellId") == cell_id,
+        })
+    return out
 
 
 def _demo_profile(info: dict, role: str) -> EnemyProfile:

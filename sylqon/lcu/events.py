@@ -1,9 +1,9 @@
-﻿"""LCU WebSocket event subscription.
+"""LCU WebSocket event subscription.
 
 The League client exposes a WAMP-style WebSocket on the same port and
 credentials as the REST API. Subscribing to an event topic lets us react the
-instant champ select changes — a hover, a ban, a lock-in, a timer tick —
-instead of polling `/lol-champ-select/v1/session` on a fixed cadence.
+instant something changes — a champ-select hover, a lobby member joining, a
+timer tick — instead of polling the matching REST resource on a fixed cadence.
 
 Wire protocol (the subset we use):
   * connect to wss://127.0.0.1:{port}/ with Basic auth (riot:token), self-signed
@@ -11,10 +11,15 @@ Wire protocol (the subset we use):
   * unsubscribe: send [6, "<topic>"]            (6 = UNSUBSCRIBE)
   * event in:    [8, "<topic>", {data, eventType, uri}]   (8 = EVENT)
 
-We expose one listener bound to the champ-select session topic. It runs on its
-own daemon thread, auto-reconnects while running, and hands every event payload
-to a callback. State diffing (deciding which events are worth acting on) is the
-caller's job — see runtime.PipelineRunner.
+``LcuEventBus`` multiplexes many topics over a single connection: register a
+callback per topic, and the bus subscribes to all of them, routes each push to
+the matching callbacks, and re-subscribes to everything after a reconnect. It
+runs on its own daemon thread; callbacks run on that thread, so a slow callback
+throttles event consumption for *all* topics — keep them cheap (the runtime
+debounces heavy work via state diffing and off-thread workers).
+
+``ChampSelectListener`` is a thin back-compat wrapper around the bus bound to
+the champ-select session topic.
 """
 from __future__ import annotations
 
@@ -31,28 +36,50 @@ from sylqon.lcu.client import LCUCredentials
 log = logging.getLogger(__name__)
 
 CHAMP_SELECT_TOPIC = "OnJsonApiEvent_lol-champ-select_v1_session"
+LOBBY_TOPIC = "OnJsonApiEvent_lol-lobby_v1_lobby"
 
 _SUBSCRIBE = 5
 _EVENT = 8
 
+# Callback receives (data, event_type): ``data`` is the raw resource dict (or
+# ``None`` on a Delete), ``event_type`` is "Create" / "Update" / "Delete".
+EventCallback = Callable[[dict | None, str], None]
 
-class ChampSelectListener:
-    """Subscribes to the champ-select session topic over the LCU WebSocket and
-    invokes ``on_event(data, event_type)`` for every push.
 
-    ``data`` is the raw session dict (or ``None`` on a Delete). ``event_type``
-    is one of "Create" / "Update" / "Delete". The callback runs on the listener
-    thread, so a slow callback throttles event consumption — which is fine here
-    because the runtime debounces heavy work via state diffing.
+class LcuEventBus:
+    """Multiplexes several LCU event topics over one WebSocket connection.
+
+    Register callbacks with ``subscribe(topic, callback)`` before or after
+    ``start()``. The bus connects once, subscribes to every registered topic,
+    dispatches each incoming event to the callbacks for its topic, and
+    auto-reconnects (re-subscribing to all topics) while running.
     """
 
-    def __init__(self, creds: LCUCredentials,
-                 on_event: Callable[[dict | None, str], None]) -> None:
+    def __init__(self, creds: LCUCredentials) -> None:
         self._creds = creds
-        self._on_event = on_event
+        self._callbacks: dict[str, list[EventCallback]] = {}
+        self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._ws: websocket.WebSocket | None = None
+
+    # --------------------------------------------------------- subscriptions
+    def subscribe(self, topic: str, callback: EventCallback) -> None:
+        """Register ``callback`` for ``topic``. If the bus is already connected,
+        the topic is subscribed immediately; otherwise it is picked up the next
+        time the run thread (re)connects."""
+        with self._lock:
+            new_topic = topic not in self._callbacks
+            self._callbacks.setdefault(topic, []).append(callback)
+            ws = self._ws
+        if new_topic and ws is not None:
+            try:
+                ws.send(json.dumps([_SUBSCRIBE, topic]))
+                log.debug("Subscribed to %s (live)", topic)
+            except Exception:
+                # A send failure just means we're mid-reconnect; the run loop
+                # will resubscribe everything on the next connect.
+                log.debug("Live subscribe to %s failed", topic, exc_info=True)
 
     # ------------------------------------------------------------ lifecycle
     def start(self) -> None:
@@ -60,9 +87,9 @@ class ChampSelectListener:
             return
         self._stop.clear()
         self._thread = threading.Thread(
-            target=self._run, name="lcu-champ-select-ws", daemon=True)
+            target=self._run, name="lcu-event-bus", daemon=True)
         self._thread.start()
-        log.info("Champ-select WebSocket listener started")
+        log.info("LCU event bus started (%d topic(s))", len(self._callbacks))
 
     def stop(self) -> None:
         self._stop.set()
@@ -88,18 +115,25 @@ class ChampSelectListener:
                     sslopt={"cert_reqs": ssl.CERT_NONE},
                     timeout=5,
                 )
-                self._ws.send(json.dumps([_SUBSCRIBE, CHAMP_SELECT_TOPIC]))
-                log.debug("Subscribed to %s", CHAMP_SELECT_TOPIC)
+                self._resubscribe_all()
                 self._consume()
             except Exception as exc:
                 if not self._stop.is_set():
-                    log.debug("Champ-select WS connection dropped: %s", exc)
+                    log.debug("LCU event bus connection dropped: %s", exc)
             finally:
                 self._close_socket()
             # Brief backoff before reconnecting (champ select may have ended,
             # or the client may be momentarily unavailable).
             if not self._stop.is_set():
                 self._stop.wait(1.0)
+
+    def _resubscribe_all(self) -> None:
+        assert self._ws is not None
+        with self._lock:
+            topics = list(self._callbacks)
+        for topic in topics:
+            self._ws.send(json.dumps([_SUBSCRIBE, topic]))
+            log.debug("Subscribed to %s", topic)
 
     def _consume(self) -> None:
         assert self._ws is not None
@@ -121,13 +155,19 @@ class ChampSelectListener:
             return
         if not (isinstance(msg, list) and len(msg) == 3 and msg[0] == _EVENT):
             return
+        topic = msg[1]
         payload = msg[2]
         if not isinstance(payload, dict):
             return
-        try:
-            self._on_event(payload.get("data"), payload.get("eventType", "Update"))
-        except Exception:
-            log.exception("Champ-select event handler failed")
+        with self._lock:
+            callbacks = list(self._callbacks.get(topic, ()))
+        data = payload.get("data")
+        event_type = payload.get("eventType", "Update")
+        for cb in callbacks:
+            try:
+                cb(data, event_type)
+            except Exception:
+                log.exception("LCU event handler for %s failed", topic)
 
     # ----------------------------------------------------------------- utils
     def _basic_auth(self) -> str:
@@ -142,3 +182,26 @@ class ChampSelectListener:
                 ws.close()
             except Exception:
                 pass
+
+
+class ChampSelectListener:
+    """Back-compat wrapper: an event bus bound to the champ-select session topic.
+
+    ``on_event(data, event_type)`` is invoked for every champ-select push, with
+    the same semantics as before the multiplexer refactor.
+    """
+
+    def __init__(self, creds: LCUCredentials,
+                 on_event: EventCallback) -> None:
+        self._bus = LcuEventBus(creds)
+        self._bus.subscribe(CHAMP_SELECT_TOPIC, on_event)
+
+    def start(self) -> None:
+        self._bus.start()
+        log.info("Champ-select WebSocket listener started")
+
+    def stop(self) -> None:
+        self._bus.stop()
+
+    def is_running(self) -> bool:
+        return self._bus.is_running()

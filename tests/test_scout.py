@@ -1,0 +1,147 @@
+"""Offline tests for pre-game lobby scouting.
+
+Cover the playstyle-fingerprint heuristics, the puuid match-history fetch (path
+selection + gameId dedup), and the prompt scout-block formatting — all without a
+League client, Ollama, or the network.
+
+Run: python -m pytest tests/test_scout.py -q
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sylqon.ai.pick_prompt import format_scout_block
+from sylqon.lcu import scout as scout_mod
+from sylqon.lcu.scout import PlayerFingerprint, fingerprint
+
+
+def mk(cid, role, win, k, d, a, cspm=6.0, played_at=0):
+    return {
+        "game_id": str(played_at), "champion_id": cid, "role": role,
+        "result": "Win" if win else "Loss",
+        "kda": {"kills": k, "deaths": d, "assists": a},
+        "stats": {"cs_per_min": cspm}, "timeline": [], "played_at": played_at,
+    }
+
+
+def test_empty_input_yields_empty_fingerprint():
+    fp = fingerprint([])
+    assert fp == PlayerFingerprint()
+    assert fp.games_analyzed == 0
+    assert fp.comfort is None
+    assert fp.playstyle_tags == []
+
+
+def test_main_role_and_pool_ordering():
+    games = ([mk(64, "jungle", True, 5, 4, 8) for _ in range(6)]
+             + [mk(121, "jungle", False, 3, 5, 6) for _ in range(2)]
+             + [mk(0, "middle", True, 4, 4, 4)])  # one off-role game
+    fp = fingerprint(games)
+    assert fp.games_analyzed == 9
+    assert fp.main_role == "jungle"
+    # Most-played champion first; win_rate computed per champion.
+    assert fp.champion_pool[0]["champion_id"] == 64
+    assert fp.champion_pool[0]["games"] == 6
+    assert fp.champion_pool[0]["win_rate"] == 1.0
+
+
+def test_one_trick_and_comfort_share():
+    games = [mk(64, "jungle", True, 5, 4, 6) for _ in range(8)] + \
+            [mk(11, "jungle", False, 2, 6, 3) for _ in range(2)]
+    fp = fingerprint(games)
+    assert fp.comfort["champion_id"] == 64
+    assert fp.comfort["share"] == 0.8
+    assert "one-trick" in fp.playstyle_tags
+
+
+def test_aggressive_tag_on_high_kills_and_deaths():
+    games = [mk(157, "top", True, 8, 8, 5) for _ in range(10)]
+    fp = fingerprint(games)
+    assert "aggressive" in fp.playstyle_tags
+
+
+def test_farm_focused_and_calculated_tags():
+    # Low deaths, strong KDA, high CS → calculated + farm-focused, not aggressive.
+    games = [mk(202, "bottom", True, 7, 2, 6, cspm=8.5) for _ in range(10)]
+    fp = fingerprint(games)
+    assert "farm-focused" in fp.playstyle_tags
+    assert "calculated" in fp.playstyle_tags
+    assert "aggressive" not in fp.playstyle_tags
+
+
+def test_recent_form_win_and_loss_streaks():
+    # Newest-first: 4 wins then losses → +4 streak, win_rate over window.
+    wins = [mk(1, "top", True, 1, 1, 1, played_at=i) for i in range(4)]
+    losses = [mk(1, "top", False, 1, 1, 1, played_at=10 + i) for i in range(3)]
+    fp = fingerprint(wins + losses)
+    assert fp.recent_form["games"] == 7
+    assert fp.recent_form["streak"] == 4
+    # Leading with a loss yields a negative streak.
+    fp2 = fingerprint(losses + wins)
+    assert fp2.recent_form["streak"] == -3
+
+
+# ---------------------------------------------------------- history fetch
+class FakeClient:
+    """Returns a single fixed page regardless of begIndex/endIndex (mirrors the
+    LCU bug the dedup guards against) and records the path it was asked for."""
+
+    def __init__(self, games):
+        self._games = games
+        self.paths: list[str] = []
+
+    def get_json(self, path):
+        self.paths.append(path)
+        return {"games": {"games": self._games}}
+
+
+def test_recent_games_for_puuid_uses_puuid_path_and_dedups():
+    raw = [
+        {"gameId": 1, "queueId": 420, "gameDuration": 1800, "gameCreation": 100,
+         "participants": [{"championId": 64, "stats": {"win": True, "kills": 5,
+                          "deaths": 4, "assists": 8, "totalMinionsKilled": 200,
+                          "neutralMinionsKilled": 20}, "timeline": {"lane": "JUNGLE"}}]},
+        {"gameId": 2, "queueId": 450, "gameDuration": 1200, "gameCreation": 200,
+         "participants": [{"championId": 1, "stats": {"win": False}}]},  # ARAM, filtered
+    ]
+    client = FakeClient(raw)
+    games = scout_mod.recent_games_for_puuid(client, "PUUID-XYZ", count=40)
+    # Only the SR game survives, deduped to a single entry despite repeated pages.
+    assert len(games) == 1
+    assert games[0]["champion_id"] == 64
+    assert any("PUUID-XYZ" in p for p in client.paths)
+
+
+def test_recent_games_for_puuid_empty_without_puuid():
+    assert scout_mod.recent_games_for_puuid(FakeClient([]), "") == []
+
+
+# ------------------------------------------------------- prompt scout block
+def test_scout_block_omitted_without_usable_players():
+    assert format_scout_block(None) == ""
+    assert format_scout_block([]) == ""
+    # Only self + hidden + zero-game players → nothing to show.
+    players = [
+        {"name": "Me", "is_self": True, "games_analyzed": 20},
+        {"name": "Anon", "hidden": True},
+        {"name": "NoData", "games_analyzed": 0},
+    ]
+    assert format_scout_block(players) == ""
+
+
+def test_scout_block_renders_teammate_line():
+    players = [{
+        "name": "Faker", "position": "middle", "games_analyzed": 15,
+        "playstyle_tags": ["carry-threat", "one-trick"],
+        "comfort": {"champion": "Azir", "share": 0.6},
+        "recent_form": {"games": 10, "wins": 8, "win_rate": 0.8, "streak": 4},
+    }]
+    block = format_scout_block(players)
+    assert "TEAMMATE SCOUT" in block
+    assert "Faker" in block
+    assert "Azir" in block
+    assert "carry-threat" in block
+    assert "4W streak" in block

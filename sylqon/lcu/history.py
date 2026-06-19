@@ -19,6 +19,15 @@ log = logging.getLogger(__name__)
 # ARAM / bots / events are excluded so the win-rate reflects SR performance.
 SR_QUEUES = {400, 420, 430, 440, 700}
 
+# Match-history endpoints. The current-summoner path needs no id; the puuid path
+# (used by lobby scouting for *other* players) substitutes a resolved puuid.
+CURRENT_SUMMONER_MATCHES = (
+    "/lol-match-history/v1/products/lol/current-summoner/matches")
+
+
+def puuid_matches_path(puuid: str) -> str:
+    return f"/lol-match-history/v1/products/lol/{puuid}/matches"
+
 
 def champion_stats(client: LCUClient, count: int = 120) -> dict[int, dict]:
     """Aggregate ``{championId: {"games": n, "wins": w}}`` over the last
@@ -74,6 +83,45 @@ def _derive_timeline(st: dict) -> list[dict]:
     return events
 
 
+def normalize_game(g: dict) -> dict | None:
+    """One raw LCU match → the normalized dict the rest of the app consumes
+    (KDA, stats, timeline). Returns ``None`` for non-SR games or games with no
+    usable participant. The summoner whose history this is appears as
+    ``participants[0]``. Shared by ``recent_games`` and lobby scouting."""
+    if g.get("queueId") not in SR_QUEUES:
+        return None
+    parts = g.get("participants") or []
+    if not parts:
+        return None
+    me = parts[0]
+    cid = me.get("championId")
+    if not cid:
+        return None
+    st = me.get("stats") or {}
+    tl = me.get("timeline") or {}
+    dur = g.get("gameDuration", 0) or 0
+    cs = (st.get("totalMinionsKilled", 0) or 0) + (st.get("neutralMinionsKilled", 0) or 0)
+    return {
+        "game_id": str(g.get("gameId")),
+        "champion_id": cid,
+        "role": _norm_lane(tl.get("lane"), tl.get("role")),
+        "result": "Win" if st.get("win") else "Loss",
+        "kda": {"kills": st.get("kills", 0), "deaths": st.get("deaths", 0),
+                "assists": st.get("assists", 0)},
+        "stats": {
+            "duration": dur,
+            "gold": st.get("goldEarned", 0),
+            "total_damage": st.get("totalDamageDealtToChampions", 0),
+            "damage_taken": st.get("totalDamageTaken", 0),
+            "vision_score": st.get("visionScore", 0),
+            "cs": cs,
+            "cs_per_min": round(cs / (dur / 60), 1) if dur else 0.0,
+        },
+        "timeline": _derive_timeline(st),
+        "played_at": g.get("gameCreation", 0),  # ms epoch
+    }
+
+
 def recent_games(client: LCUClient, count: int = 10) -> list[dict]:
     """The last ``count`` SR games as normalized dicts (KDA, stats, timeline),
     newest first. Feeds the v2 match-history store + post-game analysis."""
@@ -81,54 +129,28 @@ def recent_games(client: LCUClient, count: int = 10) -> list[dict]:
     games.sort(key=lambda g: g.get("gameCreation", 0), reverse=True)
     out: list[dict] = []
     for g in games:
-        if g.get("queueId") not in SR_QUEUES:
+        normalized = normalize_game(g)
+        if normalized is None:
             continue
-        parts = g.get("participants") or []
-        if not parts:
-            continue
-        me = parts[0]
-        cid = me.get("championId")
-        if not cid:
-            continue
-        st = me.get("stats") or {}
-        tl = me.get("timeline") or {}
-        dur = g.get("gameDuration", 0) or 0
-        cs = (st.get("totalMinionsKilled", 0) or 0) + (st.get("neutralMinionsKilled", 0) or 0)
-        out.append({
-            "game_id": str(g.get("gameId")),
-            "champion_id": cid,
-            "role": _norm_lane(tl.get("lane"), tl.get("role")),
-            "result": "Win" if st.get("win") else "Loss",
-            "kda": {"kills": st.get("kills", 0), "deaths": st.get("deaths", 0),
-                    "assists": st.get("assists", 0)},
-            "stats": {
-                "duration": dur,
-                "gold": st.get("goldEarned", 0),
-                "total_damage": st.get("totalDamageDealtToChampions", 0),
-                "damage_taken": st.get("totalDamageTaken", 0),
-                "vision_score": st.get("visionScore", 0),
-                "cs": cs,
-                "cs_per_min": round(cs / (dur / 60), 1) if dur else 0.0,
-            },
-            "timeline": _derive_timeline(st),
-            "played_at": g.get("gameCreation", 0),  # ms epoch
-        })
+        out.append(normalized)
         if len(out) >= count:
             break
     return out
 
 
-def _fetch_games(client: LCUClient, count: int) -> list[dict]:
-    """Page through match history, de-duplicating by gameId. Some client
-    versions ignore begIndex/endIndex and keep returning the first page, so we
-    stop as soon as a page contributes no new games (otherwise the same games
-    would be counted once per page)."""
+def _fetch_games(client: LCUClient, count: int,
+                 path: str = CURRENT_SUMMONER_MATCHES) -> list[dict]:
+    """Page through a match-history endpoint, de-duplicating by gameId. Some
+    client versions ignore begIndex/endIndex and keep returning the first page,
+    so we stop as soon as a page contributes no new games (otherwise the same
+    games would be counted once per page). ``path`` selects whose history to
+    page (current summoner by default; a puuid path for lobby scouting)."""
     page = 20
+    sep = "&" if "?" in path else "?"
     seen: dict[int, dict] = {}
     for beg in range(0, count, page):
         data = client.get_json(
-            "/lol-match-history/v1/products/lol/current-summoner/matches"
-            f"?begIndex={beg}&endIndex={beg + page - 1}"
+            f"{path}{sep}begIndex={beg}&endIndex={beg + page - 1}"
         )
         batch = ((data or {}).get("games") or {}).get("games") or []
         if not batch:

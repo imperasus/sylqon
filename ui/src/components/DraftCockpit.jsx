@@ -5,6 +5,7 @@ import { DAMAGE_COLORS, ROLE_LABELS, squareUrl } from "../assets.js";
 import {
   Bar, ChampPortrait, ChampionRow, Chip, Panel, Score100, SpellPips, ThreatBadge,
 } from "./shared.jsx";
+import LobbyScoutPanel from "./LobbyScoutPanel.jsx";
 
 /* Segmented progress: one cell per draft slot, lit as picks lock in. */
 function DraftProgress({ allyCount, enemyCount, phase }) {
@@ -441,6 +442,7 @@ export default function DraftCockpit({ state }) {
         <div className="scroll-thin flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
           <TimingBanner timing={intel?.counter_pick} />
           <RecoCard reco={reco} role={lobby.my_role} slugOf={slugOf} patch={patch} />
+          <LobbyScoutPanel scout={state?.scout} patch={patch} />
           <RoleTop recs={reco?.role_top} patch={patch} />
           <PoolScored scored={reco?.scored} pick={reco?.pick} slugOf={slugOf} patch={patch} />
         </div>
