@@ -10,6 +10,8 @@ const TAG_TONE = {
   "farm-focused": "accent",
   playmaker: "ally",
   calculated: "good",
+  frontliner: "ally",
+  "vision-control": "accent",
 };
 
 /* Recent-form streak as a short signed label (3W / 4L), else null. */

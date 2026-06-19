@@ -31,13 +31,28 @@ RECENT_WINDOW = 10
 # Top-N champions surfaced in the pool.
 POOL_SIZE = 5
 
-# Playstyle thresholds (per-game averages over the analyzed SR games). Kept as
-# module constants so they're easy to tune and assert against in tests.
-AGGRO_KILLS = 6.0          # avg kills at/above this → fights for kills
+# Playstyle thresholds (per-game averages over the analyzed SR games). Role
+# vocab is top/jungle/middle/bottom/utility. Roles differ enormously — a support
+# averaging 6 kills is an outlier while a mid is not, and supports farm by design
+# — so the kill/farm/playmaker floors are per-role (current-meta norms). Unknown
+# roles fall back to the *_DEFAULT floors.
+AGGRO_KILLS_BY_ROLE = {"top": 5.5, "jungle": 5.0, "middle": 6.0,
+                       "bottom": 6.5, "utility": 2.5}
+AGGRO_KILLS_DEFAULT = 6.0
+# Support is intentionally absent: it neither farms nor earns the farm tag/penalty.
+FARM_CS_BY_ROLE = {"top": 7.5, "jungle": 6.5, "middle": 7.5, "bottom": 8.0}
+FARM_CS_DEFAULT = 7.5
+PLAYMAKER_ASSISTS_BY_ROLE = {"top": 7.0, "jungle": 8.0, "middle": 8.0,
+                             "bottom": 7.0, "utility": 9.5}
+PLAYMAKER_ASSISTS_DEFAULT = 8.0
+
 AGGRO_DEATHS = 6.5         # avg deaths at/above this → high-risk / dies a lot
-FARM_CS_PER_MIN = 7.0      # avg CS/min at/above this → farm-focused
-PLAYMAKER_ASSISTS = 10.0   # avg assists at/above this → enables teammates
+CALC_DEATHS = 4.0          # avg deaths at/below this (+ decent KDA) → calculated
+CALC_RATIO = 2.0           # KDA ratio at/above this with low deaths → disciplined
+CARRY_RATIO = 3.0          # high kills + this KDA ratio → carry threat
 ONE_TRICK_SHARE = 0.5      # one champ ≥ this share of games → one-trick
+FRONTLINER_DTPM = 1800.0   # avg damage TAKEN per minute → frontliner / tank style
+VISION_CONTROL = 45.0      # avg vision score → macro / map-control oriented
 
 
 @dataclass
@@ -52,6 +67,8 @@ class PlayerFingerprint:
     aggression: float = 0.0                              # 0..1 normalized
     avg_kda: dict = field(default_factory=dict)          # {kills, deaths, assists, ratio}
     avg_cs_per_min: float = 0.0
+    avg_damage_taken_per_min: float = 0.0
+    avg_vision_score: float = 0.0
     recent_form: dict = field(default_factory=dict)      # {games, wins, win_rate, streak}
     playstyle_tags: list = field(default_factory=list)
 
@@ -89,8 +106,10 @@ def fingerprint(games: list[dict]) -> PlayerFingerprint:
     comfort = _comfort(pool, n)
     avg_kda = _avg_kda(games)
     avg_cs = round(sum(g["stats"].get("cs_per_min", 0.0) for g in games) / n, 2)
-    aggression = _aggression_score(avg_kda, avg_cs)
-    tags = _playstyle_tags(avg_kda, avg_cs, comfort)
+    avg_dtpm = _avg_damage_taken_per_min(games)
+    avg_vision = round(sum(g["stats"].get("vision_score", 0) for g in games) / n, 1)
+    aggression = _aggression_score(avg_kda, avg_cs, main_role)
+    tags = _playstyle_tags(main_role, avg_kda, avg_cs, avg_dtpm, avg_vision, comfort)
     recent = _recent_form(games[:RECENT_WINDOW])
 
     return PlayerFingerprint(
@@ -102,6 +121,8 @@ def fingerprint(games: list[dict]) -> PlayerFingerprint:
         aggression=aggression,
         avg_kda=avg_kda,
         avg_cs_per_min=avg_cs,
+        avg_damage_taken_per_min=avg_dtpm,
+        avg_vision_score=avg_vision,
         recent_form=recent,
         playstyle_tags=tags,
     )
@@ -147,37 +168,64 @@ def _avg_kda(games: list[dict]) -> dict:
             "assists": round(a, 1), "ratio": round(ratio, 2)}
 
 
-def _aggression_score(avg_kda: dict, avg_cs: float) -> float:
+def _avg_damage_taken_per_min(games: list[dict]) -> float:
+    """Average damage taken per minute over games with a known duration."""
+    vals = []
+    for g in games:
+        st = g["stats"]
+        dur = st.get("duration", 0) or 0
+        if dur:
+            vals.append(st.get("damage_taken", 0) / (dur / 60))
+    return round(sum(vals) / len(vals), 0) if vals else 0.0
+
+
+def _aggression_score(avg_kda: dict, avg_cs: float, main_role: str) -> float:
     """0..1 blend of kill involvement and risk-taking. High kills+assists and
-    high deaths read as aggressive; low deaths and high farm read as passive."""
+    high deaths read as aggressive. A farm penalty nudges passive farmers down,
+    but only when fight involvement is *low* — a fed carry farming hard is not
+    passive — and never for supports, who don't farm by design."""
     kills = avg_kda.get("kills", 0.0)
     deaths = avg_kda.get("deaths", 0.0)
     assists = avg_kda.get("assists", 0.0)
     involvement = min((kills + assists) / 18.0, 1.0)   # ~18 K+A → maxed
     risk = min(deaths / 9.0, 1.0)                       # ~9 deaths → maxed
-    farm_penalty = min(avg_cs / FARM_CS_PER_MIN, 1.0) * 0.2
+    if main_role == "utility":
+        farm_penalty = 0.0
+    else:
+        farm_base = FARM_CS_BY_ROLE.get(main_role, FARM_CS_DEFAULT)
+        farm_penalty = min(avg_cs / farm_base, 1.0) * 0.2 * (1.0 - involvement)
     score = 0.6 * involvement + 0.4 * risk - farm_penalty
     return round(max(0.0, min(score, 1.0)), 2)
 
 
-def _playstyle_tags(avg_kda: dict, avg_cs: float,
+def _playstyle_tags(main_role: str, avg_kda: dict, avg_cs: float,
+                    avg_dtpm: float, avg_vision: float,
                     comfort: dict | None) -> list[str]:
-    tags: list[str] = []
     kills = avg_kda.get("kills", 0.0)
     deaths = avg_kda.get("deaths", 0.0)
     assists = avg_kda.get("assists", 0.0)
-    if kills >= AGGRO_KILLS and deaths >= AGGRO_DEATHS:
+    ratio = avg_kda.get("ratio", 0.0)
+    aggro_kills = AGGRO_KILLS_BY_ROLE.get(main_role, AGGRO_KILLS_DEFAULT)
+    playmaker = PLAYMAKER_ASSISTS_BY_ROLE.get(main_role, PLAYMAKER_ASSISTS_DEFAULT)
+
+    tags: list[str] = []
+    if kills >= aggro_kills and deaths >= AGGRO_DEATHS:
         tags.append("aggressive")
-    elif deaths <= AGGRO_DEATHS - 2.5 and avg_kda.get("ratio", 0.0) >= 2.5:
+    elif deaths <= CALC_DEATHS and ratio >= CALC_RATIO:
         tags.append("calculated")
-    if avg_cs >= FARM_CS_PER_MIN:
+    # Supports farm by design — the farm tag would be noise, so skip the role.
+    if main_role != "utility" and avg_cs >= FARM_CS_BY_ROLE.get(main_role, FARM_CS_DEFAULT):
         tags.append("farm-focused")
-    if assists >= PLAYMAKER_ASSISTS and assists >= kills:
+    if assists >= playmaker and assists >= kills:
         tags.append("playmaker")
-    if kills >= AGGRO_KILLS and avg_kda.get("ratio", 0.0) >= 3.0:
+    if kills >= aggro_kills and ratio >= CARRY_RATIO:
         tags.append("carry-threat")
     if comfort and comfort.get("share", 0.0) >= ONE_TRICK_SHARE:
         tags.append("one-trick")
+    if avg_dtpm >= FRONTLINER_DTPM:
+        tags.append("frontliner")
+    if avg_vision >= VISION_CONTROL:
+        tags.append("vision-control")
     return tags
 
 

@@ -220,3 +220,50 @@ def test_scout_block_comfort_without_champion_name_omitted():
     # The block renders (games_analyzed > 0) but no 'mains ...' text appears.
     assert "TEAMMATE SCOUT" in block
     assert "mains" not in block
+
+
+# ------------------------------------------------- role-aware thresholds
+def mkfull(cid, role, win, k, d, a, cspm=6.0, dtaken=0, vision=0, dur=1800):
+    g = mk(cid, role, win, k, d, a, cspm)
+    g["stats"].update({"duration": dur, "damage_taken": dtaken, "vision_score": vision})
+    return g
+
+
+def test_support_is_not_mislabeled_by_flat_thresholds():
+    # A roaming engage support: low kills/CS by design, high assists.
+    games = [mkfull(412, "utility", True, 3, 7, 13, cspm=1.0, vision=50) for _ in range(10)]
+    fp = fingerprint(games)
+    # 3 kills clears the support aggro floor (2.5) with high deaths → aggressive.
+    assert "aggressive" in fp.playstyle_tags
+    assert "playmaker" in fp.playstyle_tags
+    # Supports are excluded from the farm tag regardless of (low) CS.
+    assert "farm-focused" not in fp.playstyle_tags
+    # High vision score → macro/vision-control read.
+    assert "vision-control" in fp.playstyle_tags
+
+
+def test_jungle_kill_floor_is_lower_than_mid():
+    # 5.2 avg kills: above the jungle floor (5.0) but below mid's (6.0).
+    jg = fingerprint([mkfull(64, "jungle", True, 5, 7, 6) for _ in range(5)]
+                     + [mkfull(64, "jungle", True, 6, 7, 6) for _ in range(5)])
+    md = fingerprint([mkfull(103, "middle", True, 5, 7, 6) for _ in range(5)]
+                     + [mkfull(103, "middle", True, 6, 7, 6) for _ in range(5)])
+    assert "aggressive" in jg.playstyle_tags
+    assert "aggressive" not in md.playstyle_tags
+
+
+def test_frontliner_tag_from_damage_taken():
+    # ~2000 dmg taken/min over 30-min games → frontliner.
+    games = [mkfull(54, "top", True, 3, 5, 7, dtaken=60000, dur=1800) for _ in range(10)]
+    fp = fingerprint(games)
+    assert fp.avg_damage_taken_per_min == 2000  # 60000 over 30 min
+    assert "frontliner" in fp.playstyle_tags
+
+
+def test_fed_carry_keeps_high_aggression_despite_high_farm():
+    # High kills + high CS must NOT read as passive: the farm penalty is gated
+    # on low involvement, so a fed, farming carry stays aggressive.
+    games = [mkfull(202, "bottom", True, 8, 3, 7, cspm=9.0) for _ in range(10)]
+    fp = fingerprint(games)
+    assert fp.aggression >= 0.5
+    assert "carry-threat" in fp.playstyle_tags
