@@ -37,6 +37,7 @@ log = logging.getLogger(__name__)
 
 CHAMP_SELECT_TOPIC = "OnJsonApiEvent_lol-champ-select_v1_session"
 LOBBY_TOPIC = "OnJsonApiEvent_lol-lobby_v1_lobby"
+EOG_TOPIC = "OnJsonApiEvent_lol-end-of-game_v1_eog-stats-block"
 
 _SUBSCRIBE = 5
 _EVENT = 8

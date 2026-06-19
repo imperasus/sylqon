@@ -28,7 +28,7 @@ from sylqon.data import static
 from sylqon.data.catalog import Catalog
 from sylqon.lcu import scout as scout_mod
 from sylqon.lcu.client import LCUClient
-from sylqon.lcu.events import CHAMP_SELECT_TOPIC, LOBBY_TOPIC, LcuEventBus
+from sylqon.lcu.events import CHAMP_SELECT_TOPIC, EOG_TOPIC, LOBBY_TOPIC, LcuEventBus
 from sylqon.lcu.history import champion_stats
 from sylqon.lcu.injector import Injector, merge_stat_shards
 from sylqon.lcu.lobby import (
@@ -66,6 +66,7 @@ class AppState:
             "live": {"active": False},
             "overlay": {"active": False, "role": "", "missions": [], "game": {}},
             "scout": {"players": [], "ready": False, "at": None},
+            "post_game": {"active": False},
         }
 
     def update(self, section: str, **fields) -> None:
@@ -208,6 +209,9 @@ class PipelineRunner:
         self._player_scout_cache: dict[str, dict] = {}   # puuid -> enriched fingerprint
         self._last_scout_sig: str | None = None
         self._scout_lock = threading.Lock()
+        # Auto post-game review: event-driven off the end-of-game stats block.
+        self._last_reviewed_game: str | None = None
+        self._review_lock = threading.Lock()
         self._last_role_top: list[dict] = []        # universal role top-N for live draft
         logging.getLogger("sylqon").addHandler(StateLogHandler(self.state))
         self._bootstrap_if_empty()
@@ -288,6 +292,7 @@ class PipelineRunner:
             self._ensure_live_poller()
         elif phase == "ChampSelect":
             self._ensure_event_bus()
+            self._clear_post_game()  # a new game starts — drop the last report
             # Resilience: the WebSocket only pushes *deltas*, so when it isn't
             # running (older client / blocked port) OR nothing has been published
             # yet this champ select, poll the current state so the dashboard
@@ -304,12 +309,24 @@ class PipelineRunner:
             # Pre-game: keep the event bus up so lobby-scouting fires the moment
             # the premade roster changes; the draft views stay cleared.
             self._ensure_event_bus()
+            self._clear_post_game()  # a new game starts — drop the last report
             self._reset_draft_state()
             if not self.state.snapshot().get("demo"):
                 self.state.set("lobby", None)
                 self.state.set("draft_intel", None)
                 self.state.set("recommendation", None)
-        elif phase in ("Matchmaking", "None", "EndOfGame", "PreEndOfGame"):
+        elif phase in ("WaitingForStats", "PreEndOfGame", "EndOfGame"):
+            # Post-game: keep the bus alive so the end-of-game stats block push
+            # (and its seed) can trigger the auto-review. The post-game report is
+            # left in place so it stays on screen through these phases.
+            self._ensure_event_bus()
+            self._reset_draft_state()
+            self._clear_scout()
+            if not self.state.snapshot().get("demo"):
+                self.state.set("lobby", None)
+                self.state.set("draft_intel", None)
+                self.state.set("recommendation", None)
+        elif phase in ("Matchmaking", "None"):
             self._stop_event_bus()
             self._reset_draft_state()
             self._clear_scout()
@@ -330,6 +347,7 @@ class PipelineRunner:
         bus = LcuEventBus(self.client.creds)
         bus.subscribe(CHAMP_SELECT_TOPIC, self._on_session)
         bus.subscribe(LOBBY_TOPIC, self._on_lobby)
+        bus.subscribe(EOG_TOPIC, self._on_eog)
         bus.start()
         self._event_bus = bus
         # The WS only delivers changes from here on, so seed the CURRENT champ
@@ -347,6 +365,12 @@ class PipelineRunner:
                 self._on_lobby(lobby, "Create")
         except Exception:
             log.debug("Initial lobby seed failed", exc_info=True)
+        try:
+            eog = self.client.get_json("/lol-end-of-game/v1/eog-stats-block")
+            if isinstance(eog, dict):
+                self._on_eog(eog, "Create")
+        except Exception:
+            log.debug("Initial eog seed failed", exc_info=True)
 
     def _stop_event_bus(self) -> None:
         if self._event_bus is not None:
@@ -437,6 +461,76 @@ class PipelineRunner:
         self._last_scout_sig = None
         self._player_scout_cache.clear()
         self.state.set("scout", {"players": [], "ready": False, "at": None})
+
+    # ----------------------------------------------- auto post-game review
+    def _on_eog(self, data: dict | None, event_type: str) -> None:
+        """Event-bus callback (bus thread): the end-of-game stats block appeared.
+        Trigger the auto-review off-thread; the heavy DB + Ollama work is guarded
+        and deduped by game id inside ``_run_post_game_review``."""
+        if event_type == "Delete" or self.client is None:
+            return
+        threading.Thread(target=self._run_post_game_review,
+                         name="ag-post-game", daemon=True).start()
+
+    def _run_post_game_review(self) -> None:
+        """Ingest the just-finished game, run the AI match review (graceful when
+        Ollama is offline), and publish it to the ``post_game`` state. Deduped on
+        the stored game id so repeated eog pushes/seeds review a game only once."""
+        if not self._review_lock.acquire(blocking=False):
+            return
+        session = None
+        try:
+            from sylqon.ai.match_review import MatchReviewAnalyzer
+            from sylqon.db import matches as match_store, queries
+            from sylqon.db.schema import MatchAnalysis
+            from sylqon.db.session import get_session
+            if self.client is None:
+                return
+            session = get_session()
+            match_store.sync_recent_matches(session, self.client, limit=5)
+            session.commit()
+            rows = queries.recent_matches(session, 1)
+            if not rows:
+                return
+            m = rows[0]
+            if m.game_id == self._last_reviewed_game:
+                return  # already reviewed this game
+            self._last_reviewed_game = m.game_id
+            match_dict = match_store.serialize_match(session, m)
+            # Publish the match immediately; the analysis lands when Ollama returns.
+            self.state.set("post_game", {"active": True, "match": match_dict,
+                                         "analysis": None, "pending": True,
+                                         "at": time.time()})
+            result = MatchReviewAnalyzer(self.engine).analyze_match(
+                match_store.match_to_analysis_input(session, m))
+            if result is None:
+                self.state.update("post_game", pending=False)
+                log.info("Post-game review: Ollama offline — %s %s recorded "
+                         "without analysis", match_dict["champion"], match_dict["result"])
+                return
+            if m.analysis is None:
+                session.add(MatchAnalysis(
+                    match_id=m.id, summary=result["summary"], strengths=result["strengths"],
+                    weaknesses=result["weaknesses"], tips=result["tips"]))
+                session.commit()
+            self.state.set("post_game", {"active": True, "match": match_dict,
+                                         "analysis": result, "pending": False,
+                                         "at": time.time()})
+            log.info("Auto post-game review ready: %s (%s)",
+                     match_dict["champion"], match_dict["result"])
+        except Exception:
+            log.exception("Auto post-game review failed")
+            if session is not None:
+                session.rollback()
+        finally:
+            if session is not None:
+                session.close()
+            self._review_lock.release()
+
+    def _clear_post_game(self) -> None:
+        self._last_reviewed_game = None
+        if self.state.snapshot().get("post_game", {}).get("active"):
+            self.state.set("post_game", {"active": False})
 
     # ------------------------------------------------- live-game overlay poller
     def _ensure_live_poller(self) -> None:

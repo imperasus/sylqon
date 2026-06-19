@@ -337,6 +337,14 @@ def scout_lobby() -> dict:
     return runner.state.snapshot().get("scout") or {"players": [], "ready": False}
 
 
+@app.get("/api/post-game")
+def post_game() -> dict:
+    """The auto-generated post-game review for the most recently finished game
+    (match summary + AI analysis), or ``{active: false}`` when none is pending.
+    Driven event-side by the end-of-game stats block; see runtime ``_on_eog``."""
+    return runner.state.snapshot().get("post_game") or {"active": False}
+
+
 @app.get("/api/champions")
 def list_champions() -> dict:
     """All champions (name/slug/tags) for the pool editor's picker."""
