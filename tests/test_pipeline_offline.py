@@ -881,6 +881,48 @@ def test_my_turn_flag_drives_trigger():
     assert idle.trigger_signature() != mine.trigger_signature()
 
 
+def test_pick_prompt_schema():
+    """Both pick prompts constrain the model to the pool with JSON-serialized
+    names (not a Python list repr) and ask for raw JSON output."""
+    from sylqon.ai.pick_prompt import (
+        compile_pick_prompt, compile_universe_pick_prompt, format_scout_block,
+    )
+
+    ctx = make_ctx(role="bottom", enemies=[threat("Ahri", threats=["burst_ap"])])
+    ranked = [
+        {"name": "Jinx", "tags": ["Marksman"], "damage_type": "AD",
+         "score": 2, "notes": ["+2 vs tanks"]},
+        {"name": "Sivir", "tags": ["Marksman"], "damage_type": "AD",
+         "score": 0, "notes": []},
+    ]
+    prompt = compile_pick_prompt(ctx, ranked)
+    assert "raw JSON" in prompt
+    assert '"pick" MUST be one of' in prompt
+    assert '"Jinx"' in prompt and '"Sivir"' in prompt   # JSON-quoted
+    assert "'Jinx'" not in prompt                        # not a Python repr
+
+    candidates = [
+        {"champion": {"name": "Jinx"},
+         "score": {"total": 80, "counter": 70, "synergy": 60, "meta": 90, "comfort": 68},
+         "in_pool": True, "reasoning": "strong"},
+    ]
+    uni = compile_universe_pick_prompt(ctx, candidates, scout_players=None)
+    assert "raw JSON" in uni and '"Jinx"' in uni and "'Jinx'" not in uni
+    # Scout block is omitted entirely when there's no usable fingerprint.
+    assert format_scout_block(None) == ""
+    assert format_scout_block([{"hidden": True}, {"is_self": True}]) == ""
+
+
+def test_strip_json_fences():
+    """The engine tolerates a stray markdown fence around an otherwise-valid
+    JSON body (insurance for if format='json' is ever dropped)."""
+    from sylqon.ai.engine import _strip_json_fences
+    assert _strip_json_fences('{"a": 1}') == '{"a": 1}'
+    assert _strip_json_fences('  {"a": 1}  ') == '{"a": 1}'
+    assert _strip_json_fences('```json\n{"a": 1}\n```') == '{"a": 1}'
+    assert _strip_json_fences('```\n{"a": 1}```') == '{"a": 1}'
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):

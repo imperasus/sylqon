@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 
 from sylqon import loadout as loadout_mod
+from sylqon.data import static
 from sylqon.data.catalog import Catalog
 from sylqon.lcu.lobby import MatchContext
 
@@ -68,7 +69,8 @@ RULES:
    (e.g. anti-tank vs %-pen, anti-burst survivability, anti-heal). Quality over quantity.
 3. core_items: exactly {len(candidate.get('core_items', []))} names, at most ONE swapped from the situational pool.
 4. situational_items: exactly {situational_count} names, all from the situational pool above.
-5. Runes are optional to change; if you change them keep a legal LoL keystone + tree.
+5. Runes are optional to change; if you change them use a keystone EXACTLY from this
+   list: {list(static.KEYSTONES)} — plus minor runes from that keystone's own tree.
 6. Each variant needs a short "name" (e.g. "Anti-Tank") and 1-sentence "reasoning".
 
 OUTPUT JSON ONLY:

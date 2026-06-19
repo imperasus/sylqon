@@ -17,6 +17,19 @@ from sylqon import config
 log = logging.getLogger(__name__)
 
 
+def _strip_json_fences(raw: str) -> str:
+    """Defensive cleanup before parsing. ``format="json"`` already constrains the
+    model to raw JSON, but if that is ever dropped/ignored the model tends to wrap
+    output in a ```json fence. Strip a single surrounding fence so a stray wrapper
+    doesn't discard an otherwise-valid response. Left untouched otherwise."""
+    s = raw.strip()
+    if s.startswith("```"):
+        s = s.split("\n", 1)[-1] if "\n" in s else s[3:]
+        if s.rstrip().endswith("```"):
+            s = s.rstrip()[:-3]
+    return s.strip()
+
+
 class OllamaEngine:
     def __init__(self) -> None:
         self.url = f"{config.OLLAMA_URL}/api/generate"
@@ -78,7 +91,7 @@ class OllamaEngine:
             return None
 
         try:
-            parsed = json.loads(raw)
+            parsed = json.loads(_strip_json_fences(raw))
         except ValueError:
             log.warning("Ollama response was not valid JSON: %.120s", raw)
             return None

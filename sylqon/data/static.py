@@ -240,11 +240,16 @@ STYLE_BY_ID = {v: k for k, v in RUNE_STYLES.items()}
 HEAVY_CC_CHAMPS = {
     "Malzahar", "Warwick", "Skarner", "Urgot", "Mordekaiser", "Tahm Kench",
     "Leona", "Nautilus", "Thresh", "Morgana", "Lux", "Zoe", "Lissandra",
-    "Sejuani", "Maokai", "Amumu", "Rammus", "Ashe", "Varus", "Jhin",
+    "Sejuani", "Maokai", "Amumu", "Rammus", "Ashe", "Varus",
     "Twisted Fate", "Pantheon", "Renata Glasc", "Rell", "Alistar", "Braum",
     "Veigar", "Annie", "Neeko", "Ornn", "Cho'Gath", "Sion", "Poppy", "Zac",
 }
-SUPPRESSION_CHAMPS = {"Malzahar", "Warwick", "Skarner", "Urgot", "Mordekaiser", "Tahm Kench"}
+# True suppression / point-click lockdown that a QSS / Mercurial CAN cleanse and
+# that effectively neutralises a carry. Mordekaiser (R is a banish/isolation, not
+# removable by QSS) and post-rework Tahm Kench (no offensive devour) were removed
+# — neither is a real suppression, so neither should force the near-mandatory
+# anti-CC directive. Urgot's R applies a true suppression that QSS clears.
+SUPPRESSION_CHAMPS = {"Malzahar", "Warwick", "Skarner", "Urgot"}
 HIGH_BURST_AD = {
     "Zed", "Talon", "Qiyana", "Rengar", "Kha'Zix", "Naafiri", "Pyke",
     "Nocturne", "Kayn", "Briar", "Pantheon",
@@ -256,7 +261,7 @@ HIGH_BURST_AP = {
 HEAVY_HEALING = {
     "Soraka", "Aatrox", "Dr. Mundo", "Vladimir", "Sylas", "Swain", "Yuumi",
     "Sona", "Nami", "Warwick", "Fiora", "Illaoi", "Briar", "Zac", "Maokai",
-    "Kayn", "Rhaast",
+    "Kayn", "Rhaast", "Olaf", "Trundle",
 }
 HEAVY_POKE = {
     "Xerath", "Vel'Koz", "Ziggs", "Lux", "Jayce", "Zoe", "Varus", "Ezreal",
@@ -270,7 +275,7 @@ HEAVY_TANK = {
 # the draft comp classifier to flag a split-push archetype.
 SPLIT_PUSH_CHAMPS = {
     "Fiora", "Jax", "Camille", "Tryndamere", "Yorick", "Trundle", "Nasus",
-    "Tahm Kench", "Sion", "Shen", "Gangplank", "Quinn", "Kayle", "Master Yi",
+    "Sion", "Shen", "Gangplank", "Quinn", "Kayle",
     "Illaoi", "Riven", "Aatrox", "Renekton", "Yone", "Jayce",
 }
 

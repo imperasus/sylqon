@@ -1493,7 +1493,13 @@ class PipelineRunner:
                 self.state.update("ollama", processing=True)
                 log.info("Routing match context to %s for counter-analysis", self.engine.model)
                 try:
-                    ai_result = self.engine.evaluate(compile_prompt(ctx, candidate, self.catalog))
+                    # The counter-loadout JSON (items + runes + shards + spells +
+                    # reasoning) can exceed the default 512-token budget; a cut-off
+                    # response fails to parse and the whole AI decision is dropped.
+                    # Give it headroom — generation still stops at the JSON's end.
+                    ai_result = self.engine.evaluate(
+                        compile_prompt(ctx, candidate, self.catalog),
+                        options={"num_predict": 1024})
                 finally:
                     self.state.update("ollama", processing=False)
             elif not ctx.enemies:

@@ -27,7 +27,7 @@ TIER_SCORE = {0: 100, 1: 95, 2: 80, 3: 65, 4: 50, 5: 35}
 # games on starts low; a pool champion without a recent sample sits mid-high.
 COMFORT_OFF_POOL = 42.0
 COMFORT_IN_POOL = 68.0
-COMFORT_MIN_GAMES = 3  # personal win rate only trusted past this sample size
+COMFORT_MIN_GAMES = 5  # personal win rate only trusted past this sample size
 
 
 class ChampionScorer:
@@ -115,7 +115,9 @@ class ChampionScorer:
         return float(TIER_SCORE.get(int(tier), 50))
 
     def _win_rate_score(self, session: Session, champion_id: int, role: str) -> float:
-        """Win rate (percentage) -> 0..100. 45%->40, 50%->70, 55%+->100."""
+        """Win rate (percentage) -> 0..100. 40%->20, 45%->40, 50%->70, 55%+->100.
+        Below 45% keeps a gentle slope (not a flat floor) so a merely-weak pick is
+        still ranked above a genuinely-bad one when other terms are close."""
         wr = None
         build = queries.build_for(session, champion_id, role)
         if build is not None and build.win_rate is not None:
@@ -126,7 +128,7 @@ class ChampionScorer:
         if wr is None:
             return 50.0
         if wr < 45:
-            score = 40.0
+            score = 40 - (45 - wr) * 2          # 45%->40, 40%->30, 35%->20 (floored)
         elif wr < 50:
             score = 40 + (wr - 45) * (30 / 5)
         elif wr < 55:

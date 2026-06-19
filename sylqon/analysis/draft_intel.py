@@ -40,7 +40,7 @@ _ARCHETYPES = {
                     "disengage/peel tool and don't get caught grouped."),
     "poke_siege": ("Poke / Siege",
                    "Force engage onto them — they fold once you close the gap; "
-                   "stack MR/sustain and look for hard-engage angles."),
+                   "stack sustain/shields and look for hard-engage angles."),
     "pick": ("Pick / Assassinate",
              "Never walk alone: ward deep, group, and bring a "
              "Zhonya/GA/QSS to survive the first burst."),

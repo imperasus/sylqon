@@ -144,7 +144,7 @@ CANDIDATE POOL (pick from these names only; heuristic score pre-computed):
 {pool_lines}
 
 RULES:
-- "pick" MUST be one of: {names}
+- "pick" MUST be one of: {json.dumps(names)}
 - Prefer high heuristic scores but override when the spells/comp clearly justify it.
 - Favor champions that synergise with ally engage/peel and exploit enemy weaknesses.
 
@@ -229,7 +229,7 @@ SCORED CANDIDATES (pick from these names only):
 {cand_block}
 
 RULES:
-- "pick" MUST be one of: {names}
+- "pick" MUST be one of: {json.dumps(names)}
 - Prefer higher overall scores but override when spells/comp clearly justify it.
 
 Respond with raw JSON only, exactly this shape:
