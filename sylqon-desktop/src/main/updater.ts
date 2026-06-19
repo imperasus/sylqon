@@ -22,6 +22,9 @@ import { autoUpdater } from "electron-updater";
 // ---------------------------------------------------------------------------
 
 type UpdateStatus =
+  | { phase: "checking" }
+  | { phase: "uptodate"; version: string }
+  | { phase: "error"; message: string }
   | { phase: "available"; version: string }
   | { phase: "progress"; percent: number }
   | { phase: "downloaded"; version: string };
@@ -32,6 +35,10 @@ const RECHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 let getMainWindow: () => BrowserWindow | null = () => null;
 let latestStatus: UpdateStatus | null = null;
+// True only while a USER-triggered check is in flight, so the "up to date" /
+// "check failed" feedback is shown for manual checks but stays silent for the
+// routine background checks (which must never interrupt the user).
+let manualCheckPending = false;
 
 /** Build a self-contained, idempotent script that renders/updates the banner. */
 function bannerScript(status: UpdateStatus): string {
@@ -60,7 +67,13 @@ function bannerScript(status: UpdateStatus): string {
       b.onclick=onClick;
       return b;
     }
-    if(s.phase==="available"){
+    if(s.phase==="checking"){
+      el.appendChild(span("Checking for updates…"));
+    } else if(s.phase==="uptodate"){
+      el.appendChild(span("Sylqon "+s.version+" is up to date."));
+    } else if(s.phase==="error"){
+      el.appendChild(span(s.message));
+    } else if(s.phase==="available"){
       el.appendChild(span("Sylqon "+s.version+" is available."));
       el.appendChild(button("Download", function(){ if(api.download) api.download(); }));
     } else if(s.phase==="progress"){
@@ -74,6 +87,11 @@ function bannerScript(status: UpdateStatus): string {
     dismiss.style.cssText="cursor:pointer;opacity:.6;padding-left:4px;";
     dismiss.onclick=function(){ el.remove(); };
     el.appendChild(dismiss);
+    // Transient results clear themselves so a stale "up to date"/error notice
+    // doesn't linger (or reappear after a page navigation).
+    if(s.phase==="uptodate" || s.phase==="error"){
+      setTimeout(function(){ if(el && el.parentNode) el.remove(); }, s.phase==="error"?6000:4000);
+    }
   })();`;
 }
 
@@ -90,6 +108,40 @@ function renderBanner(): void {
 function pushStatus(status: UpdateStatus): void {
   latestStatus = status;
   renderBanner();
+}
+
+/** Push a self-clearing status: the banner removes itself client-side, and we
+ *  also drop it from `latestStatus` so a later navigation won't re-render it. */
+function pushTransient(status: UpdateStatus, ms: number): void {
+  pushStatus(status);
+  setTimeout(() => {
+    if (latestStatus === status) latestStatus = null;
+  }, ms);
+}
+
+/**
+ * User-triggered "check for updates" (tray menu / UI version badge). Unlike the
+ * silent background checks, this always gives feedback: a "checking…" banner,
+ * then "up to date" / "available" / "check failed". No-ops with a friendly
+ * notice when the app isn't packaged (no release feed to check against).
+ */
+export function checkForUpdatesManual(): void {
+  if (!app.isPackaged) {
+    pushTransient(
+      { phase: "error", message: "Updates are only available in the installed app." },
+      6000
+    );
+    return;
+  }
+  manualCheckPending = true;
+  pushStatus({ phase: "checking" });
+  autoUpdater.checkForUpdates().catch((err) => {
+    console.error("[sylqon-desktop] manual update check failed:", err?.message ?? err);
+    if (manualCheckPending) {
+      manualCheckPending = false;
+      pushTransient({ phase: "error", message: "Update check failed." }, 6000);
+    }
+  });
 }
 
 /**
@@ -121,6 +173,8 @@ export function setupAutoUpdates(resolveWindow: () => BrowserWindow | null): voi
     // the close-to-tray handler lets the app actually exit.
     autoUpdater.quitAndInstall();
   });
+  // Manual "check for updates" from the tray menu / UI version badge.
+  ipcMain.on("sylqon:update-check", () => checkForUpdatesManual());
 
   if (!app.isPackaged) {
     console.log("[sylqon-desktop] auto-update disabled (not packaged).");
@@ -130,19 +184,33 @@ export function setupAutoUpdates(resolveWindow: () => BrowserWindow | null): voi
   autoUpdater.autoDownload = false; // user clicks Download
   autoUpdater.autoInstallOnAppQuit = true; // install on quit if already downloaded
 
-  autoUpdater.on("update-available", (info) =>
-    pushStatus({ phase: "available", version: info.version })
-  );
+  autoUpdater.on("update-available", (info) => {
+    manualCheckPending = false;
+    pushStatus({ phase: "available", version: info.version });
+  });
+  autoUpdater.on("update-not-available", (info) => {
+    // Only surface "you're up to date" for a check the user explicitly asked
+    // for; background checks finding nothing must stay silent.
+    if (manualCheckPending) {
+      manualCheckPending = false;
+      pushTransient({ phase: "uptodate", version: info?.version ?? app.getVersion() }, 4000);
+    }
+  });
   autoUpdater.on("download-progress", (p) =>
     pushStatus({ phase: "progress", percent: Math.round(p.percent) })
   );
   autoUpdater.on("update-downloaded", (info) =>
     pushStatus({ phase: "downloaded", version: info.version })
   );
-  autoUpdater.on("error", (err) =>
-    // Non-intrusive: log only. A failed check must never interrupt the user.
-    console.error("[sylqon-desktop] auto-update error:", err?.message ?? err)
-  );
+  autoUpdater.on("error", (err) => {
+    // Background failures are logged only — they must never interrupt the user.
+    // A failure during a manual check gets a transient, dismissable notice.
+    console.error("[sylqon-desktop] auto-update error:", err?.message ?? err);
+    if (manualCheckPending) {
+      manualCheckPending = false;
+      pushTransient({ phase: "error", message: "Update check failed." }, 6000);
+    }
+  });
 
   const check = () =>
     autoUpdater.checkForUpdates().catch((err) =>

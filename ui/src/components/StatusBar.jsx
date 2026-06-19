@@ -1,5 +1,21 @@
+import { useEffect, useState } from "react";
 import { Cpu, Loader2, Play, RadioTower, RefreshCw, Square, Zap } from "lucide-react";
 import { Button } from "./shared.jsx";
+
+/** Installed desktop-app version (same value auto-update compares). Resolves via
+ *  the Electron preload bridge; stays empty in a plain browser, so the badge is
+ *  simply hidden there. */
+function useAppVersion() {
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+    let alive = true;
+    Promise.resolve(window.sylqon?.getVersion?.())
+      .then((v) => { if (alive && v) setVersion(String(v)); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  return version;
+}
 
 function Dot({ ok }) {
   return (
@@ -30,12 +46,23 @@ export default function StatusBar({ state, mode, act, api, demoActive }) {
   const patch = state?.cache?.patch || "—";
   const tag = MODE_TAG[mode] || MODE_TAG.home;
   const syncing = sync.running;
+  const version = useAppVersion();
 
   return (
     <header className="frost edge-accent flex items-center gap-3 px-3 py-1.5">
       <div className="flex items-center gap-2">
         <Zap className="h-4 w-4 text-accent" />
         <span className="font-display text-[14px] font-bold tracking-[0.28em] text-white/90">SYLQON</span>
+        {version && (
+          <button
+            type="button"
+            onClick={() => window.sylqonUpdater?.check?.()}
+            className="font-mono text-[10px] tracking-wide text-white/35 transition-colors hover:text-white/70"
+            title="Installed app version — click to check for updates"
+          >
+            v{version}
+          </button>
+        )}
       </div>
       <span className={`rounded border px-1.5 py-px font-display text-[11px] font-bold tracking-[0.2em] ${tag.tone}`}>
         {tag.label}

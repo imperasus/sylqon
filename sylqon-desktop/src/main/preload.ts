@@ -16,10 +16,14 @@ contextBridge.exposeInMainWorld("sylqon", {
   getBaseUrl: (): Promise<string> => ipcRenderer.invoke("sylqon:getBaseUrl"),
   /** Resolve the backend log file path (for troubleshooting display). */
   getLogPath: (): Promise<string> => ipcRenderer.invoke("sylqon:getLogPath"),
+  /** Resolve the installed app version (for the UI version badge). */
+  getVersion: (): Promise<string> => ipcRenderer.invoke("sylqon:getVersion"),
 });
 
 // Update banner buttons (Download / Restart) → main process (see updater.ts).
 contextBridge.exposeInMainWorld("sylqonUpdater", {
+  /** Manually check for an update (shows checking → up-to-date / available). */
+  check: (): void => ipcRenderer.send("sylqon:update-check"),
   /** Start downloading the available update. */
   download: (): void => ipcRenderer.send("sylqon:update-download"),
   /** Quit and install the downloaded update. */

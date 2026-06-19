@@ -16,7 +16,7 @@ import {
 import { startBackend, stopBackend } from "./backend";
 import { createTray, destroyTray, notifyTray } from "./tray";
 import { checkBackend } from "./health";
-import { setupAutoUpdates, attachUpdateBanner } from "./updater";
+import { setupAutoUpdates, attachUpdateBanner, checkForUpdatesManual } from "./updater";
 
 // ---------------------------------------------------------------------------
 // Sylqon Desktop — main process
@@ -208,6 +208,8 @@ ipcMain.handle("sylqon:getBaseUrl", () => getBaseUrl());
 ipcMain.handle("sylqon:getLogPath", () =>
   path.join(app.getPath("userData"), "backend.log")
 );
+// App version (same value electron-updater compares against) for the UI badge.
+ipcMain.handle("sylqon:getVersion", () => app.getVersion());
 
 // --- Single instance: a second launch focuses the existing window -----------
 if (!app.requestSingleInstanceLock()) {
@@ -227,7 +229,7 @@ if (!app.requestSingleInstanceLock()) {
     // Create the overlay up front (hidden) so the first hotkey press is instant.
     createOverlayWindow();
     registerHotkeys();
-    createTray({ showMainWindow, quit: quitApp });
+    createTray({ showMainWindow, checkForUpdates: checkForUpdatesManual, quit: quitApp });
 
     // Check for updates silently and surface an in-app banner if one is found
     // (no-op when not packaged). Non-blocking — never gates the UI.

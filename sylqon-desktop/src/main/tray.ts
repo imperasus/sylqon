@@ -9,6 +9,7 @@ let tray: Tray | null = null;
 
 interface TrayActions {
   showMainWindow: () => void;
+  checkForUpdates: () => void;
   quit: () => void;
 }
 
@@ -23,6 +24,8 @@ export function createTray(actions: TrayActions): void {
   const menu = Menu.buildFromTemplate([
     { label: "Megnyitás", click: () => actions.showMainWindow() },
     { label: "Overlay be/ki (F10)", click: () => toggleOverlay() },
+    { type: "separator" },
+    { label: "Frissítés keresése", click: () => actions.checkForUpdates() },
     { type: "separator" },
     { label: "Kilépés", click: () => actions.quit() },
   ]);
