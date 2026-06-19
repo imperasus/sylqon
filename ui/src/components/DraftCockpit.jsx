@@ -1,11 +1,10 @@
 import { useMemo } from "react";
-import { Ban, Crown, Radar, Shuffle, Sparkles, Swords, Target } from "lucide-react";
+import { Ban, Crown, EyeOff, Radar, Shuffle, Sparkles, Swords, Target } from "lucide-react";
 import { useStaticData } from "../api.js";
-import { DAMAGE_COLORS, ROLE_LABELS, squareUrl } from "../assets.js";
+import { DAMAGE_COLORS, ROLE_LABELS, pct, squareUrl } from "../assets.js";
 import {
   Bar, ChampPortrait, ChampionRow, Chip, Panel, Score100, SpellPips, ThreatBadge,
 } from "./shared.jsx";
-import LobbyScoutPanel from "./LobbyScoutPanel.jsx";
 
 /* Segmented progress: one cell per draft slot, lit as picks lock in. */
 function DraftProgress({ allyCount, enemyCount, phase }) {
@@ -85,6 +84,66 @@ function MiniPickList({ label, tone, items, patch, isCounter }) {
   );
 }
 
+/* Playstyle tag → chip tone, so the read is glanceable (mirrors the old panel). */
+const SCOUT_TAG_TONE = {
+  aggressive: "enemy", "carry-threat": "amber", "one-trick": "amber",
+  "farm-focused": "accent", playmaker: "ally", calculated: "good",
+  frontliner: "ally", "vision-control": "accent",
+};
+
+/* Recent-form streak as a short signed label (3W / 4L), else null. */
+function scoutStreak(streak) {
+  if (!streak || Math.abs(streak) < 3) return null;
+  return `${Math.abs(streak)}${streak > 0 ? "W" : "L"}`;
+}
+
+/* Full fingerprint for the strip's hover tooltip. */
+function scoutTip(p) {
+  const f = p.recent_form || {};
+  const bits = [p.name];
+  if ((p.playstyle_tags || []).length) bits.push(p.playstyle_tags.join(", "));
+  if (f.games) bits.push(`recent ${pct(f.win_rate)} over ${f.games} games`);
+  if (p.comfort?.champion) bits.push(`mains ${p.comfort.champion} (${pct(p.comfort.share)} of games, ${pct(p.comfort.win_rate)} WR)`);
+  if ((p.champion_pool || []).length) bits.push("pool: " + p.champion_pool.slice(0, 4).map((c) => c.champion).join(", "));
+  return bits.filter(Boolean).join("\n");
+}
+
+/* Compact pre-game scout fingerprint, shown under a teammate's champion card:
+   summoner name + top playstyle tags + recent win-rate; full read in the tip. */
+function ScoutStrip({ p, patch }) {
+  if (!p) return null;
+  if (p.hidden) {
+    return (
+      <div className="mt-0.5 ml-2 flex items-center gap-1.5 rounded-md border border-white/[0.06]
+                      bg-white/[0.012] px-1.5 py-0.5 opacity-60" title="Match history hidden / anonymized">
+        <EyeOff className="h-3 w-3 shrink-0 text-white/35" />
+        <span className="truncate text-[10px] text-white/45">{p.name} · hidden</span>
+      </div>
+    );
+  }
+  const f = p.recent_form || {};
+  const tags = (p.playstyle_tags || []).slice(0, 2);
+  const wr = f.games ? f.win_rate : null;
+  const streak = scoutStreak(f.streak);
+  return (
+    <div className="mt-0.5 ml-2 flex items-center gap-1 rounded-md border border-white/[0.06]
+                    bg-white/[0.012] px-1.5 py-0.5" title={scoutTip(p)}>
+      <span className="max-w-[78px] shrink-0 truncate text-[10px] font-bold text-white/55">{p.name}</span>
+      {tags.map((t) => <Chip key={t} tone={SCOUT_TAG_TONE[t] || "muted"}>{t}</Chip>)}
+      {wr != null && (
+        <span className={`ml-auto shrink-0 font-mono text-[10px] tabular-nums
+          ${f.win_rate >= 0.5 ? "text-good/70" : "text-enemy/70"}`}>
+          {pct(wr)}{streak ? ` ${streak}` : ""}
+        </span>
+      )}
+      {p.comfort?.champion && (
+        <ChampPortrait slug={p.comfort.slug} patch={patch} size="h-5 w-5" round
+                       title={`mains ${p.comfort.champion}`} />
+      )}
+    </div>
+  );
+}
+
 /* One tight player row in a team column. */
 function PlayerRow({ pick, patch, side, isMe }) {
   if (!pick) {
@@ -131,13 +190,15 @@ function PlayerRow({ pick, patch, side, isMe }) {
 
 /* A pick row plus its pool-derived Top-3 list (counters for enemies, synergies
    for allies) — only once the pick is locked and a list exists. */
-function PlayerCard({ pick, patch, side, isMe }) {
+function PlayerCard({ pick, patch, side, isMe, scout }) {
   if (!pick) return <PlayerRow pick={null} patch={patch} side={side} />;
   const isEnemy = side === "enemy";
   const list = isEnemy ? pick.counters : pick.synergies;
   return (
     <div className="flex flex-col">
       <PlayerRow pick={pick} patch={patch} side={side} isMe={isMe} />
+      {/* Pre-game scout fingerprint at the player's own card (teammates + self). */}
+      {scout && <ScoutStrip p={scout} patch={patch} />}
       {pick.locked && !isMe && (
         <MiniPickList
           label={isEnemy ? "COUNTERS" : "SYNERGY"}
@@ -151,7 +212,7 @@ function PlayerCard({ pick, patch, side, isMe }) {
   );
 }
 
-function TeamColumn({ title, icon, side, picks, patch, comp }) {
+function TeamColumn({ title, icon, side, picks, patch, comp, scoutByRole }) {
   const slots = [...picks, ...Array(Math.max(0, 5 - picks.length)).fill(null)].slice(0, 5);
   return (
     <Panel title={title} icon={icon} accent={side} edge={side} className="gap-1.5">
@@ -165,7 +226,8 @@ function TeamColumn({ title, icon, side, picks, patch, comp }) {
       <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5">
         {slots.map((p, i) => (
           <PlayerCard key={p ? `${side}-${p.champion_id}` : `${side}-e-${i}`}
-                      pick={p} patch={patch} side={side} isMe={p?.isMe} />
+                      pick={p} patch={patch} side={side} isMe={p?.isMe}
+                      scout={p ? scoutByRole?.[p.role] : null} />
         ))}
       </div>
     </Panel>
@@ -407,6 +469,18 @@ export default function DraftCockpit({ state }) {
     return m;
   }, [champions]);
 
+  // Pre-game scout fingerprints, keyed by champ-select position so each
+  // teammate's read sits on their own champion card (scout.position and
+  // pick.role share the same normalized role vocabulary). Scouting is
+  // allies-only, so only the YOUR TEAM column resolves a match.
+  const scoutByRole = useMemo(() => {
+    const m = {};
+    for (const p of state?.scout?.players || []) {
+      if (p.position && (p.games_analyzed > 0 || p.hidden)) m[p.position] = p;
+    }
+    return m;
+  }, [state?.scout]);
+
   if (!lobby) {
     return (
       <div className="frost flex h-full flex-col items-center justify-center gap-2">
@@ -437,12 +511,11 @@ export default function DraftCockpit({ state }) {
 
       <div className="grid min-h-0 grid-cols-[1fr_1.15fr_1fr] gap-2">
         <TeamColumn title="YOUR TEAM" icon={Sparkles} side="ally" picks={allyPicks}
-                    patch={patch} comp={allyComp} />
+                    patch={patch} comp={allyComp} scoutByRole={scoutByRole} />
 
         <div className="scroll-thin flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
           <TimingBanner timing={intel?.counter_pick} />
           <RecoCard reco={reco} role={lobby.my_role} slugOf={slugOf} patch={patch} />
-          <LobbyScoutPanel scout={state?.scout} patch={patch} />
           <RoleTop recs={reco?.role_top} patch={patch} />
           <PoolScored scored={reco?.scored} pick={reco?.pick} slugOf={slugOf} patch={patch} />
         </div>
