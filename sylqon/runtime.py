@@ -28,7 +28,9 @@ from sylqon.data import static
 from sylqon.data.catalog import Catalog
 from sylqon.lcu import scout as scout_mod
 from sylqon.lcu.client import LCUClient
-from sylqon.lcu.events import CHAMP_SELECT_TOPIC, EOG_TOPIC, LOBBY_TOPIC, LcuEventBus
+from sylqon.lcu.events import (
+    CHAMP_SELECT_TOPIC, EOG_TOPIC, GAMEFLOW_TOPIC, LOBBY_TOPIC, LcuEventBus,
+)
 from sylqon.lcu.history import champion_stats
 from sylqon.lcu.injector import Injector, merge_stat_shards
 from sylqon.lcu.lobby import (
@@ -173,6 +175,11 @@ class PipelineRunner:
         self.engine = OllamaEngine()
         self.client: LCUClient | None = None
         self._event_bus: LcuEventBus | None = None
+        # Always-on (while connected) bus carrying just the gameflow phase, so a
+        # phase transition is acted on the instant it pushes — independent of the
+        # per-phase ``_event_bus`` which is started/stopped by phase.
+        self._gameflow_bus: LcuEventBus | None = None
+        self._phase_lock = threading.Lock()
         self._summoner_id: int = 0
         self._compile_lock = threading.Lock()
         self._inject_lock = threading.Lock()
@@ -243,6 +250,7 @@ class PipelineRunner:
     def stop(self) -> None:
         self._stop.set()
         self._stop_event_bus()
+        self._stop_gameflow_bus()
         self._stop_live_poller()
         self.stop_live_demo()
 
@@ -256,6 +264,7 @@ class PipelineRunner:
         if self.client is None or not self.client.is_alive():
             was_connected = self.client is not None
             self._stop_event_bus()
+            self._stop_gameflow_bus()
             self.client = LCUClient.connect()
             if self.client is None:
                 if was_connected:
@@ -279,61 +288,75 @@ class PipelineRunner:
                     log.info("Re-converted %d build(s) with newly available items",
                              reconverted)
                 self._catalog_lcu_supplemented = True
+            # Subscribe to gameflow phase pushes for instant transitions; the
+            # seed below drives the first _handle_phase for the current phase.
+            self._ensure_gameflow_bus()
 
-        phase = self.client.gameflow_phase()
-        self.state.update("lcu", connected=True, phase=phase)
+        # Poll the phase as a safety net (and seed when the WS hasn't pushed yet);
+        # the gameflow WS handles the same transition the instant it happens.
+        self._handle_phase(self.client.gameflow_phase())
 
-        # The live-game overlay poller only runs during the actual game.
-        if phase != "InProgress":
-            self._stop_live_poller()
+    def _handle_phase(self, phase: str) -> None:
+        """Drive all phase-dependent subsystems (event bus, live poller, state
+        clearing) for ``phase``. Invoked both by the gameflow WS push (instant)
+        and by the poll-loop watchdog (safety net), so a lock serializes the two
+        and the body stays idempotent."""
+        with self._phase_lock:
+            if self.client is None:
+                return
+            self.state.update("lcu", connected=True, phase=phase)
 
-        if phase == "InProgress":
-            self._stop_event_bus()
-            self._ensure_live_poller()
-        elif phase == "ChampSelect":
-            self._ensure_event_bus()
-            self._clear_post_game()  # a new game starts — drop the last report
-            # Resilience: the WebSocket only pushes *deltas*, so when it isn't
-            # running (older client / blocked port) OR nothing has been published
-            # yet this champ select, poll the current state so the dashboard
-            # switches to Live Draft immediately — without waiting for a hover.
-            bus_ok = self._event_bus and self._event_bus.is_running()
-            if not bus_ok or self.state.snapshot().get("lobby") is None:
-                ctx = read_match_context(self.client, self.catalog,
-                                         summoner_id=self._summoner_id)
-                if ctx:
-                    self._publish_lobby(ctx, demo=False)
-                    self._maybe_recommend(ctx)
-            self._retry_injection_if_pending()
-        elif phase == "Lobby":
-            # Pre-game: keep the event bus up so lobby-scouting fires the moment
-            # the premade roster changes; the draft views stay cleared.
-            self._ensure_event_bus()
-            self._clear_post_game()  # a new game starts — drop the last report
-            self._reset_draft_state()
-            if not self.state.snapshot().get("demo"):
-                self.state.set("lobby", None)
-                self.state.set("draft_intel", None)
-                self.state.set("recommendation", None)
-        elif phase in ("WaitingForStats", "PreEndOfGame", "EndOfGame"):
-            # Post-game: keep the bus alive so the end-of-game stats block push
-            # (and its seed) can trigger the auto-review. The post-game report is
-            # left in place so it stays on screen through these phases.
-            self._ensure_event_bus()
-            self._reset_draft_state()
-            self._clear_scout()
-            if not self.state.snapshot().get("demo"):
-                self.state.set("lobby", None)
-                self.state.set("draft_intel", None)
-                self.state.set("recommendation", None)
-        elif phase in ("Matchmaking", "None"):
-            self._stop_event_bus()
-            self._reset_draft_state()
-            self._clear_scout()
-            if not self.state.snapshot().get("demo"):
-                self.state.set("lobby", None)
-                self.state.set("draft_intel", None)
-                self.state.set("recommendation", None)
+            # The live-game overlay poller only runs during the actual game.
+            if phase != "InProgress":
+                self._stop_live_poller()
+
+            if phase == "InProgress":
+                self._stop_event_bus()
+                self._ensure_live_poller()
+            elif phase == "ChampSelect":
+                self._ensure_event_bus()
+                self._clear_post_game()  # a new game starts — drop the last report
+                # Resilience: the WebSocket only pushes *deltas*, so when it isn't
+                # running (older client / blocked port) OR nothing has been published
+                # yet this champ select, poll the current state so the dashboard
+                # switches to Live Draft immediately — without waiting for a hover.
+                bus_ok = self._event_bus and self._event_bus.is_running()
+                if not bus_ok or self.state.snapshot().get("lobby") is None:
+                    ctx = read_match_context(self.client, self.catalog,
+                                             summoner_id=self._summoner_id)
+                    if ctx:
+                        self._publish_lobby(ctx, demo=False)
+                        self._maybe_recommend(ctx)
+                self._retry_injection_if_pending()
+            elif phase == "Lobby":
+                # Pre-game: keep the event bus up so lobby-scouting fires the moment
+                # the premade roster changes; the draft views stay cleared.
+                self._ensure_event_bus()
+                self._clear_post_game()  # a new game starts — drop the last report
+                self._reset_draft_state()
+                if not self.state.snapshot().get("demo"):
+                    self.state.set("lobby", None)
+                    self.state.set("draft_intel", None)
+                    self.state.set("recommendation", None)
+            elif phase in ("WaitingForStats", "PreEndOfGame", "EndOfGame"):
+                # Post-game: keep the bus alive so the end-of-game stats block push
+                # (and its seed) can trigger the auto-review. The post-game report is
+                # left in place so it stays on screen through these phases.
+                self._ensure_event_bus()
+                self._reset_draft_state()
+                self._clear_scout()
+                if not self.state.snapshot().get("demo"):
+                    self.state.set("lobby", None)
+                    self.state.set("draft_intel", None)
+                    self.state.set("recommendation", None)
+            elif phase in ("Matchmaking", "None"):
+                self._stop_event_bus()
+                self._reset_draft_state()
+                self._clear_scout()
+                if not self.state.snapshot().get("demo"):
+                    self.state.set("lobby", None)
+                    self.state.set("draft_intel", None)
+                    self.state.set("recommendation", None)
 
     # ------------------------------------------------- LCU event bus
     def _ensure_event_bus(self) -> None:
@@ -376,6 +399,36 @@ class PipelineRunner:
         if self._event_bus is not None:
             self._event_bus.stop()
             self._event_bus = None
+
+    # ------------------------------------------------- gameflow event bus
+    def _ensure_gameflow_bus(self) -> None:
+        """Start the always-on gameflow bus (while connected) so phase changes
+        act instantly. Separate from ``_event_bus`` precisely because that one is
+        torn down per phase — we must not miss the transition that ends a game."""
+        if self._gameflow_bus and self._gameflow_bus.is_running():
+            return
+        if self.client is None:
+            return
+        bus = LcuEventBus(self.client.creds)
+        bus.subscribe(GAMEFLOW_TOPIC, self._on_gameflow)
+        bus.start()
+        self._gameflow_bus = bus
+
+    def _stop_gameflow_bus(self) -> None:
+        if self._gameflow_bus is not None:
+            self._gameflow_bus.stop()
+            self._gameflow_bus = None
+
+    def _on_gameflow(self, data: str | None, event_type: str) -> None:
+        """Gameflow-phase push (bus thread): ``data`` is the new phase string
+        (not a resource dict). Drive the transition immediately; the poll loop
+        remains as a safety net for missed pushes."""
+        if event_type == "Delete" or not isinstance(data, str) or not data:
+            return
+        if self.client is None:
+            return
+        log.debug("Gameflow phase push: %s", data)
+        self._handle_phase(data)
 
     # --------------------------------------------------- pre-game lobby scout
     def _on_lobby(self, data: dict | None, event_type: str) -> None:

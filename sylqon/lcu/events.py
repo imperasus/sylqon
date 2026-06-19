@@ -38,6 +38,9 @@ log = logging.getLogger(__name__)
 CHAMP_SELECT_TOPIC = "OnJsonApiEvent_lol-champ-select_v1_session"
 LOBBY_TOPIC = "OnJsonApiEvent_lol-lobby_v1_lobby"
 EOG_TOPIC = "OnJsonApiEvent_lol-end-of-game_v1_eog-stats-block"
+# Gameflow phase pushes a bare phase string as the event ``data`` (e.g.
+# "ChampSelect", "InProgress", "EndOfGame") rather than a resource dict.
+GAMEFLOW_TOPIC = "OnJsonApiEvent_lol-gameflow_v1_gameflow-phase"
 
 _SUBSCRIBE = 5
 _EVENT = 8
