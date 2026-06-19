@@ -145,3 +145,78 @@ def test_scout_block_renders_teammate_line():
     assert "Azir" in block
     assert "carry-threat" in block
     assert "4W streak" in block
+
+
+def test_scout_block_renders_loss_streak():
+    """A negative streak (>= 3 losses) must appear as 'L streak', not 'W'."""
+    players = [{
+        "name": "Unlucky", "position": "top", "games_analyzed": 12,
+        "recent_form": {"games": 12, "wins": 3, "win_rate": 0.25, "streak": -5},
+    }]
+    block = format_scout_block(players)
+    assert "5L streak" in block
+    assert "W streak" not in block
+
+
+def test_scout_block_no_streak_label_when_below_threshold():
+    """Streaks of -2, -1, 0, 1, 2 must NOT add a streak label to the line."""
+    for streak in (-2, -1, 0, 1, 2):
+        players = [{
+            "name": "Player", "position": "jungle", "games_analyzed": 5,
+            "recent_form": {"games": 5, "wins": 2, "win_rate": 0.4,
+                            "streak": streak},
+        }]
+        block = format_scout_block(players)
+        assert "streak" not in block, f"unexpected streak label for streak={streak}"
+
+
+def test_scout_block_position_fallback_to_main_role_then_flex():
+    """When 'position' is absent, fall back to 'main_role'; when both absent use 'flex'."""
+    p_main = {
+        "name": "Player", "games_analyzed": 5, "main_role": "jungle",
+    }
+    p_flex = {
+        "name": "Player2", "games_analyzed": 5,
+    }
+    block_main = format_scout_block([p_main])
+    assert "jungle Player" in block_main
+
+    block_flex = format_scout_block([p_flex])
+    assert "flex Player2" in block_flex
+
+
+def test_scout_block_excludes_self_even_with_games():
+    """is_self=True players must always be excluded, even when games_analyzed > 0."""
+    players = [{
+        "name": "Me", "position": "bottom", "games_analyzed": 20,
+        "is_self": True,
+        "recent_form": {"games": 20, "wins": 15, "win_rate": 0.75, "streak": 5},
+    }]
+    assert format_scout_block(players) == ""
+
+
+def test_scout_block_mixed_self_and_teammate():
+    """Only the teammate line should appear when mixed with self+hidden."""
+    players = [
+        {"name": "Me", "position": "bottom", "is_self": True, "games_analyzed": 20},
+        {"name": "Anon", "hidden": True},
+        {"name": "Ally", "position": "top", "games_analyzed": 8,
+         "playstyle_tags": ["aggressive"]},
+    ]
+    block = format_scout_block(players)
+    assert "TEAMMATE SCOUT" in block
+    assert "Ally" in block
+    assert "Me" not in block
+    assert "Anon" not in block
+
+
+def test_scout_block_comfort_without_champion_name_omitted():
+    """If comfort has no 'champion' key (id-only, not yet enriched), skip it."""
+    players = [{
+        "name": "Player", "position": "mid", "games_analyzed": 5,
+        "comfort": {"champion_id": 64, "share": 0.8},  # no 'champion' key
+    }]
+    block = format_scout_block(players)
+    # The block renders (games_analyzed > 0) but no 'mains ...' text appears.
+    assert "TEAMMATE SCOUT" in block
+    assert "mains" not in block

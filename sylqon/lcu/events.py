@@ -153,6 +153,11 @@ class LcuEventBus:
             self._dispatch(raw)
 
     def _dispatch(self, raw: str | bytes) -> None:
+        # A message may already be in hand when stop() is requested; drop it so a
+        # callback can't fire (and e.g. republish stale champ-select state) after
+        # the bus is considered stopped.
+        if self._stop.is_set():
+            return
         try:
             msg = json.loads(raw)
         except (ValueError, TypeError):
