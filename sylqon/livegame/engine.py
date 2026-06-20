@@ -167,6 +167,8 @@ class MissionEngine:
                 "game_time": live.game_time, "cs": live.cs, "cs_per_min": live.cs_per_min,
                 "deaths": live.deaths, "kills": live.kills, "assists": live.assists,
                 "ward_score": live.ward_score, "champion": live.champion,
+                "level": live.level, "cs_benchmark": live.cs_benchmark,
+                "level_diff": live.level_diff, "objective_timers": live.objective_timers,
             },
         }
 

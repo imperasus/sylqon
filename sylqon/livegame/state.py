@@ -37,6 +37,9 @@ class LiveGameState:
     death_times: list = field(default_factory=list)  # game-time of my deaths
     events: list = field(default_factory=list)       # lightweight event log
     roster: list = field(default_factory=list)       # all 10 players, live stats
+    cs_benchmark: dict = field(default_factory=dict) # {target, delta, status}
+    level_diff: int = 0                              # my level − enemy avg level
+    objective_timers: dict = field(default_factory=dict)  # {dragon, baron} secs to next
 
     @classmethod
     def none(cls) -> "LiveGameState":
@@ -132,6 +135,37 @@ def _parse_roster(all_players: list[dict], my_team: str) -> list[dict]:
     return out
 
 
+# Rough CS-per-minute targets by role (lane + jungle camps for JG). Used only as
+# a live "are you keeping up" gauge, not a hard rule.
+_CS_TARGETS = {"top": 7.5, "jungle": 5.5, "middle": 8.0, "bottom": 8.5, "utility": 1.5}
+
+
+def _cs_benchmark(role: str, cs_per_min: float) -> dict:
+    target = _CS_TARGETS.get(role, 7.0)
+    delta = round(cs_per_min - target, 1)
+    status = "ahead" if delta >= 0.3 else "behind" if delta <= -0.3 else "on-track"
+    return {"target": target, "delta": delta, "status": status}
+
+
+def _level_diff(roster: list[dict], my_level: int) -> int:
+    enemies = [p["level"] for p in roster if p.get("side") == "enemy" and p.get("level")]
+    if not enemies or not my_level:
+        return 0
+    return my_level - round(sum(enemies) / len(enemies))
+
+
+def _objective_timers(events: list[dict], game_time: float) -> dict:
+    """Seconds until the next dragon / baron, derived from kill events + the clock.
+    Standard timings (dragon 5:00, baron 6:00 respawn; baron first at 20:00) — a
+    best-effort estimate from on-screen events, not a server feed. 0 == up now."""
+    drag = [e["time"] for e in events if e.get("name") == "DragonKill"]
+    baron = [e["time"] for e in events if e.get("name") == "BaronKill"]
+    next_dragon = (max(drag) + 300.0) if drag else 300.0
+    next_baron = (max(baron) + 360.0) if baron else 1200.0
+    return {"dragon": max(0, round(next_dragon - game_time)),
+            "baron": max(0, round(next_baron - game_time))}
+
+
 def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
     """Convert a raw ``allgamedata`` payload into a normalized snapshot. Returns
     the no-game sentinel for ``None``/malformed input. ``my_role`` (the champ-select
@@ -161,6 +195,8 @@ def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
                    if e.get("EventName") == "ChampionKill" and e.get("VictimName") == my_name]
     light_events = [{"name": e.get("EventName"), "time": float(e.get("EventTime") or 0.0)}
                     for e in events]
+    roster = _parse_roster(all_players, my_team)
+    my_level = int(me.get("level") or active.get("level") or 0)
 
     return LiveGameState(
         active=True,
@@ -182,5 +218,8 @@ def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
         objectives=objectives,
         death_times=death_times,
         events=light_events,
-        roster=_parse_roster(all_players, my_team),
+        roster=roster,
+        cs_benchmark=_cs_benchmark(role, cs_per_min),
+        level_diff=_level_diff(roster, my_level),
+        objective_timers=_objective_timers(light_events, game_time),
     )

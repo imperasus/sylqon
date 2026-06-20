@@ -92,11 +92,24 @@ def test_roster_tags_allies_and_enemies():
     assert (me["kills"], me["deaths"], me["assists"], me["cs"]) == (3, 1, 5, 120)
 
 
+def test_live_metrics_benchmark_and_timers():
+    s = parse_live_state(SAMPLE)
+    # CS benchmark: bottom target 8.5, live 12.0/min → well ahead.
+    assert s.cs_benchmark["target"] == 8.5
+    assert s.cs_benchmark["status"] == "ahead"
+    # Objective timers from kill events (game_time 600): last dragon at 480 →
+    # next at 780 → 180s out; no baron kill → first baron 1200 → 600s out.
+    assert s.objective_timers == {"dragon": 180, "baron": 600}
+    # No enemy levels in the sample → neutral level diff.
+    assert s.level_diff == 0
+
+
 def test_dict_serializable():
     s = parse_live_state(SAMPLE)
     d = s.to_dict()
     assert d["active"] is True and d["cs"] == 120 and "objectives" in d
     assert len(d["roster"]) == 3 and d["roster"][0]["champion"] == "Jinx"
+    assert "cs_benchmark" in d and "objective_timers" in d
 
 
 if __name__ == "__main__":
