@@ -90,17 +90,22 @@ async function loadMainContent(win: BrowserWindow): Promise<void> {
 
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
-    // Fixed companion canvas: every dashboard view is tuned to exactly 1280x800
-    // of renderer area, so the window is locked to that size — no resize/maximize
-    // means the layout can never leave empty gaps or clip.
+    // Fixed companion canvas: every dashboard view is tuned to 1280x800, so the
+    // window is locked to that size via equal min/max bounds (not resizable:false
+    // + useContentSize, which left the window black on launch on some Windows/GPU
+    // setups — a hidden window that never gets a resize pass never paints its
+    // first frame). Keeping the default paint path + an explicit backgroundColor
+    // is the safe way to pin the size.
     width: 1280,
     height: 800,
-    useContentSize: true, // 1280x800 is the web content, excluding the OS frame
+    minWidth: 1280,
+    maxWidth: 1280,
+    minHeight: 800,
+    maxHeight: 800,
+    maximizable: false,
+    backgroundColor: "#060a14", // matches the app bg; guarantees a painted surface
     show: false, // shown on ready-to-show to avoid a white flash
     frame: true, // normal OS frame (title bar + controls)
-    resizable: false,
-    maximizable: false,
-    fullscreenable: false,
     alwaysOnTop: false, // the MAIN window is a normal window
     icon: resolveAppIcon(),
     title: "Sylqon",
