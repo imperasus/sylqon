@@ -540,7 +540,7 @@ def champion_details(champion_id: int, role: str = "") -> dict:
         result = {
             "champion": {"id": champ.id, "name": champ.name, "slug": champ.slug,
                          "icon": _champ_icon(patch, champ.slug), "roles": champ.roles or [],
-                         "stats": champ.op_gg_stats or {}},
+                         "tags": champ.tags or [], "stats": champ.op_gg_stats or {}},
             "counters": counters,
             "synergies": synergies,
             "build": build.build_json if build else None,
