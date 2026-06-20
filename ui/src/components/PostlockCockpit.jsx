@@ -1,14 +1,20 @@
 import { Fragment, useState } from "react";
 import {
-  Brain, Check, CheckCircle2, ChevronDown, ChevronRight, Loader2, Lock, Package, Sparkles, Sword,
+  ArrowLeftRight, Brain, Check, CheckCircle2, ChevronDown, ChevronRight, Gauge,
+  Loader2, Lock, Package, ShieldHalf, Skull, Sparkles, Sword, Swords, Target, Users,
 } from "lucide-react";
 import { usePerkIcons } from "../api.js";
-import { itemUrl, spellUrl } from "../assets.js";
+import { DAMAGE_COLORS, ROLE_LABELS, TIER_STYLE, itemUrl, spellUrl } from "../assets.js";
 import { useBuildVariants } from "../hooks/useBuildVariants.js";
-import { Chip, EmptyState, Panel, SectionTitle, Tabs } from "./shared.jsx";
+import {
+  ChampPortrait, Chip, EmptyState, Panel, Score100, ScorePill, SectionTitle,
+  Tabs, ThreatBadge,
+} from "./shared.jsx";
 
 const EMPTY_DIFF = { added: [], removed: [] };
 const ROLE_STARTER_IDS = new Set([1101, 1102, 1103, 3865, 3866, 3867]);
+
+const fmtAdv = (v) => `${v > 0 ? "+" : ""}${v}`;
 
 function Banner({ injection }) {
   const status = injection?.status || "idle";
@@ -57,6 +63,204 @@ function VariantTabs({ variants, activeIndex, importVariant, importing, patch })
   });
   return <Tabs items={items} active={activeIndex} onSelect={(i) => importVariant(i)} />;
 }
+
+/* ----------------------------------------------------------------- scorecard */
+
+/* SVG strength ring (no gradient — flat stroke), used for the overall score. */
+function ScoreRing({ value, label }) {
+  const v = Math.round(value ?? 0);
+  const r = 22, c = 2 * Math.PI * r;
+  const stroke = v >= 75 ? "var(--color-good)" : v >= 55 ? "var(--color-accent)" : "var(--color-amber)";
+  return (
+    <div className="relative grid shrink-0 place-items-center">
+      <svg width="56" height="56" className="-rotate-90">
+        <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
+        <circle cx="28" cy="28" r={r} fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round"
+                strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)} />
+      </svg>
+      <div className="absolute flex flex-col items-center leading-none">
+        <span className="font-display text-[18px] font-extrabold" style={{ color: stroke }}>{v}</span>
+        <span className="mt-0.5 text-[8px] tracking-[0.15em] text-white/40">{label}</span>
+      </div>
+    </div>
+  );
+}
+
+const STAT_BAR = {
+  accent: ["bg-accent", "text-accent"], ally: ["bg-ally", "text-ally"],
+  amber: ["bg-amber", "text-amber"], good: ["bg-good", "text-good"], mana: ["bg-mana", "text-mana"],
+};
+
+function StatBar({ label, value, display, tone = "accent" }) {
+  const v = Math.max(0, Math.min(100, value ?? 0));
+  const [bg, text] = STAT_BAR[tone] || STAT_BAR.accent;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-[66px] shrink-0 text-[11px] text-white/55">{label}</span>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/8">
+        <div className={`h-full rounded-full ${bg}`} style={{ width: `${v}%` }} />
+      </div>
+      <span className={`w-9 shrink-0 text-right font-mono text-[11px] font-bold tabular-nums ${text}`}>{display}</span>
+    </div>
+  );
+}
+
+function Scorecard({ matchup, patch }) {
+  const ch = matchup.champion || {};
+  const s = matchup.scores || {};
+  const tier = TIER_STYLE[ch.tier];
+  return (
+    <Panel title="MATCHUP SCORE" icon={Gauge} accent="accent">
+      <div className="flex items-center gap-3">
+        <ChampPortrait slug={ch.slug} patch={patch} size="h-14 w-14" accent="accent" title={ch.name} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-display text-[17px] font-extrabold tracking-wide text-white/95">{ch.name}</div>
+          <div className="mt-1 flex items-center gap-1.5">
+            <Chip tone="ally">{ROLE_LABELS[ch.role] || ch.role || "—"}</Chip>
+            {tier && <span className={`rounded border px-1.5 py-px text-[11px] font-bold ${tier.cls}`}>{tier.label}</span>}
+          </div>
+        </div>
+        <ScoreRing value={s.total} label="OVERALL" />
+      </div>
+      <div className="mt-0.5 flex flex-col gap-1.5">
+        <StatBar label="Counter" value={s.counter} display={Math.round(s.counter ?? 0)} tone="accent" />
+        <StatBar label="Synergy" value={s.synergy} display={Math.round(s.synergy ?? 0)} tone="ally" />
+        <StatBar label="Meta tier" value={s.meta} display={Math.round(s.meta ?? 0)} tone="amber" />
+        <StatBar label="Win rate" value={s.win_rate}
+                 display={matchup.win_rate_pct != null ? `${matchup.win_rate_pct}%` : "—"} tone="good" />
+        <StatBar label="Mastery" value={s.comfort} display={Math.round(s.comfort ?? 0)} tone="mana" />
+      </div>
+      {matchup.lane_score != null && (
+        <div className="mt-0.5 flex items-center justify-between rounded-md border border-white/8 bg-white/[0.015] px-2.5 py-1.5">
+          <span className="t-label" title="Laning-phase read: counter score weighted toward your direct opponent.">LANE PHASE</span>
+          <Score100 value={matchup.lane_score} />
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* ----------------------------------------------------- synergy / counter rows */
+
+function PairItem({ item, patch, signed }) {
+  const v = item.value;
+  return (
+    <div className="flex flex-col items-center gap-1" title={`${item.name} · ${ROLE_LABELS[item.role] || item.role || ""}`}>
+      <ChampPortrait slug={item.slug} patch={patch} size="h-9 w-9" round
+                     accent={item.is_lane_opponent ? "accent" : "white"} title={item.name} />
+      {v == null
+        ? <span className="text-[10px] text-white/25">—</span>
+        : signed ? <ScorePill score={v} /> : <span className="font-mono text-[12px] font-bold tabular-nums text-ally">{v}</span>}
+    </div>
+  );
+}
+
+function PairPanel({ title, icon, accent, items, patch, avg, signed }) {
+  if (!items?.length) return null;
+  const avgEl = avg != null && (
+    <span className={`text-[11px] font-bold ${signed ? (avg > 0 ? "text-good" : avg < 0 ? "text-bad" : "text-white/45") : "text-ally"}`}>
+      avg {signed ? fmtAdv(avg) : avg}
+    </span>
+  );
+  return (
+    <Panel title={title} icon={icon} accent={accent} right={avgEl}>
+      <div className="flex flex-wrap justify-around gap-x-2 gap-y-1.5">
+        {items.map((it) => <PairItem key={`${it.name}-${it.role}`} item={it} patch={patch} signed={signed} />)}
+      </div>
+    </Panel>
+  );
+}
+
+/* ------------------------------------------------------------- lane matchup */
+
+function killThreatRead(threats = []) {
+  const t = new Set(threats);
+  if (t.has("suppression") || t.has("burst_ad") || t.has("burst_ap")) return "high";
+  if (t.has("heavy_cc")) return "medium";
+  return "low";
+}
+
+function LaneMatchup({ matchup, patch }) {
+  const opp = matchup.lane_opponent;
+  if (!opp) return null;
+  const adv = opp.advantage;
+  const verdict = adv == null ? { label: "NO MATCHUP DATA", tone: "muted" }
+    : adv > 1.5 ? { label: `FAVOURED ${fmtAdv(adv)}`, tone: "good" }
+    : adv < -1.5 ? { label: `TOUGH ${fmtAdv(adv)}`, tone: "bad" }
+    : { label: `EVEN ${fmtAdv(adv)}`, tone: "amber" };
+  const trading = adv == null ? "unknown" : adv > 1.5 ? "you win trades" : adv < -1.5 ? "they win trades" : "even trades";
+  return (
+    <Panel title="LANE MATCHUP" icon={Swords} accent="enemy" right={<Chip tone={verdict.tone}>{verdict.label}</Chip>}>
+      <div className="flex items-center gap-2.5">
+        <ChampPortrait slug={opp.slug} patch={patch} size="h-11 w-11" accent="enemy" title={opp.name} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-[14px] font-bold text-white/90">{opp.name}</span>
+            <span className="text-[11px] tracking-widest text-white/35">{ROLE_LABELS[opp.role] || opp.role}</span>
+            {opp.damage_type && opp.damage_type !== "—" && (
+              <span className={`rounded border px-1 text-[10px] font-bold ${DAMAGE_COLORS[opp.damage_type] || ""}`}>{opp.damage_type}</span>
+            )}
+          </div>
+          {opp.threats?.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {opp.threats.slice(0, 3).map((t) => <ThreatBadge key={t} threat={t} />)}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+        <span className="flex items-center gap-1.5">
+          <ArrowLeftRight className="h-3.5 w-3.5 text-accent/70" />
+          <span className="text-white/45">Trading:</span><span className="text-white/75">{trading}</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Skull className="h-3.5 w-3.5 text-enemy/70" />
+          <span className="text-white/45">Kill threat:</span><span className="text-white/75">{killThreatRead(opp.threats)}</span>
+        </span>
+      </div>
+    </Panel>
+  );
+}
+
+/* --------------------------------------------------------------- team stats */
+
+function TeamStats({ lobby, intel }) {
+  const ally = lobby?.ally_summary || {};
+  const comp = intel?.enemy_comp;
+  const ad = ally.physical_threats || 0, ap = ally.magic_threats || 0;
+  const total = ad + ap || 1;
+  const adPct = Math.round((ad / total) * 100), apPct = 100 - adPct;
+  return (
+    <Panel title="TEAM STATS" icon={ShieldHalf} accent="white">
+      <div className="text-[10px] tracking-wide text-white/40">Your team damage profile</div>
+      <div className="flex h-2 overflow-hidden rounded-full bg-white/8">
+        <div className="bg-amber" style={{ width: `${adPct}%` }} />
+        <div className="bg-mana" style={{ width: `${apPct}%` }} />
+      </div>
+      <div className="flex justify-between text-[10px] font-bold">
+        <span className="text-amber">AD {adPct}%</span><span className="text-mana">AP {apPct}%</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {(ally.heavy_cc_count || 0) > 0 && <Chip tone="enemy">CC {ally.heavy_cc_count}</Chip>}
+        {(ally.frontline || 0) > 0
+          ? <Chip tone="ally">FRONTLINE {ally.frontline}</Chip>
+          : <Chip tone="bad">NO FRONTLINE</Chip>}
+        {(ally.tanks || 0) > 0 && <Chip tone="muted">TANK {ally.tanks}</Chip>}
+      </div>
+      {comp && comp.archetype !== "unknown" && comp.archetype !== "balanced" && (
+        <div className="mt-0.5 border-t border-white/8 pt-2">
+          <div className="flex items-center gap-1.5">
+            <span className="t-label text-enemy/70">ENEMY COMP</span>
+            <Chip tone="enemy">{comp.label}</Chip>
+          </div>
+          {comp.counter_plan && <p className="mt-1 t-body text-white/60">{comp.counter_plan}</p>}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* ------------------------------------------------------------------- build */
 
 function ItemCell({ item, patch, added, small }) {
   const box = small ? "h-9 w-9" : "h-10 w-10";
@@ -207,6 +411,44 @@ function RunesPanel({ build }) {
   );
 }
 
+/* --------------------------------------------------------- AI strategy foot */
+
+const PHASE_TONE = {
+  good: ["border-good", "text-good"], amber: ["border-amber", "text-amber"], mana: ["border-mana", "text-mana"],
+};
+
+function Phase({ label, tone, text }) {
+  const [border, color] = PHASE_TONE[tone] || PHASE_TONE.good;
+  return (
+    <div className={`border-l-2 ${border} pl-2.5`}>
+      <div className={`text-[10px] font-bold tracking-[0.12em] ${color}`}>{label}</div>
+      <div className="mt-0.5 text-[11px] leading-snug text-white/70">{text || "—"}</div>
+    </div>
+  );
+}
+
+function LanePlan({ plan }) {
+  return (
+    <div className="frost frost-accent p-2.5">
+      <SectionTitle accent="accent" icon={Brain}>AI LANE GAME PLAN · OLLAMA</SectionTitle>
+      <div className="mt-1.5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+        <Phase label="EARLY · 1–6" tone="good" text={plan.early} />
+        <Phase label="MID · 7–13" tone="amber" text={plan.mid} />
+        <Phase label="LATE · 14+" tone="mana" text={plan.late} />
+      </div>
+      {plan.win_condition && (
+        <div className="mt-2 flex items-start gap-1.5 border-t border-white/8 pt-2">
+          <Target className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-bright" />
+          <span className="text-[11px]">
+            <span className="font-bold tracking-wide text-accent/80">WIN CONDITION: </span>
+            <span className="text-white/75">{plan.win_condition}</span>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AIInsight({ build }) {
   const [expanded, setExpanded] = useState(false);
   const opt = build.optimized;
@@ -244,7 +486,11 @@ function AIInsight({ build }) {
 export default function PostlockCockpit({ state, api }) {
   const build = state?.build;
   const patch = state?.cache?.patch || "16.12.1";
-  const enemySummary = (state?.lobby?.enemies || []).map((e) => e.name).slice(0, 3).join(", ");
+  const matchup = build?.matchup;
+  const lanePlan = build?.lane_plan;
+  const lobby = state?.lobby;
+  const intel = state?.draft_intel;
+  const enemySummary = (lobby?.enemies || []).map((e) => e.name).slice(0, 3).join(", ");
   const { variants, active, activeIndex, importVariant, importing } = useBuildVariants(build, api?.injectVariant);
 
   if (!build || !active) {
@@ -257,19 +503,56 @@ export default function PostlockCockpit({ state, api }) {
   }
   const activeBuild = { optimized: active, diff: activeIndex === 0 ? build.diff : EMPTY_DIFF };
 
+  const header = (
+    <div className="flex items-center gap-3">
+      <Banner injection={state?.injection} />
+      <div className="scroll-thin flex-1 overflow-x-auto">
+        <VariantTabs variants={variants} activeIndex={activeIndex} importVariant={importVariant} importing={importing} patch={patch} />
+      </div>
+    </div>
+  );
+  const foot = lanePlan ? <LanePlan plan={lanePlan} /> : <AIInsight build={activeBuild} />;
+
+  // No scored matchup (DB not synced yet) → fall back to the classic build view.
+  if (!matchup) {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-3">
+        {header}
+        <div className="grid min-h-0 flex-1 grid-cols-[1.3fr_1fr] gap-3">
+          <ItemsPanel build={activeBuild} patch={patch} enemySummary={enemySummary} />
+          <RunesPanel build={activeBuild} />
+        </div>
+        {foot}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <Banner injection={state?.injection} />
-        <div className="scroll-thin flex-1 overflow-x-auto">
-          <VariantTabs variants={variants} activeIndex={activeIndex} importVariant={importVariant} importing={importing} patch={patch} />
+    <div className="flex h-full min-h-0 flex-col gap-2.5">
+      {header}
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(230px,0.85fr)_minmax(0,1.25fr)_minmax(240px,0.95fr)] gap-2.5">
+        {/* Left rail — scorecard + per-champ synergy & counter values. */}
+        <div className="scroll-thin flex min-h-0 flex-col gap-2.5 overflow-y-auto pr-0.5">
+          <Scorecard matchup={matchup} patch={patch} />
+          <PairPanel title="SYNERGY" icon={Users} accent="ally"
+                     items={matchup.synergies} patch={patch} avg={matchup.synergy_avg} />
+          <PairPanel title="COUNTERS" icon={Swords} accent="enemy"
+                     items={matchup.counters} patch={patch} avg={matchup.counter_avg} signed />
+        </div>
+
+        {/* Center — direct lane matchup, then the compiled build. */}
+        <div className="scroll-thin flex min-h-0 flex-col gap-2.5 overflow-y-auto pr-0.5">
+          <LaneMatchup matchup={matchup} patch={patch} />
+          <ItemsPanel build={activeBuild} patch={patch} enemySummary={enemySummary} />
+        </div>
+
+        {/* Right — runes + team-wide stats / enemy comp. */}
+        <div className="scroll-thin flex min-h-0 flex-col gap-2.5 overflow-y-auto pr-0.5">
+          <RunesPanel build={activeBuild} />
+          <TeamStats lobby={lobby} intel={intel} />
         </div>
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-[1.3fr_1fr] gap-3">
-        <ItemsPanel build={activeBuild} patch={patch} enemySummary={enemySummary} />
-        <RunesPanel build={activeBuild} />
-      </div>
-      <AIInsight build={activeBuild} />
+      {foot}
     </div>
   );
 }

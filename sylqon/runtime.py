@@ -205,6 +205,8 @@ class PipelineRunner:
         self.last_loadout: loadout_mod.Loadout | None = None
         self.last_standard: loadout_mod.Loadout | None = None
         self.last_variants: list[loadout_mod.Loadout] = []  # [0] = primary (auto-injected)
+        self.last_matchup: dict | None = None               # post-lock scorecard
+        self.last_lane_plan: dict | None = None              # AI early/mid/late plan
         self._last_injected_fp: str | None = None
         self._last_reco_fp: str | None = None
         self._last_display_sig: str | None = None
@@ -784,6 +786,8 @@ class PipelineRunner:
         self._last_reco_fp = None
         self._last_display_sig = None
         self._last_trigger_sig = None
+        self.last_matchup = None
+        self.last_lane_plan = None
         # Clear the sticky injection flag so the NEXT champ select starts in the
         # live-draft view. Without this, a prior game's status="ok" would make the
         # dashboard skip champ select and jump straight to the post-lock build.
@@ -1476,6 +1480,7 @@ class PipelineRunner:
         """Cache read -> Ollama counter-analysis -> validated loadout, with
         every stage published to the dashboard."""
         with self._compile_lock:
+            self.last_lane_plan = None  # drop any plan from a previous pick
             candidate, source = self.store.get_build(ctx.my_champion, ctx.my_role)
             # No real data for this champion (only a generic seed fell out)?
             # Pull the current build straight from op.gg before the AI sees it.
@@ -1514,6 +1519,10 @@ class PipelineRunner:
         # primary build/injection is never delayed; covers both live and demo.
         threading.Thread(target=self._generate_variants, args=(ctx,),
                          name="ag-variants", daemon=True).start()
+        # AI lane game-plan (early/mid/late) — independent Ollama call, merged
+        # into the build state when it lands so the scorecard shows instantly.
+        threading.Thread(target=self._generate_lane_plan, args=(ctx,),
+                         name="ag-lane-plan", daemon=True).start()
         return final
 
     def _publish_build(self, candidate: dict, final: loadout_mod.Loadout,
@@ -1527,6 +1536,8 @@ class PipelineRunner:
 
         def archetype_of(items: list[dict]) -> str:
             return build_archetype.classify_archetype(items, self.catalog, dmg)
+
+        self.last_matchup = self._matchup_analytics(ctx)
 
         self.state.set("build", {
             "standard": {
@@ -1552,7 +1563,56 @@ class PipelineRunner:
                  "skill_order": skill, "archetype": archetype_of(v.items)}
                 for i, v in enumerate(self.last_variants or [final])
             ],
+            # Post-lock matchup scorecard (deterministic) + AI lane plan (filled
+            # in off-thread once Ollama answers; None until then / when it's down).
+            "matchup": self.last_matchup,
+            "lane_plan": self.last_lane_plan,
         })
+
+    def _matchup_analytics(self, ctx: MatchContext) -> dict | None:
+        """Final-pick scorecard: the locked champion's 0-100 component scores plus
+        per-ally synergy / per-enemy counter values and the direct lane matchup.
+        DB-only and best-effort — never raises into the publish path."""
+        try:
+            from sylqon.analysis.matchup import compute_matchup
+            from sylqon.db.session import get_session
+        except Exception:
+            return None
+        try:
+            session = get_session()
+        except Exception:
+            return None
+        try:
+            return compute_matchup(
+                session, ctx, self.catalog,
+                pool_names=set(self.store.get_pool().get(ctx.my_role, [])),
+                personal_stats=self.champion_stats_named())
+        except Exception:
+            log.debug("matchup analytics failed", exc_info=True)
+            return None
+        finally:
+            session.close()
+
+    def _generate_lane_plan(self, ctx: MatchContext) -> None:
+        """Generate the AI early/mid/late lane plan off-thread and re-publish the
+        build with it. Best-effort: a failure or Ollama-down leaves the
+        deterministic scorecard in place (lane_plan stays None)."""
+        if self.last_candidate is None or self.last_loadout is None:
+            return
+        try:
+            from sylqon.ai.lane_plan import LaneCoach
+            intel = self.state.snapshot().get("draft_intel")
+            plan = LaneCoach(self.engine).plan(ctx, self.last_matchup, intel)
+        except Exception:
+            log.exception("Lane-plan generation failed")
+            return
+        if plan is None:
+            return
+        cur = self.last_ctx
+        if cur is not None and cur.my_champion_id != ctx.my_champion_id:
+            return  # locked pick changed while we were thinking — drop the plan
+        self.last_lane_plan = plan
+        self._publish_build(self.last_candidate, self.last_loadout, ctx)
 
     def _skill_order(self, champion: str, candidate: dict) -> list[str]:
         """Skill max-order for the loadout: op.gg's order when the build carries

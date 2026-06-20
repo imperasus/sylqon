@@ -1,10 +1,40 @@
 import { useState } from "react";
+import { Swords, Users } from "lucide-react";
 import { useSylqon } from "./api.js";
 import StatusBar from "./components/StatusBar.jsx";
 import HomeCockpit from "./components/HomeCockpit.jsx";
 import DraftCockpit from "./components/DraftCockpit.jsx";
 import PostlockCockpit from "./components/PostlockCockpit.jsx";
+import PlayersView from "./components/PlayersView.jsx";
 import MatchAnalysisModal from "./components/MatchAnalysisModal.jsx";
+
+/* Loadout ↔ Players toggle for the post-lock / in-game phase. The Players view
+   surfaces the lobby scout (allies now, enemies once the game reveals them). */
+function PostlockTabs({ view, onChange, scout }) {
+  const scouted = (scout?.players || []).filter((p) => !p.hidden && p.games_analyzed > 0).length;
+  const tabs = [
+    { key: "loadout", label: "Loadout", icon: Swords },
+    { key: "players", label: "Players", icon: Users, badge: scouted || null },
+  ];
+  return (
+    <div className="frost flex w-fit items-center gap-1 px-1.5 py-1">
+      {tabs.map((t) => {
+        const on = t.key === view;
+        return (
+          <button key={t.key} onClick={() => onChange(t.key)}
+            className={`flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-bold tracking-wide transition-colors
+              ${on ? "bg-accent/18 text-accent-bright" : "text-white/50 hover:bg-white/5 hover:text-white/80"}`}>
+            <t.icon className="h-4 w-4" />
+            {t.label}
+            {t.badge != null && (
+              <span className="rounded-full bg-white/10 px-1.5 text-[10px] font-mono text-white/60">{t.badge}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /* Single-screen cockpit: the body is driven purely by the live phase — no tabs.
    Idle → Home, champ select → Draft, locked/injected → Postlock. */
@@ -20,6 +50,7 @@ export default function App() {
   const { state } = api;
   const mode = deriveMode(state);
   const demoActive = !!state?.demo;
+  const [postlockView, setPostlockView] = useState("loadout");
 
   const [toast, setToast] = useState("");
   const act = async (fn) => {
@@ -41,13 +72,22 @@ export default function App() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
-      <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col gap-3 p-4">
+      <div className="mx-auto flex h-full w-full max-w-[1280px] flex-col gap-3 p-4">
         <StatusBar state={state} mode={mode} act={act} api={api} demoActive={demoActive} />
 
         <main className="relative min-h-0 flex-1">
           {mode === "home" && <HomeCockpit state={state} act={act} api={api} />}
           {mode === "draft" && <DraftCockpit state={state} />}
-          {mode === "postlock" && <PostlockCockpit state={state} act={act} api={api} />}
+          {mode === "postlock" && (
+            <div className="flex h-full min-h-0 flex-col gap-2.5">
+              <PostlockTabs view={postlockView} onChange={setPostlockView} scout={state?.scout} />
+              <div className="min-h-0 flex-1">
+                {postlockView === "loadout"
+                  ? <PostlockCockpit state={state} act={act} api={api} />
+                  : <PlayersView state={state} />}
+              </div>
+            </div>
+          )}
         </main>
       </div>
 

@@ -90,13 +90,17 @@ async function loadMainContent(win: BrowserWindow): Promise<void> {
 
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
+    // Fixed companion canvas: every dashboard view is tuned to exactly 1280x800
+    // of renderer area, so the window is locked to that size — no resize/maximize
+    // means the layout can never leave empty gaps or clip.
     width: 1280,
     height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    useContentSize: true, // 1280x800 is the web content, excluding the OS frame
     show: false, // shown on ready-to-show to avoid a white flash
     frame: true, // normal OS frame (title bar + controls)
-    resizable: true,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
     alwaysOnTop: false, // the MAIN window is a normal window
     icon: resolveAppIcon(),
     title: "Sylqon",
