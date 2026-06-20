@@ -77,10 +77,26 @@ def test_deaths_and_objectives():
     assert s.objectives["towers"]["ally"] == 1
 
 
+def test_roster_tags_allies_and_enemies():
+    s = parse_live_state(SAMPLE)
+    by_name = {p["name"]: p for p in s.roster}
+    assert set(by_name) == {"Sneaky", "AllyJg", "Enemy1"}
+    # side is relative to me (ORDER): same team = ally, other = enemy.
+    assert by_name["Sneaky"]["side"] == "ally"
+    assert by_name["AllyJg"]["side"] == "ally"
+    assert by_name["Enemy1"]["side"] == "enemy"
+    # enemy carries champion + role + live stats from allPlayers (read-only).
+    enemy = by_name["Enemy1"]
+    assert enemy["champion"] == "Caitlyn" and enemy["role"] == "bottom"
+    me = by_name["Sneaky"]
+    assert (me["kills"], me["deaths"], me["assists"], me["cs"]) == (3, 1, 5, 120)
+
+
 def test_dict_serializable():
     s = parse_live_state(SAMPLE)
     d = s.to_dict()
     assert d["active"] is True and d["cs"] == 120 and "objectives" in d
+    assert len(d["roster"]) == 3 and d["roster"][0]["champion"] == "Jinx"
 
 
 if __name__ == "__main__":

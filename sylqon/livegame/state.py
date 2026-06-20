@@ -36,6 +36,7 @@ class LiveGameState:
     objectives: dict = field(default_factory=dict)   # {dragons:{ally,enemy}, ...}
     death_times: list = field(default_factory=list)  # game-time of my deaths
     events: list = field(default_factory=list)       # lightweight event log
+    roster: list = field(default_factory=list)       # all 10 players, live stats
 
     @classmethod
     def none(cls) -> "LiveGameState":
@@ -98,6 +99,39 @@ def _parse_objectives(events: list[dict], name_to_team: dict[str, str],
     return obj
 
 
+def _player_name(p: dict) -> str:
+    for key in ("riotIdGameName", "summonerName", "riotId", "gameName"):
+        v = (p.get(key) or "").strip()
+        if v:
+            return v.split("#")[0]
+    return ""
+
+
+def _parse_roster(all_players: list[dict], my_team: str) -> list[dict]:
+    """All ten players with their LIVE stats, tagged ally/enemy relative to me.
+    Everything here is already on-screen in-game (Live Client Data ``allPlayers``)
+    — champion, level, K/D/A, CS — so it is read-only and ToS-safe. Enemy *history*
+    (puuid) is not exposed by Riot, so this is the live read, not a fingerprint."""
+    out: list[dict] = []
+    for p in all_players:
+        scores = p.get("scores") or {}
+        team = p.get("team") or ""
+        out.append({
+            "name": _player_name(p),
+            "champion": p.get("championName") or "",
+            "role": _norm_role(p.get("position") or ""),
+            "team": team,
+            "side": "ally" if (my_team and team == my_team) else "enemy",
+            "kills": int(scores.get("kills") or 0),
+            "deaths": int(scores.get("deaths") or 0),
+            "assists": int(scores.get("assists") or 0),
+            "cs": int(scores.get("creepScore") or 0),
+            "level": int(p.get("level") or 0),
+            "is_dead": bool(p.get("isDead")),
+        })
+    return out
+
+
 def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
     """Convert a raw ``allgamedata`` payload into a normalized snapshot. Returns
     the no-game sentinel for ``None``/malformed input. ``my_role`` (the champ-select
@@ -148,4 +182,5 @@ def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
         objectives=objectives,
         death_times=death_times,
         events=light_events,
+        roster=_parse_roster(all_players, my_team),
     )

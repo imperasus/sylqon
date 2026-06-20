@@ -154,9 +154,39 @@ function EnemyCard({ e, scout, patch }) {
   );
 }
 
+/* Live in-game readout for one player (read-only Live Client Data): champion,
+   level, K/D/A and CS. Used for the enemy column once the game starts, where
+   historical fingerprints aren't available (Riot doesn't expose enemy puuids). */
+function LivePlayerCard({ p, slug, patch, side = "enemy" }) {
+  const kda = ((p.kills + p.assists) / Math.max(1, p.deaths)).toFixed(1);
+  return (
+    <div className="frost flex flex-col gap-1.5 p-2">
+      <div className="flex items-center gap-2">
+        <div className={`relative ${p.is_dead ? "grayscale" : ""}`}>
+          <ChampPortrait slug={slug} patch={patch} size="h-8 w-8" accent={side} title={p.champion} />
+        </div>
+        <div className="min-w-0 flex-1 leading-tight">
+          <div className="truncate text-[12px] font-bold text-white/90">{p.name || p.champion}</div>
+          <div className="text-[9px] font-bold tracking-widest text-white/40">
+            {ROLE_LABELS[p.role] || "—"} · {p.champion}
+          </div>
+        </div>
+        {p.is_dead
+          ? <Chip tone="bad">DEAD</Chip>
+          : <span className="shrink-0 text-[10px] font-bold text-white/45">Lv {p.level}</span>}
+      </div>
+      <div className="flex items-center gap-2 border-t border-white/8 pt-1.5 text-[10px]">
+        <span className="font-mono font-bold text-white/75">{p.kills}/{p.deaths}/{p.assists}</span>
+        <span className="text-white/35">KDA {kda}</span>
+        <span className="ml-auto font-mono text-white/55">{p.cs} CS</span>
+      </div>
+    </div>
+  );
+}
+
 /* Lane-by-lane read. Ally fingerprint is live; the enemy laner's champion is
-   known from the draft, and the edge leans on the ally's recent form until the
-   enemy player resolves in-game. */
+   known from the draft / live game, and the edge leans on the ally's recent
+   form (enemy history isn't available). */
 function LaneLadder({ allyByRole, enemyByRole, enemyScoutByRole, patch }) {
   return (
     <Panel title="LANE MATCHUPS" icon={Swords} accent="white" className="gap-1">
@@ -287,7 +317,28 @@ export default function PlayersView({ state }) {
     return m;
   }, [enemyScout]);
 
-  if (!lobby && allies.length === 0) {
+  // Live in-game roster (read-only Live Client Data): enemies with their current
+  // champion + live K/D/A/CS. This is how enemies show up in-game — their match
+  // *history* isn't available (Riot doesn't expose enemy puuids to third parties).
+  const live = state?.live;
+  const liveActive = !!live?.active;
+  const liveEnemies = useMemo(
+    () => (liveActive ? (live.roster || []) : []).filter((p) => p.side === "enemy"),
+    [liveActive, live?.roster]);
+  const liveEnemyByRole = useMemo(() => {
+    const m = {};
+    for (const p of liveEnemies) if (p.role) m[p.role] = p;
+    return m;
+  }, [liveEnemies]);
+  const inGame = liveEnemies.length > 0;
+  const enemyLadderByRole = useMemo(() => {
+    if (!inGame) return enemyByRole;
+    const m = {};
+    for (const p of liveEnemies) if (p.role) m[p.role] = { slug: slugOf[p.champion], name: p.champion };
+    return m;
+  }, [inGame, liveEnemies, enemyByRole, slugOf]);
+
+  if (!lobby && allies.length === 0 && !liveActive) {
     return (
       <div className="frost h-full">
         <EmptyState icon={Radar} label="NO LOBBY INTEL YET"
@@ -311,13 +362,17 @@ export default function PlayersView({ state }) {
           <Users className="h-4 w-4" /> LOBBY INTEL
         </span>
         <Chip tone="ally">{scoutedAllies}/5 allies</Chip>
-        <Chip tone={scoutedEnemies ? "enemy" : "muted"}>{scoutedEnemies}/5 enemies</Chip>
-        {scoutedEnemies === 0 && (
+        <Chip tone={inGame || scoutedEnemies ? "enemy" : "muted"}>
+          {inGame ? `${liveEnemies.length}/5 enemies` : `${scoutedEnemies}/5 enemies`}
+        </Chip>
+        {!inGame && scoutedEnemies === 0 && (
           <span className="flex items-center gap-1 text-[11px] text-white/40">
-            <Lock className="h-3.5 w-3.5" /> enemies unlock in-game (ranked hides them in champ select)
+            <Lock className="h-3.5 w-3.5" /> enemies appear in-game (Riot hides them in champ select)
           </span>
         )}
-        {scout?.at && <span className="ml-auto text-[10px] text-white/30">scouted from LCU match history</span>}
+        <span className="ml-auto text-[10px] text-white/30">
+          {inGame ? "live · Live Client Data" : scout?.at ? "scouted from LCU match history" : ""}
+        </span>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_0.92fr_1fr] gap-2.5">
@@ -331,28 +386,34 @@ export default function PlayersView({ state }) {
         </div>
 
         <div className="scroll-thin flex min-h-0 flex-col gap-2.5 overflow-y-auto pr-0.5">
-          <LaneLadder allyByRole={allyByRole} enemyByRole={enemyByRole}
+          <LaneLadder allyByRole={allyByRole} enemyByRole={enemyLadderByRole}
                       enemyScoutByRole={enemyScoutByRole} patch={patch} />
           <TeamRead allies={allies} />
-          {scoutedEnemies === 0 && (
+          {!inGame && (
             <div className="frost frost-accent flex items-start gap-2.5 p-2.5">
               <Eye className="mt-0.5 h-4 w-4 shrink-0 text-accent-bright" />
               <div className="text-[11px] leading-snug text-white/70">
                 <div className="t-label text-accent/70">ENEMY INTEL</div>
-                <p className="mt-1">Enemy players are anonymized in ranked champ select. The moment the game
-                  loads, Sylqon resolves them from the read-only Live Client Data API and fills in their
-                  fingerprints, lane edges and a watch list — no game interaction.</p>
+                <p className="mt-1">Enemies are hidden in champ select. Once the game loads, their live
+                  champion + K/D/A/CS appear here from the read-only Live Client Data API. Riot doesn't
+                  expose enemy match history, so there's no historical profile for them.</p>
               </div>
             </div>
           )}
         </div>
 
         <div className="scroll-thin flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
-          <div className="t-label text-enemy/70">ENEMY TEAM</div>
-          {enemyRoster.map((e, i) => (
-            <EnemyCard key={e ? e.champion_id : `e-${i}`} e={e}
-                       scout={e ? enemyScoutByRole[e.role] : null} patch={patch} />
-          ))}
+          <div className="t-label text-enemy/70">ENEMY TEAM{inGame && <span className="text-white/30"> · live</span>}</div>
+          {inGame
+            ? [...ROLE_ORDER.map((r) => liveEnemyByRole[r]).filter(Boolean),
+               ...liveEnemies.filter((p) => !p.role)].map((p, i) => (
+                <LivePlayerCard key={`${p.name}-${p.champion}-${i}`} p={p}
+                                slug={slugOf[p.champion]} side="enemy" patch={patch} />
+              ))
+            : enemyRoster.map((e, i) => (
+                <EnemyCard key={e ? e.champion_id : `e-${i}`} e={e}
+                           scout={e ? enemyScoutByRole[e.role] : null} patch={patch} />
+              ))}
         </div>
       </div>
     </div>
