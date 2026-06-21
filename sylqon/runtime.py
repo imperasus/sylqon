@@ -14,7 +14,7 @@ import time
 from collections import deque
 
 from sylqon import config, loadout as loadout_mod
-from sylqon.ai import build_variants
+from sylqon.ai import build_variants, open_build_prompt
 from sylqon.ai.engine import OllamaEngine
 from sylqon.ai.prompts import compile_prompt
 from sylqon.ai.pick_prompt import (
@@ -1498,19 +1498,27 @@ class PipelineRunner:
                 self.state.update("ollama", processing=True)
                 log.info("Routing match context to %s for counter-analysis", self.engine.model)
                 try:
-                    # The counter-loadout JSON (items + runes + shards + spells +
-                    # reasoning) can exceed the default 512-token budget; a cut-off
-                    # response fails to parse and the whole AI decision is dropped.
-                    # Give it headroom — generation still stops at the JSON's end.
-                    ai_result = self.engine.evaluate(
-                        compile_prompt(ctx, candidate, self.catalog),
-                        options={"num_predict": 1024})
+                    if config.OPEN_BUILD_MODE:
+                        ai_result = self.engine.evaluate(
+                            open_build_prompt.compile_open_prompt(
+                                ctx, candidate, self.catalog),
+                            options={"num_predict": 768})
+                    else:
+                        # The counter-loadout JSON can exceed the default 512-token
+                        # budget; give it headroom — generation stops at JSON's end.
+                        ai_result = self.engine.evaluate(
+                            compile_prompt(ctx, candidate, self.catalog),
+                            options={"num_predict": 1024})
                 finally:
                     self.state.update("ollama", processing=False)
             elif not ctx.enemies:
                 log.info("Enemy team hidden; skipping AI counter-analysis")
 
-            final = loadout_mod.apply_ai_decision(base, ai_result, ctx, self.catalog)
+            if config.OPEN_BUILD_MODE:
+                final = loadout_mod.apply_ai_open_decision(
+                    base, ai_result, ctx, self.catalog)
+            else:
+                final = loadout_mod.apply_ai_decision(base, ai_result, ctx, self.catalog)
             final.name = final.name or "Recommended"
             self.last_candidate, self.last_loadout = candidate, final
             self.last_variants = [final]  # primary only until alternatives generate

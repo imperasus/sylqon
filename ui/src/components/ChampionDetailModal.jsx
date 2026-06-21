@@ -1,12 +1,63 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  ChartLine, Lightbulb, Loader2, Package, ShieldAlert, Sparkles, Swords, Trophy, X,
+  ChartLine, Lightbulb, Loader2, Package, ShieldAlert, Sparkles, Swords, Trophy, X, Zap,
 } from "lucide-react";
 import { fetchProBuilds } from "../api.js";
-import { itemUrl, ROLE_LABELS, TIER_STYLE } from "../assets.js";
-import { useChampionDetails } from "../hooks/useChampionData.js";
+import { abilityIconUrl, itemUrl, passiveIconUrl, ROLE_LABELS, TIER_STYLE } from "../assets.js";
+import { useChampionAbilities, useChampionDetails } from "../hooks/useChampionData.js";
 import { ChampPortrait, Chip, ScorePill, SectionTitle } from "./shared.jsx";
+
+const ABILITY_KEYS = ["Q", "W", "E", "R"];
+const RANK_STYLE = [
+  "ring-accent text-accent",
+  "ring-white/40 text-white/60",
+  "ring-white/20 text-white/35",
+];
+
+function AbilitiesBar({ slug, patch, skillOrder = [] }) {
+  const abilities = useChampionAbilities(slug, patch);
+  if (!abilities) return null;
+
+  const rankOf = (key) => skillOrder.indexOf(key); // -1 if not ranked (R)
+  const all = [
+    { key: "P", name: abilities.passive.name, img: passiveIconUrl(patch, abilities.passive.image.full) },
+    ...abilities.spells.map((s, i) => ({
+      key: ABILITY_KEYS[i], name: s.name, img: abilityIconUrl(patch, s.image.full),
+    })),
+  ];
+
+  return (
+    <div className="md:col-span-2">
+      <div className="flex items-center justify-between">
+        <SectionTitle accent="accent" icon={Zap}>ABILITIES</SectionTitle>
+        {skillOrder.length > 0 && (
+          <span className="text-[11px] tracking-wider text-white/40">
+            MAX ORDER — R &rsaquo; {skillOrder.join(" › ")}
+          </span>
+        )}
+      </div>
+      <div className="mt-2 flex gap-3">
+        {all.map(({ key, name, img }) => {
+          const rank = rankOf(key);
+          return (
+            <div key={key} className="flex flex-col items-center gap-1" title={name}>
+              <div className={`relative rounded-md ring-1 ${rank >= 0 ? RANK_STYLE[rank].split(" ")[0] : "ring-white/12"}`}>
+                <img src={img} alt={name} className="h-10 w-10 rounded-md" draggable={false} />
+                {rank >= 0 && (
+                  <span className={`absolute -bottom-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-bg-2 text-[9px] font-bold ring-1 ${RANK_STYLE[rank]}`}>
+                    {rank + 1}
+                  </span>
+                )}
+              </div>
+              <span className="text-[9px] font-bold tracking-widest text-white/40">{key}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 /* Power curve + playstyle, derived from the champion's class tags. A heuristic
    read (not per-patch data), but a useful at-a-glance "when is this champ strong". */
@@ -218,6 +269,8 @@ export default function ChampionDetailModal({ champion, role, patch, onClose }) 
 
         {!loading && details && !details.error && (
           <div className="scroll-thin grid min-h-0 gap-x-5 gap-y-4 overflow-y-auto pr-1 md:grid-cols-2">
+            <AbilitiesBar slug={champion.slug} patch={patch} skillOrder={details.build?.skill_order || []} />
+
             {/* left: power curve + playstyle */}
             <div className="flex flex-col gap-4">
               <PowerCurve tags={tags} />

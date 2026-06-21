@@ -159,8 +159,66 @@ class Catalog:
     def items(self) -> dict[str, dict]:
         return self._data.get("items", {})
 
-    def completed_items(self) -> dict[str, dict]:
-        return {n: it for n, it in self.items().items() if it.get("completed")}
+    def completed_items(self) -> dict[int, dict]:
+        """Purchasable completed items, filtered for open-build use.
+
+        Returns a dict keyed by integer item ID. Excludes excluded IDs,
+        excluded DDragon tag categories, and items cheaper than 2200 gold.
+        """
+        from sylqon.data import static as _static
+        result: dict[int, dict] = {}
+        for name, it in self._data.get("items", {}).items():
+            raw_id = it["id"]
+            corrected_id = DDRAGON_ID_CORRECTIONS.get(raw_id, raw_id)
+            if corrected_id in _static.OPEN_BUILD_EXCLUDED_ITEM_IDS:
+                continue
+            if set(it.get("tags", [])) & _static.OPEN_BUILD_EXCLUDED_DDRAGON_TAGS:
+                continue
+            if it.get("gold", 0) < 2200:
+                continue
+            result[corrected_id] = {**it, "name": name, "id": corrected_id}
+        return result
+
+    def items_for_threat(
+        self,
+        threat_tags: list[str],
+        exclude_ids: set[int] | None = None,
+        limit: int = 12,
+    ) -> list[dict]:
+        """Items from ITEM_COUNTER_TAGS whose tags overlap with threat_tags.
+
+        Returns up to `limit` dicts sorted by overlap count descending.
+        Each dict: {"id": int, "name": str, "description": str, "counter_tags": list[str]}.
+        Items missing from the catalog's item table are silently skipped.
+        """
+        from sylqon.data import static as _static
+        if exclude_ids is None:
+            exclude_ids = set()
+        threat_set = set(threat_tags)
+        items_data = self._data.get("items", {})
+
+        scored: list[tuple[int, dict]] = []
+        for iid, tags in _static.ITEM_COUNTER_TAGS.items():
+            if iid in exclude_ids:
+                continue
+            overlap = set(tags) & threat_set
+            if not overlap:
+                continue
+            name = self.item_name(iid)
+            if name is None:
+                continue
+            item = items_data.get(name)
+            if item is None:
+                continue
+            scored.append((len(overlap), {
+                "id": iid,
+                "name": name,
+                "description": item.get("plaintext", ""),
+                "counter_tags": list(tags),
+            }))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [entry for _, entry in scored[:limit]]
 
     def boots_names(self) -> set[str]:
         return {n for n, it in self.items().items() if "Boots" in it.get("tags", [])}

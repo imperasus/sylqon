@@ -4,6 +4,8 @@ export const splashUrl = (slug) => `${DD}/img/champion/splash/${slug}_0.jpg`;
 export const loadingUrl = (slug) => `${DD}/img/champion/loading/${slug}_0.jpg`;
 export const squareUrl = (patch, slug) => `${DD}/${patch}/img/champion/${slug}.png`;
 export const itemUrl = (patch, id) => `${DD}/${patch}/img/item/${id}.png`;
+export const abilityIconUrl = (patch, imageFull) => `${DD}/${patch}/img/spell/${imageFull}`;
+export const passiveIconUrl = (patch, imageFull) => `${DD}/${patch}/img/passive/${imageFull}`;
 
 const SPELL_FILES = {
   Flash: "SummonerFlash",

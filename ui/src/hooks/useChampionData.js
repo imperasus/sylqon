@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { fetchChampionDetails, fetchChampionsByRole } from "../api.js";
 
+const DD = "https://ddragon.leagueoflegends.com/cdn";
+
 /** All champions that can play a role, with per-role meta stats. */
 export function useChampionData(role) {
   const [champions, setChampions] = useState([]);
@@ -52,4 +54,25 @@ export function useChampionDetails(championId, role) {
   }, [championId, role]);
 
   return { details, loading };
+}
+
+/** Passive + Q/W/E/R icons and names from Data Dragon for one champion. */
+export function useChampionAbilities(slug, patch) {
+  const [abilities, setAbilities] = useState(null);
+
+  useEffect(() => {
+    if (!slug || !patch) return undefined;
+    let cancelled = false;
+    fetch(`${DD}/${patch}/data/en_US/champion/${slug}.json`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const champ = data.data?.[slug];
+        if (champ) setAbilities({ passive: champ.passive, spells: champ.spells });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [slug, patch]);
+
+  return abilities;
 }

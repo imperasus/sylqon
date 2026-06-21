@@ -79,6 +79,19 @@ def _tag_label(item: dict) -> str:
     return " [" + "/".join(static.COUNTER_TAG_INFO[t][0] for t in tags) + "]"
 
 
+def rune_pool_for_champion(champion: str) -> dict | None:
+    """Return the curated rune pool for a champion, or None if not in the dict.
+
+    When None is returned, compile_prompt falls back to the current global
+    rune pool behavior (unchanged).
+
+    Returns a dict with keys:
+        keystone_options, primary_minor_flex,
+        secondary_style_options, secondary_minor_options
+    """
+    return static.CHAMPION_RUNE_ARCHETYPES.get(champion)
+
+
 def compile_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) -> str:
     from sylqon import loadout as loadout_mod
     threat = ctx.team_threat_summary()
@@ -88,6 +101,7 @@ def compile_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) -> str:
     ally_lines = "\n".join(f"- {a.describe()}" for a in ctx.allies) or "- none locked yet"
     doctrine_lines = "\n".join(f"- {d}" for d in threat_directives(threat))
     rune_lines = "\n".join(f"- {d}" for d in rune_directives(threat))
+    rune_pool = rune_pool_for_champion(ctx.my_champion)
 
     # --- Item sections -------------------------------------------------------
     boots = candidate.get("boots")
@@ -116,10 +130,22 @@ def compile_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) -> str:
     response_schema = {
         "core_items": [f"exactly {len(core_items)} names (default or swap 1 with pool item)"],
         "situational_items": [f"exactly {situational_count} names from situational pool, ordered"],
-        "keystone": "exact keystone name",
-        "primary_runes": ["3 exact rune names from the keystone's tree"],
-        "secondary_style": "one of Precision/Domination/Sorcery/Resolve/Inspiration",
-        "secondary_runes": ["2 exact rune names from that tree"],
+        "keystone": (
+            f"one of {rune_pool['keystone_options']}"
+            if rune_pool else "exact keystone name"
+        ),
+        "primary_runes": (
+            [f"exactly 3 names from: {rune_pool['primary_minor_flex']}"]
+            if rune_pool else ["3 exact rune names from the keystone's tree"]
+        ),
+        "secondary_style": (
+            f"one of {rune_pool['secondary_style_options']}"
+            if rune_pool else "one of Precision/Domination/Sorcery/Resolve/Inspiration"
+        ),
+        "secondary_runes": (
+            [f"exactly 2 names from: {rune_pool['secondary_minor_options']}"]
+            if rune_pool else ["2 exact rune names from that tree"]
+        ),
         "stat_shards": ["offense row pick", "flex row pick", "defense row pick"],
         "spell1": (f"KEEP \"{def_spell1}\" unless strongly justified; "
                    f"if changing, ONLY one of {a1}"),
@@ -127,6 +153,21 @@ def compile_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) -> str:
                    f"if changing, ONLY one of {a2}"),
         "reasoning": "max 2 sentences",
     }
+
+    if rune_pool:
+        rune_pool_section = (
+            f"RUNE POOL (curated for {ctx.my_champion} — use ONLY these names):\n"
+            f"  Keystone options (first is meta default): {rune_pool['keystone_options']}\n"
+            f"  Primary flexible minor runes (pick exactly 3 from keystone tree, "
+            f"these are the allowed options): {rune_pool['primary_minor_flex']}\n"
+            f"  Secondary style options: {rune_pool['secondary_style_options']}\n"
+            f"  Secondary minor rune options (pick exactly 2): {rune_pool['secondary_minor_options']}"
+        )
+    else:
+        rune_pool_section = (
+            f"RUNE POOL: keystones {list(static.KEYSTONES)}; "
+            f"minor runes by tree {json.dumps({s: [n for n, t in static.RUNE_STYLE_OF_MINOR.items() if t == s] for s in static.RUNE_STYLES})}"
+        )
 
     return f"""You are a deterministic League of Legends loadout filter. Analyze the enemy threat profile and select the optimal counter-loadout using ONLY the names provided below. Do not invent names.
 
@@ -148,7 +189,7 @@ RUNE DOCTRINE (keep the base page; only adjust the flexible defensive picks as b
 
 {item_section}
 
-RUNE POOL: keystones {list(static.KEYSTONES)}; minor runes by tree {json.dumps({s: [n for n, t in static.RUNE_STYLE_OF_MINOR.items() if t == s] for s in static.RUNE_STYLES})}
+{rune_pool_section}
 
 STAT SHARD ROWS: offense {static.SHARD_ROW_OFFENSE}; flex {static.SHARD_ROW_FLEX}; defense {static.SHARD_ROW_DEFENSE}
 

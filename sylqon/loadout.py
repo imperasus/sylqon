@@ -103,7 +103,23 @@ def _rune_ids(keystone: str, primary: list[str], secondary: list[str]) -> list[i
     return ids
 
 
-def _valid_rune_block(keystone, primary, secondary, secondary_style) -> bool:
+def _valid_rune_block(
+    keystone: str,
+    primary: list[str],
+    secondary: list[str],
+    secondary_style: str,
+    rune_pool: dict | None = None,
+) -> bool:
+    """Validate a rune block.
+
+    When rune_pool is provided (champion-specific archetype), additionally
+    checks that:
+    - keystone is in rune_pool['keystone_options']
+    - secondary_style is in rune_pool['secondary_style_options']
+    - all secondary runes are in rune_pool['secondary_minor_options']
+
+    The primary tree / style-consistency check always runs regardless of pool.
+    """
     if keystone not in static.KEYSTONES:
         return False
     p_style = static.KEYSTONE_STYLE[keystone]
@@ -113,7 +129,18 @@ def _valid_rune_block(keystone, primary, secondary, secondary_style) -> bool:
         return False
     if secondary_style not in static.RUNE_STYLES or secondary_style == p_style:
         return False
-    return all(static.RUNE_STYLE_OF_MINOR.get(r) == secondary_style for r in secondary)
+    if not all(static.RUNE_STYLE_OF_MINOR.get(r) == secondary_style for r in secondary):
+        return False
+
+    if rune_pool is not None:
+        if keystone not in rune_pool["keystone_options"]:
+            return False
+        if secondary_style not in rune_pool["secondary_style_options"]:
+            return False
+        if not all(r in rune_pool["secondary_minor_options"] for r in secondary):
+            return False
+
+    return True
 
 
 def allowed_spells(build: dict, role: str) -> tuple[list[str], list[str]]:
@@ -287,34 +314,121 @@ def apply_ai_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
                     len(new_items), len(base.items),
                 )
 
-    # Runes: all-or-nothing block validation.
+    from sylqon.ai.prompts import rune_pool_for_champion
+    champion_rune_pool = rune_pool_for_champion(ctx.my_champion)
+
+    _apply_runes(out, ai, rune_pool=champion_rune_pool)
+    _apply_shards(out, ai)
+    _apply_spells(out, ai, ctx)
+
+    out.reasoning = str(ai.get("reasoning", ""))[:300]
+    out.source = f"{base.source}+ollama"
+    return out
+
+
+def _apply_runes(out: Loadout, ai: dict, rune_pool: dict | None = None) -> None:
     ks = ai.get("keystone", "")
     prim = ai.get("primary_runes", [])
     sec = ai.get("secondary_runes", [])
     sec_style = ai.get("secondary_style", "")
-    if _valid_rune_block(ks, prim, sec, sec_style):
+    if _valid_rune_block(ks, prim, sec, sec_style, rune_pool=rune_pool):
         out.primary_style_id = static.RUNE_STYLES[static.KEYSTONE_STYLE[ks]]
         out.secondary_style_id = static.RUNE_STYLES[sec_style]
         out.rune_perk_ids = _rune_ids(ks, prim, sec)
     else:
         log.debug("AI rune block rejected; keeping candidate runes")
 
-    # Stat shards: each of the 3 must belong to its row.
+
+def _apply_shards(out: Loadout, ai: dict) -> None:
     shards = ai.get("stat_shards", [])
     rows = [static.SHARD_ROW_OFFENSE, static.SHARD_ROW_FLEX, static.SHARD_ROW_DEFENSE]
     if (isinstance(shards, list) and len(shards) == 3
             and all(s in rows[i] for i, s in enumerate(shards))):
         out.shard_ids = [static.STAT_SHARDS[s] for s in shards]
 
-    # Summoner spells: the AI may only deviate into spells op.gg actually runs
-    # on this champion (base.allowed_spell1/2). jungle's D-key stays Smite.
-    if ctx.my_role != "jungle" and ai.get("spell1") in base.allowed_spell1:
+
+def _apply_spells(out: Loadout, ai: dict, ctx: MatchContext) -> None:
+    if ctx.my_role != "jungle" and ai.get("spell1") in out.allowed_spell1:
         if ai["spell1"] != out.spell1:
             log.info("AI changed D-key spell: %s -> %s", out.spell1, ai["spell1"])
         out.spell1 = ai["spell1"]
-    if ai.get("spell2") in base.allowed_spell2:
+    if ai.get("spell2") in out.allowed_spell2:
         out.spell2 = ai["spell2"]
 
+
+def apply_ai_open_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
+                           catalog: Catalog) -> Loadout:
+    """Like apply_ai_decision but for OpenBuild mode.
+
+    Differences from the standard path:
+    - has_pool only requires core_items (no situational_pool check).
+    - Core swap target only needs to exist in catalog, not in the op.gg pool.
+    - Situational items only need to exist in catalog (no pool membership check).
+    - Source suffix is +ollama-open.
+    """
+    if not isinstance(ai, dict):
+        log.info("No usable AI output; using %s build verbatim", base.source)
+        return base
+
+    out = base
+
+    has_pool = bool(base.core_items) and base.boots is not None
+
+    if has_pool and ("core_items" in ai or "situational_items" in ai):
+        default_core_names = [item["name"] for item in base.core_items]
+        situational_count = len(base.items) - 1 - len(base.core_items)
+
+        ai_core = ai.get("core_items", [])
+        final_core_names = default_core_names
+        if isinstance(ai_core, list) and len(ai_core) == len(base.core_items):
+            ai_core_names = [str(n) for n in ai_core]
+            swaps = sum(1 for n in ai_core_names if n not in default_core_names)
+            all_exist = all(catalog.item_id(n) is not None for n in ai_core_names)
+            if swaps <= 1 and all_exist:
+                final_core_names = ai_core_names
+            else:
+                log.debug(
+                    "AI core_items rejected (swaps=%d, exist=%s)",
+                    swaps, all_exist,
+                )
+
+        ai_situ = ai.get("situational_items", [])
+        situ_valid = False
+        if isinstance(ai_situ, list) and len(ai_situ) == situational_count:
+            ai_situ_names = [str(n) for n in ai_situ]
+            occupied = {base.boots["name"]} | set(final_core_names)
+            no_dup = len(set(ai_situ_names)) == situational_count and not (
+                set(ai_situ_names) & occupied
+            )
+            all_exist = all(catalog.item_id(n) is not None for n in ai_situ_names)
+            if no_dup and all_exist:
+                situ_valid = True
+            else:
+                log.debug(
+                    "AI situational_items rejected (no_dup=%s, exist=%s)",
+                    no_dup, all_exist,
+                )
+
+        if situ_valid:
+            boots_item = [base.boots]
+            core_resolved = [{"id": catalog.item_id(n), "name": n} for n in final_core_names]
+            situ_resolved = [{"id": catalog.item_id(n), "name": n} for n in ai_situ_names]
+            new_items = boots_item + core_resolved + situ_resolved
+            if len(new_items) == len(base.items):
+                out.items = new_items
+            else:
+                log.debug(
+                    "AI item list length mismatch (%d vs %d); keeping baseline",
+                    len(new_items), len(base.items),
+                )
+
+    from sylqon.ai.prompts import rune_pool_for_champion
+    champion_rune_pool = rune_pool_for_champion(ctx.my_champion)
+
+    _apply_runes(out, ai, rune_pool=champion_rune_pool)
+    _apply_shards(out, ai)
+    _apply_spells(out, ai, ctx)
+
     out.reasoning = str(ai.get("reasoning", ""))[:300]
-    out.source = f"{base.source}+ollama"
+    out.source = f"{base.source}+ollama-open"
     return out

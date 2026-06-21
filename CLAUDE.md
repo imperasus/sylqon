@@ -1,5 +1,13 @@
 # CLAUDE.md
 
+<!-- maintainer notes
+  Rebranded from Antigravity → Sylqon on 2026-06-15
+  DB renamed antigravity.db → sylqon.db (legacy may still exist locally)
+  LCU injection tag must stay "Sylqon Meta" — matches existing client item sets in the wild
+  Release: only .github/workflows/release.yml fires on vX.Y.Z tag push; never on PRs/main
+  Path-scoped constraints live in .claude/rules/ — edit there, not here
+-->
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this is
@@ -95,15 +103,6 @@ Strictly **read-only and observational** — see "Riot-safe" below. Polls Riot's
 - **PostLockView** — final items, runes, AI explanation after champion lock
 
 `api.js` polls `/api/state` and manages all server communication. Components consume this via hooks in `hooks/`.
-
-### Key constraints
-
-- **Riot-safe / read-only overlay** — the overlay (and both Electron shells) must never touch the game process: no memory read/write, no DLL/code/overlay injection, no synthesized input. It only reads the Live Client Data API and displays normal desktop windows. Preserve this; it's what keeps the app ToS-compliant.
-- **LCU item set limit** — 64 KB per item set; JSON must stay compact (no pretty-print)
-- **Ollama is optional** — system falls back to heuristic scoring if Ollama is unreachable; never block the UI waiting for LLM. AI helpers (`ai/match_review.py`, etc.) return `None` when Ollama is down so the API degrades gracefully.
-- **Match history deduplication** — LCU match-history endpoint ignores `begIndex`/`endIndex`; always dedupe by `gameId`
-- **op.gg builds are cached** — `meta_cache.json` with 24h TTL; live fetch only on cache miss or expiry
-- **Validation is mandatory** — LCU rejects invalid rune/spell IDs silently; all AI output must pass `data/static.py` checks before injection
 
 ### Database (SQLite, `sylqon.db`)
 

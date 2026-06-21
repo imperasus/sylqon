@@ -89,3 +89,9 @@ LOBBY_POLL_SECONDS = 2.0
 
 # Writable log location. Overridable via SYLQON_LOG_DIR (see CACHE_DIR note).
 LOG_PATH = Path(os.getenv("SYLQON_LOG_DIR", str(PROJECT_ROOT))) / "sylqon.log"
+
+# --- OpenBuild mode ---------------------------------------------------------
+# When enabled, the counter-loadout prompt draws from the full Data Dragon
+# catalog rather than just the op.gg situational pool.
+OPEN_BUILD_MODE: bool = os.getenv("SYLQON_OPEN_BUILD", "0") == "1"
+OPEN_BUILD_CATALOG_LIMIT: int = int(os.getenv("SYLQON_OPEN_BUILD_CATALOG_LIMIT", "12"))

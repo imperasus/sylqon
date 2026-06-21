@@ -191,6 +191,132 @@ KEYSTONE_STYLE = {
     "First Strike": "Inspiration",
 }
 
+# Per-champion rune archetype: the keystones op.gg actually runs on this
+# champion and the flexible minor-rune slots the AI may adjust.
+# Structure per entry:
+#   "keystone_options": list[str]  — first item is the meta default
+#   "primary_minor_flex": list[str] — row 2+3 minor rune names the AI may pick from
+#                                     (row 1 / slot 1 is typically fixed per keystone)
+#   "secondary_style_options": list[str] — trees op.gg uses as secondary
+#   "secondary_minor_options": list[str] — minor runes from those trees the AI may use
+# If a champion is absent from this dict, the system falls back to the full
+# global rune pool (current behavior, unchanged).
+CHAMPION_RUNE_ARCHETYPES: dict[str, dict] = {
+    # ADC
+    "Jinx": {
+        "keystone_options": ["Lethal Tempo", "Fleet Footwork"],
+        "primary_minor_flex": ["Triumph", "Presence of Mind", "Legend: Alacrity", "Legend: Bloodline", "Coup de Grace", "Cut Down", "Last Stand"],
+        "secondary_style_options": ["Domination", "Sorcery", "Resolve"],
+        "secondary_minor_options": ["Taste of Blood", "Treasure Hunter", "Eyeball Collection", "Absolute Focus", "Gathering Storm", "Bone Plating", "Second Wind"],
+    },
+    "Caitlyn": {
+        "keystone_options": ["Lethal Tempo", "Fleet Footwork"],
+        "primary_minor_flex": ["Triumph", "Presence of Mind", "Legend: Alacrity", "Legend: Bloodline", "Coup de Grace", "Cut Down"],
+        "secondary_style_options": ["Domination", "Inspiration", "Sorcery"],
+        "secondary_minor_options": ["Taste of Blood", "Eyeball Collection", "Treasure Hunter", "Magical Footwear", "Biscuit Delivery", "Manaflow Band", "Absolute Focus"],
+    },
+    "Kai'Sa": {
+        "keystone_options": ["Press the Attack", "Lethal Tempo"],
+        "primary_minor_flex": ["Triumph", "Legend: Alacrity", "Legend: Bloodline", "Coup de Grace", "Cut Down"],
+        "secondary_style_options": ["Domination", "Sorcery", "Resolve"],
+        "secondary_minor_options": ["Taste of Blood", "Eyeball Collection", "Treasure Hunter", "Absolute Focus", "Gathering Storm", "Bone Plating"],
+    },
+    "Jhin": {
+        "keystone_options": ["Fleet Footwork", "Lethal Tempo"],
+        "primary_minor_flex": ["Triumph", "Presence of Mind", "Legend: Alacrity", "Legend: Bloodline", "Coup de Grace", "Cut Down", "Last Stand"],
+        "secondary_style_options": ["Sorcery", "Domination", "Resolve"],
+        "secondary_minor_options": ["Manaflow Band", "Absolute Focus", "Gathering Storm", "Taste of Blood", "Eyeball Collection", "Bone Plating", "Second Wind"],
+    },
+    "Ezreal": {
+        "keystone_options": ["Fleet Footwork", "Conqueror"],
+        "primary_minor_flex": ["Triumph", "Presence of Mind", "Legend: Alacrity", "Legend: Haste", "Coup de Grace", "Last Stand"],
+        "secondary_style_options": ["Sorcery", "Inspiration", "Domination"],
+        "secondary_minor_options": ["Manaflow Band", "Absolute Focus", "Gathering Storm", "Magical Footwear", "Biscuit Delivery", "Taste of Blood"],
+    },
+    "Ashe": {
+        "keystone_options": ["Fleet Footwork", "Lethal Tempo"],
+        "primary_minor_flex": ["Triumph", "Presence of Mind", "Legend: Alacrity", "Legend: Bloodline", "Coup de Grace", "Cut Down", "Last Stand"],
+        "secondary_style_options": ["Domination", "Sorcery", "Resolve"],
+        "secondary_minor_options": ["Taste of Blood", "Eyeball Collection", "Treasure Hunter", "Absolute Focus", "Bone Plating", "Second Wind"],
+    },
+    # Mid
+    "Zed": {
+        "keystone_options": ["Electrocute", "Dark Harvest"],
+        "primary_minor_flex": ["Cheap Shot", "Taste of Blood", "Eyeball Collection", "Ghost Poro", "Treasure Hunter", "Relentless Hunter", "Ultimate Hunter"],
+        "secondary_style_options": ["Precision", "Sorcery", "Inspiration"],
+        "secondary_minor_options": ["Triumph", "Coup de Grace", "Legend: Alacrity", "Absolute Focus", "Gathering Storm", "Magical Footwear"],
+    },
+    "Ahri": {
+        "keystone_options": ["Electrocute", "Dark Harvest", "Phase Rush"],
+        "primary_minor_flex": ["Cheap Shot", "Taste of Blood", "Eyeball Collection", "Ghost Poro", "Treasure Hunter", "Relentless Hunter", "Ultimate Hunter"],
+        "secondary_style_options": ["Sorcery", "Inspiration", "Precision"],
+        "secondary_minor_options": ["Manaflow Band", "Transcendence", "Gathering Storm", "Magical Footwear", "Biscuit Delivery", "Triumph"],
+    },
+    "Syndra": {
+        "keystone_options": ["Electrocute", "Arcane Comet"],
+        "primary_minor_flex": ["Cheap Shot", "Taste of Blood", "Eyeball Collection", "Treasure Hunter", "Ultimate Hunter", "Relentless Hunter"],
+        "secondary_style_options": ["Sorcery", "Inspiration"],
+        "secondary_minor_options": ["Manaflow Band", "Transcendence", "Absolute Focus", "Gathering Storm", "Magical Footwear", "Biscuit Delivery"],
+    },
+    "LeBlanc": {
+        "keystone_options": ["Electrocute", "Dark Harvest"],
+        "primary_minor_flex": ["Cheap Shot", "Taste of Blood", "Eyeball Collection", "Treasure Hunter", "Relentless Hunter", "Ultimate Hunter"],
+        "secondary_style_options": ["Sorcery", "Inspiration", "Precision"],
+        "secondary_minor_options": ["Manaflow Band", "Absolute Focus", "Gathering Storm", "Magical Footwear", "Biscuit Delivery"],
+    },
+    # Top
+    "Darius": {
+        "keystone_options": ["Conqueror", "Grasp of the Undying"],
+        "primary_minor_flex": ["Triumph", "Presence of Mind", "Legend: Alacrity", "Legend: Haste", "Coup de Grace", "Last Stand"],
+        "secondary_style_options": ["Domination", "Resolve", "Sorcery"],
+        "secondary_minor_options": ["Taste of Blood", "Eyeball Collection", "Treasure Hunter", "Bone Plating", "Second Wind", "Conditioning", "Transcendence"],
+    },
+    "Garen": {
+        "keystone_options": ["Conqueror", "Grasp of the Undying"],
+        "primary_minor_flex": ["Triumph", "Legend: Alacrity", "Legend: Haste", "Coup de Grace", "Last Stand"],
+        "secondary_style_options": ["Resolve", "Domination", "Inspiration"],
+        "secondary_minor_options": ["Bone Plating", "Second Wind", "Conditioning", "Overgrowth", "Demolish", "Magical Footwear"],
+    },
+    "Aatrox": {
+        "keystone_options": ["Conqueror"],
+        "primary_minor_flex": ["Triumph", "Legend: Alacrity", "Legend: Haste", "Coup de Grace", "Last Stand"],
+        "secondary_style_options": ["Domination", "Resolve", "Sorcery"],
+        "secondary_minor_options": ["Taste of Blood", "Eyeball Collection", "Treasure Hunter", "Bone Plating", "Second Wind", "Gathering Storm"],
+    },
+    # Jungle
+    "Vi": {
+        "keystone_options": ["Conqueror", "Dark Harvest"],
+        "primary_minor_flex": ["Triumph", "Legend: Alacrity", "Legend: Haste", "Coup de Grace", "Last Stand"],
+        "secondary_style_options": ["Domination", "Resolve", "Sorcery"],
+        "secondary_minor_options": ["Taste of Blood", "Treasure Hunter", "Bone Plating", "Second Wind", "Gathering Storm"],
+    },
+    "Kayn": {
+        "keystone_options": ["Conqueror", "Dark Harvest", "Electrocute"],
+        "primary_minor_flex": ["Triumph", "Legend: Alacrity", "Coup de Grace", "Taste of Blood", "Eyeball Collection", "Treasure Hunter"],
+        "secondary_style_options": ["Domination", "Precision", "Resolve"],
+        "secondary_minor_options": ["Eyeball Collection", "Treasure Hunter", "Legend: Alacrity", "Triumph", "Bone Plating", "Second Wind"],
+    },
+    # Support
+    "Thresh": {
+        "keystone_options": ["Aftershock", "Glacial Augment"],
+        "primary_minor_flex": ["Font of Life", "Shield Bash", "Bone Plating", "Second Wind", "Conditioning", "Overgrowth", "Unflinching"],
+        "secondary_style_options": ["Inspiration", "Domination", "Precision"],
+        "secondary_minor_options": ["Magical Footwear", "Biscuit Delivery", "Cosmic Insight", "Eyeball Collection", "Treasure Hunter", "Triumph"],
+    },
+    "Nautilus": {
+        "keystone_options": ["Aftershock", "Guardian"],
+        "primary_minor_flex": ["Font of Life", "Shield Bash", "Bone Plating", "Second Wind", "Conditioning", "Overgrowth", "Unflinching"],
+        "secondary_style_options": ["Inspiration", "Domination", "Precision"],
+        "secondary_minor_options": ["Magical Footwear", "Biscuit Delivery", "Cosmic Insight", "Eyeball Collection", "Treasure Hunter"],
+    },
+    "Soraka": {
+        "keystone_options": ["Summon Aery", "Arcane Comet"],
+        "primary_minor_flex": ["Manaflow Band", "Nimbus Cloak", "Transcendence", "Celerity", "Absolute Focus", "Gathering Storm"],
+        "secondary_style_options": ["Resolve", "Inspiration", "Precision"],
+        "secondary_minor_options": ["Revitalize", "Bone Plating", "Second Wind", "Font of Life", "Magical Footwear", "Biscuit Delivery", "Triumph"],
+    },
+}
+
 RUNE_STYLE_OF_MINOR = {
     name: style
     for style, names in {
@@ -374,6 +500,11 @@ ITEM_COUNTER_TAGS: dict[int, tuple[str, ...]] = {
     # Mobility / kiting
     3046: ("mobility",),                  # Phantom Dancer
     4629: ("mobility",),                  # Cosmic Drive
+    # OpenBuild additions
+    3179: ("percent_pen",),               # Opportunity
+    3161: ("tank_shred", "percent_pen"),  # Spear of Shojin
+    3094: ("mobility",),                  # Rapidfire Cannon
+    6662: ("anti_burst", "armor"),        # Iceborn Gauntlet
 }
 
 # tag -> (short label, when-to-buy guidance). Dict order doubles as display
@@ -392,3 +523,14 @@ COUNTER_TAG_INFO: dict[str, tuple[str, str]] = {
     "mobility":    ("Mobility", "extra MS for kiting / positioning"),
     "damage":      ("Damage / Greed", "when ahead or no dominant threat"),
 }
+
+OPEN_BUILD_EXCLUDED_DDRAGON_TAGS: frozenset[str] = frozenset({
+    "Trinket", "Consumable", "Lane",
+})
+
+OPEN_BUILD_EXCLUDED_ITEM_IDS: frozenset[int] = frozenset({
+    2003, 2031, 2033, 2010,
+    3340, 3363, 3364,
+    1101, 1102, 1103,
+    3865,
+})
