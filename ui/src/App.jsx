@@ -74,6 +74,11 @@ export default function App() {
   const [dismissedGame, setDismissedGame] = useState(null);
   const showPostGame = pgMatch?.id != null && pgMatch.game_id !== dismissedGame;
 
+  // Show the LiveBoard as soon as the LCU phase is InProgress — the Live Client
+  // Data API (port 2999) may take a few seconds to respond after the game starts,
+  // so relying solely on live.active would delay the switch unnecessarily.
+  const isInGame = state?.lcu?.phase === "InProgress" || state?.live?.active;
+
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       <div className="mx-auto flex h-full w-full max-w-[1280px] flex-col gap-3 p-4">
@@ -88,7 +93,7 @@ export default function App() {
               <div className="min-h-0 flex-1">
                 {postlockView === "loadout"
                   ? <PostlockCockpit state={state} act={act} api={api} />
-                  : state?.live?.active
+                  : isInGame
                     ? <LiveBoard scout={state?.scout} live={state.live} patch={state?.cache?.patch || "16.12.1"} />
                     : <PlayersView state={state} />}
               </div>
