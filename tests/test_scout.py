@@ -119,6 +119,47 @@ def test_recent_games_for_puuid_empty_without_puuid():
     assert scout_mod.recent_games_for_puuid(FakeClient([]), "") == []
 
 
+# ---------------------------------------------------- local rank from the LCU
+class RankedClient:
+    """Returns a fixed /lol-ranked/v1/current-ranked-stats payload."""
+
+    def __init__(self, data):
+        self._data = data
+
+    def get_json(self, path):
+        return self._data
+
+
+def test_current_ranked_summary_solo_and_flex():
+    from sylqon.lcu.ranked import current_ranked_summary
+    data = {"queueMap": {
+        "RANKED_SOLO_5x5": {"tier": "GOLD", "division": "I", "leaguePoints": 82,
+                            "wins": 50, "losses": 40, "isHotStreak": True},
+        "RANKED_FLEX_SR": {"tier": "NONE", "division": "NA"},  # unranked → dropped
+    }}
+    acc = current_ranked_summary(RankedClient(data))
+    assert acc["rank"] == "G1 · 82 LP"
+    assert acc["solo"]["win_rate"] == round(50 / 90, 3)
+    assert acc["solo"]["hot_streak"] is True
+    assert acc["flex"] is None
+
+
+def test_current_ranked_summary_apex_blank_division():
+    from sylqon.lcu.ranked import current_ranked_summary
+    data = {"queueMap": {"RANKED_SOLO_5x5": {"tier": "MASTER", "division": "NA",
+                         "leaguePoints": 312, "wins": 0, "losses": 0}}}
+    acc = current_ranked_summary(RankedClient(data))
+    assert acc["rank"] == "M · 312 LP"
+    assert acc["solo"]["win_rate"] is None   # 0 games
+
+
+def test_current_ranked_summary_unranked_and_bad_input():
+    from sylqon.lcu.ranked import current_ranked_summary
+    assert current_ranked_summary(
+        RankedClient({"queueMap": {"RANKED_SOLO_5x5": {"tier": "NONE"}}})) is None
+    assert current_ranked_summary(RankedClient(None)) is None
+
+
 # ------------------------------------------------------- prompt scout block
 def test_scout_block_omitted_without_usable_players():
     assert format_scout_block(None) == ""

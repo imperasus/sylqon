@@ -217,6 +217,9 @@ class PipelineRunner:
         # signature so a static lobby/draft is only scouted once.
         self._player_scout_cache: dict[str, dict] = {}   # puuid -> enriched fingerprint
         self._last_scout_sig: str | None = None
+        # Local player's own rank, read from the LCU (works in custom/bot games
+        # where the Spectator-based scout never runs). Cached per scout session.
+        self._self_ranked: dict | None = None
         # Local player's PUUID — set on LCU connect; used for Spectator scouting.
         self._my_puuid: str = ""
         self._scout_lock = threading.Lock()
@@ -485,12 +488,37 @@ class PipelineRunner:
                     enriched = self._enrich_fingerprint(fp)
                     self._player_scout_cache[puuid] = enriched
                 out.append({**enriched, **self._player_meta(p)})
+            self._apply_self_rank(out)
             self.state.set("scout", {"players": out, "ready": True, "at": time.time()})
             scouted = sum(1 for p in out if not p.get("hidden"))
             log.info("Lobby scout: %d player(s) profiled (%d hidden)",
                      scouted, len(out) - scouted)
         finally:
             self._scout_lock.release()
+
+    def _self_rank_summary(self) -> dict | None:
+        """The local player's own rank from the LCU, cached per scout session.
+        Lets the live board show your rank even in custom/bot games (Spectator
+        doesn't return those, so the Riot scout never fetches it). Best-effort."""
+        if self._self_ranked is None and self.client is not None:
+            try:
+                from sylqon.lcu.ranked import current_ranked_summary
+                self._self_ranked = current_ranked_summary(self.client) or {}
+            except Exception:
+                log.debug("self-rank fetch failed", exc_info=True)
+                self._self_ranked = {}
+        return self._self_ranked or None
+
+    def _apply_self_rank(self, players: list[dict]) -> None:
+        """Stamp the local player's own LCU rank onto their scout entry."""
+        acct = self._self_rank_summary()
+        if not acct:
+            return
+        for entry in players:
+            if entry.get("is_self"):
+                entry["rank"] = acct.get("rank", "") or entry.get("rank", "")
+                entry["account"] = acct
+                break
 
     def _hidden_card(self, p: dict) -> dict:
         return {"hidden": True, "games_analyzed": 0, **self._player_meta(p)}
@@ -518,6 +546,7 @@ class PipelineRunner:
     def _clear_scout(self) -> None:
         self._last_scout_sig = None
         self._player_scout_cache.clear()
+        self._self_ranked = None   # re-read next session (LP/tier may have changed)
         self.state.set("scout", {"players": [], "ready": False, "at": None})
 
     # ----------------------------------------------- auto post-game review
