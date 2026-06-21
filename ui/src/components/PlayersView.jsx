@@ -54,15 +54,15 @@ function AllyCard({ p, champ, patch }) {
   const accent = p.is_self ? "accent" : "ally";
 
   return (
-    <div className={`frost ${p.is_self ? "frost-accent" : ""} flex flex-col gap-1.5 p-2`}>
-      <div className="flex items-center gap-2">
-        <ChampPortrait slug={champ?.slug || p.comfort?.slug} patch={patch} size="h-8 w-8" accent={accent} title={champ?.name || p.comfort?.champion} />
+    <div className={`frost ${p.is_self ? "frost-accent" : ""} flex flex-col gap-1 p-1.5`}>
+      <div className="flex items-center gap-1.5">
+        <ChampPortrait slug={champ?.slug || p.comfort?.slug} patch={patch} size="h-7 w-7" accent={accent} title={champ?.name || p.comfort?.champion} />
         <div className="min-w-0 flex-1 leading-tight">
           <div className="flex items-center gap-1">
-            <span className="truncate text-[12px] font-bold text-white/90">{p.name}</span>
+            <span className="truncate text-[11px] font-bold text-white/90">{p.name}</span>
             {p.is_self && <span className="text-[8px] font-bold tracking-widest text-accent">YOU</span>}
           </div>
-          <div className="text-[10px] font-bold tracking-widest text-white/50">
+          <div className="text-[9px] font-bold tracking-widest text-white/50">
             {ROLE_LABELS[p.position || p.main_role] || "—"} · {p.games_analyzed}g
           </div>
         </div>
@@ -95,7 +95,7 @@ function AllyCard({ p, champ, patch }) {
         )}
       </div>
 
-      <div className="flex items-center gap-2 border-t border-white/8 pt-1.5">
+      <div className="flex items-center gap-2 border-t border-white/8 pt-1">
         <div className="flex gap-0.5">
           {pool.map((c) => (
             <ChampPortrait key={c.champion_id} slug={c.slug} patch={patch} size="h-5 w-5" round
@@ -159,26 +159,39 @@ function EnemyCard({ e, scout, patch }) {
    historical fingerprints aren't available (Riot doesn't expose enemy puuids). */
 function LivePlayerCard({ p, slug, patch, side = "enemy" }) {
   const kda = ((p.kills + p.assists) / Math.max(1, p.deaths)).toFixed(1);
+  const kdaColor = parseFloat(kda) >= 3 ? "text-good" : parseFloat(kda) < 1.5 ? "text-enemy/80" : "text-white/75";
+
   return (
-    <div className="frost flex flex-col gap-1.5 p-2">
-      <div className="flex items-center gap-2">
-        <div className={`relative ${p.is_dead ? "grayscale" : ""}`}>
-          <ChampPortrait slug={slug} patch={patch} size="h-8 w-8" accent={side} title={p.champion} />
+    <div className="frost flex flex-col gap-1 p-1.5">
+      {/* Row 1: portrait · name + role · level/dead */}
+      <div className="flex items-center gap-1.5">
+        <div className={p.is_dead ? "grayscale opacity-60" : ""}>
+          <ChampPortrait slug={slug} patch={patch} size="h-7 w-7" accent={side} title={p.champion} />
         </div>
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate text-[12px] font-bold text-white/90">{p.name || p.champion}</div>
+          <div className="truncate text-[11px] font-bold text-white/85">{p.name || p.champion}</div>
           <div className="text-[9px] font-bold tracking-widest text-white/40">
             {ROLE_LABELS[p.role] || "—"} · {p.champion}
           </div>
         </div>
         {p.is_dead
           ? <Chip tone="bad">DEAD</Chip>
-          : <span className="shrink-0 text-[10px] font-bold text-white/45">Lv {p.level}</span>}
+          : <span className="shrink-0 text-[10px] font-bold text-white/40">Lv {p.level}</span>}
       </div>
-      <div className="flex items-center gap-2 border-t border-white/8 pt-1.5 text-[10px]">
-        <span className="font-mono font-bold text-white/75">{p.kills}/{p.deaths}/{p.assists}</span>
-        <span className="text-white/35">KDA {kda}</span>
-        <span className="ml-auto font-mono text-white/55">{p.cs} CS</span>
+
+      {/* Deaths danger bar */}
+      <div className="h-0.5 w-full overflow-hidden rounded-full bg-white/8">
+        <div
+          className="h-full bg-enemy/50"
+          style={{ width: `${Math.min(100, p.deaths * 16)}%` }}
+        />
+      </div>
+
+      {/* Row 2: K/D/A · KDA ratio · CS */}
+      <div className="flex items-center gap-2 border-t border-white/8 pt-1 text-[10px]">
+        <span className="font-mono font-bold text-white/70">{p.kills}/{p.deaths}/{p.assists}</span>
+        <span className={`font-mono font-bold ${kdaColor}`}>{kda} KDA</span>
+        <span className="ml-auto font-mono text-white/50">{p.cs} CS</span>
       </div>
     </div>
   );
