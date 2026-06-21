@@ -135,6 +135,23 @@ def _parse_roster(all_players: list[dict], my_team: str) -> list[dict]:
     return out
 
 
+_ROLE_ORDER = ["top", "jungle", "middle", "bottom", "utility"]
+
+
+def _infer_roles(roster: list[dict]) -> None:
+    """Assign positional-fallback roles to roster entries whose role is empty."""
+    for side in ("ally", "enemy"):
+        side_players = [p for p in roster if p.get("side") == side]
+        taken = {p["role"] for p in side_players if p["role"]}
+        available = [r for r in _ROLE_ORDER if r not in taken]
+        idx = 0
+        for p in side_players:
+            if not p["role"]:
+                if idx < len(available):
+                    p["role"] = available[idx]
+                    idx += 1
+
+
 # Rough CS-per-minute targets by role (lane + jungle camps for JG). Used only as
 # a live "are you keeping up" gauge, not a hard rule.
 _CS_TARGETS = {"top": 7.5, "jungle": 5.5, "middle": 8.0, "bottom": 8.5, "utility": 1.5}
@@ -196,6 +213,7 @@ def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
     light_events = [{"name": e.get("EventName"), "time": float(e.get("EventTime") or 0.0)}
                     for e in events]
     roster = _parse_roster(all_players, my_team)
+    _infer_roles(roster)
     my_level = int(me.get("level") or active.get("level") or 0)
 
     return LiveGameState(

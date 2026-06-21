@@ -327,7 +327,10 @@ export default function PlayersView({ state }) {
     [liveActive, live?.roster]);
   const liveEnemyByRole = useMemo(() => {
     const m = {};
-    for (const p of liveEnemies) if (p.role) m[p.role] = p;
+    for (const p of liveEnemies) {
+      const key = p.role || `__unknown_${p.name}`;
+      m[key] = p;
+    }
     return m;
   }, [liveEnemies]);
   const inGame = liveEnemies.length > 0;
@@ -405,8 +408,10 @@ export default function PlayersView({ state }) {
         <div className="scroll-thin flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
           <div className="t-label text-enemy/70">ENEMY TEAM{inGame && <span className="text-white/30"> · live</span>}</div>
           {inGame
-            ? [...ROLE_ORDER.map((r) => liveEnemyByRole[r]).filter(Boolean),
-               ...liveEnemies.filter((p) => !p.role)].map((p, i) => (
+            ? [
+                ...ROLE_ORDER.map((r) => liveEnemyByRole[r]).filter(Boolean),
+                ...liveEnemies.filter((p) => !p.role || !ROLE_ORDER.includes(p.role)),
+              ].map((p, i) => (
                 <LivePlayerCard key={`${p.name}-${p.champion}-${i}`} p={p}
                                 slug={slugOf[p.champion]} side="enemy" patch={patch} />
               ))
