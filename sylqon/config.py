@@ -78,6 +78,15 @@ except (ValueError, TypeError):
 _enabled = [t.strip() for t in os.getenv("MISSION_TYPES_ENABLED", "").split(",") if t.strip()]
 MISSION_TYPES_ENABLED: set[str] | None = set(_enabled) or None
 
+# --- Riot REST API (live-game scouting via Spectator + LEAGUE + MATCH) -----
+RIOT_API_KEY: str = os.getenv("RIOT_API_KEY", "")
+# Platform route for SPECTATOR-V5 and LEAGUE-V4 (e.g. euw1 / na1 / kr).
+RIOT_API_REGION: str = os.getenv("RIOT_API_REGION", "euw1")
+# Mass region for MATCH-V5 (europe / americas / asia).
+RIOT_API_MASS_REGION: str = os.getenv("RIOT_API_MASS_REGION", "europe")
+# Recent ranked solo games to pull per player during live-game scouting.
+RIOT_MATCH_COUNT: int = int(os.getenv("RIOT_MATCH_COUNT", 40))
+
 # --- LCU --------------------------------------------------------------------
 LCU_LOCKFILE_OVERRIDE = os.getenv("LOL_LOCKFILE", "")
 LCU_LOCKFILE_CANDIDATES = [

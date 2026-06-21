@@ -65,6 +65,9 @@ function AllyCard({ p, champ, patch }) {
           <div className="text-[9px] font-bold tracking-widest text-white/50">
             {ROLE_LABELS[p.position || p.main_role] || "—"} · {p.games_analyzed}g
           </div>
+          {p.rank && (
+            <span className="text-[9px] font-bold tracking-widest text-amber/80">{p.rank}</span>
+          )}
         </div>
         {flag && (
           <Chip tone={flag.tone}>
@@ -173,6 +176,9 @@ function LivePlayerCard({ p, slug, patch, side = "enemy" }) {
           <div className="text-[9px] font-bold tracking-widest text-white/40">
             {ROLE_LABELS[p.role] || "—"} · {p.champion}
           </div>
+          {p.rank && (
+            <span className="text-[9px] font-bold tracking-widest text-amber/80">{p.rank}</span>
+          )}
         </div>
         {p.is_dead
           ? <Chip tone="bad">DEAD</Chip>

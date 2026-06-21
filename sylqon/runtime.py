@@ -217,6 +217,8 @@ class PipelineRunner:
         # signature so a static lobby/draft is only scouted once.
         self._player_scout_cache: dict[str, dict] = {}   # puuid -> enriched fingerprint
         self._last_scout_sig: str | None = None
+        # Local player's PUUID — set on LCU connect; used for Spectator scouting.
+        self._my_puuid: str = ""
         self._scout_lock = threading.Lock()
         # Auto post-game review: event-driven off the end-of-game stats block.
         self._last_reviewed_game: str | None = None
@@ -275,6 +277,7 @@ class PipelineRunner:
                 return
             summoner = self.client.current_summoner() or {}
             self._summoner_id = summoner.get("summonerId", 0)
+            self._my_puuid = summoner.get("puuid", "")
             name = summoner.get("displayName") or summoner.get("gameName") or ""
             self.state.update("lcu", connected=True, summoner=name)
             threading.Thread(target=self._refresh_champion_stats,
@@ -600,6 +603,14 @@ class PipelineRunner:
             target=self._live_loop, name="ag-live", daemon=True)
         self._live_thread.start()
         log.info("Live game poller started")
+        # Kick off Riot API scouting for all 10 players via Spectator + MATCH.
+        if self._my_puuid:
+            threading.Thread(
+                target=self._do_live_scout,
+                args=(self._my_puuid,),
+                name="ag-live-scout",
+                daemon=True,
+            ).start()
 
     def _stop_live_poller(self) -> None:
         """Tear the poller down on game end and clear the overlay state."""
@@ -615,6 +626,85 @@ class PipelineRunner:
         # its post-game stats (off-thread — a slow Ollama call never blocks polls).
         self._was_in_game = False
         self._schedule_mission_generation()
+
+    def _do_live_scout(self, my_puuid: str) -> None:
+        """Fetch full fingerprints for all 10 players via Spectator + MATCH APIs.
+        Runs on a daemon thread — updates scout state when complete."""
+        try:
+            from sylqon.riot.api import get_active_game_by_puuid
+            from sylqon.riot.scout import scout_all
+
+            game = get_active_game_by_puuid(my_puuid)
+            if not isinstance(game, dict):
+                log.info("Live scout: spectator game not found for local player")
+                return
+            participants = game.get("participants") or []
+
+            me = next((p for p in participants if p.get("puuid") == my_puuid), None)
+            my_team_id = me.get("teamId") if me else 100
+
+            puuids = [p["puuid"] for p in participants if p.get("puuid")]
+            if not puuids:
+                return
+
+            log.info("Live scout: scouting %d players via Riot API", len(puuids))
+            scouted = scout_all(puuids)
+
+            players: list[dict] = []
+            for p in participants:
+                pu = p.get("puuid", "")
+                fp, rank = scouted.get(pu, (None, ""))
+                entry: dict = (fp.to_dict() if fp and fp.games_analyzed > 0
+                               else {"games_analyzed": 0})
+                # Resolve champion_pool/comfort IDs → display name + slug.
+                for pool_entry in entry.get("champion_pool", []):
+                    self._name_slug(pool_entry)
+                if entry.get("comfort"):
+                    self._name_slug(entry["comfort"])
+                name = (p.get("riotId") or "").split("#")[0] or p.get("summonerName", "")
+                entry["name"] = name
+                entry["puuid"] = pu
+                entry["champion_id"] = p.get("championId")
+                entry["rank"] = rank
+                entry["side"] = "ally" if p.get("teamId") == my_team_id else "enemy"
+                entry["position"] = (p.get("teamPosition") or "").lower()
+                players.append(entry)
+
+            self._on_live_scout(players)
+        except Exception:
+            log.exception("_do_live_scout failed")
+
+    def _on_live_scout(self, players: list[dict]) -> None:
+        """Merge Riot-scouted players into the scout state. Existing ally LCU
+        fingerprints are kept (they're richer); enemies are new entries."""
+        current = self.state.snapshot().get("scout") or {}
+        existing: list[dict] = current.get("players") or []
+        by_puuid: dict[str, dict] = {
+            p.get("puuid", ""): p for p in existing if p.get("puuid")
+        }
+        merged: list[dict] = []
+        seen: set[str] = set()
+        for p in players:
+            pu = p.get("puuid") or ""
+            seen.add(pu)
+            if pu and pu in by_puuid and p.get("side") == "ally":
+                # Keep richer LCU fingerprint; add rank from Riot if absent.
+                entry = by_puuid[pu]
+                if not entry.get("rank"):
+                    entry = {**entry, "rank": p.get("rank", "")}
+                merged.append(entry)
+            else:
+                merged.append(p)
+        # Preserve any existing entry (e.g. hidden ally) not in spectator response.
+        for p in existing:
+            pu = p.get("puuid") or ""
+            if pu not in seen:
+                merged.append(p)
+        self.state.set("scout", {**current, "players": merged,
+                                  "ready": True, "at": time.time()})
+        enemies = sum(1 for p in merged if p.get("side") == "enemy"
+                      and p.get("games_analyzed", 0) > 0)
+        log.info("Live scout: %d enemy player(s) profiled via Riot API", enemies)
 
     def _live_loop(self) -> None:
         """Poll the Live Client Data API at a conservative cadence and publish a
