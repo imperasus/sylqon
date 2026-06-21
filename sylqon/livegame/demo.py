@@ -57,6 +57,38 @@ def fake_live_state(elapsed_seconds: float, role: str = "bottom") -> LiveGameSta
     )
 
 
+def _match_items(p: dict) -> list[int]:
+    """item0..item6 from a MATCH-V5 participant, in slot order, zeros dropped."""
+    return [iid for slot in range(7)
+            if (iid := int(p.get(f"item{slot}") or 0))]
+
+
+def _match_spells(p: dict) -> list[str]:
+    """Summoner spell display names from a MATCH-V5 participant (D then F)."""
+    out = []
+    for key in ("summoner1Id", "summoner2Id"):
+        name = static.SPELL_BY_ID.get(int(p.get(key) or 0))
+        if name:
+            out.append(name)
+    return out
+
+
+def _match_runes(p: dict) -> dict:
+    """Keystone + primary/secondary tree names from a MATCH-V5 ``perks`` block."""
+    styles = ((p.get("perks") or {}).get("styles") or [])
+    primary = next((s for s in styles if s.get("description") == "primaryStyle"),
+                   styles[0] if styles else {})
+    secondary = next((s for s in styles if s.get("description") == "subStyle"),
+                     styles[1] if len(styles) > 1 else {})
+    sels = primary.get("selections") or []
+    keystone_id = sels[0].get("perk") if sels else 0
+    return {
+        "keystone": static.RUNE_BY_ID.get(keystone_id, ""),
+        "primary": static.STYLE_BY_ID.get(primary.get("style", 0), ""),
+        "secondary": static.STYLE_BY_ID.get(secondary.get("style", 0), ""),
+    }
+
+
 def match_to_live_state(match: dict, my_puuid: str) -> LiveGameState:
     """Convert a MATCH-V5 payload into a static end-of-game LiveGameState.
     The roster is fully populated so the PlayersView live panel shows all 10
@@ -94,6 +126,9 @@ def match_to_live_state(match: dict, my_puuid: str) -> LiveGameState:
             "cs": int(cs),
             "level": int(p.get("champLevel") or 0),
             "is_dead": False,
+            "items": _match_items(p),
+            "spells": _match_spells(p),
+            "runes": _match_runes(p),
         })
     _infer_roles(roster)
 

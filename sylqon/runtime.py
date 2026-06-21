@@ -628,11 +628,14 @@ class PipelineRunner:
         self._schedule_mission_generation()
 
     def _do_live_scout(self, my_puuid: str) -> None:
-        """Fetch full fingerprints for all 10 players via Spectator + MATCH APIs.
-        Runs on a daemon thread — updates scout state when complete."""
+        """Fetch full fingerprints for all 10 players via Spectator + MATCH APIs,
+        detect premade groups from shared matches, and resolve each player's
+        games/WR + mastery on the champion they're on now. Runs on a daemon
+        thread — updates scout state when complete."""
         try:
+            from sylqon.riot import api as riot_api
+            from sylqon.riot import scout as riot_scout
             from sylqon.riot.api import get_active_game_by_puuid
-            from sylqon.riot.scout import scout_all
 
             game = get_active_game_by_puuid(my_puuid)
             if not isinstance(game, dict):
@@ -648,12 +651,17 @@ class PipelineRunner:
                 return
 
             log.info("Live scout: scouting %d players via Riot API", len(puuids))
-            scouted = scout_all(puuids)
+            scouted = riot_scout.scout_all(puuids)
+
+            # Premade groups, cross-referenced from everyone's shared recent games.
+            comatches = {pu: c for pu, (_, _, c) in scouted.items()}
+            groups = riot_scout.detect_premades(set(puuids), comatches)
+            group_of = {pu: i for i, g in enumerate(groups) for pu in g}
 
             players: list[dict] = []
             for p in participants:
                 pu = p.get("puuid", "")
-                fp, rank = scouted.get(pu, (None, ""))
+                fp, account, _ = scouted.get(pu, (None, {}, {}))
                 entry: dict = (fp.to_dict() if fp and fp.games_analyzed > 0
                                else {"games_analyzed": 0})
                 # Resolve champion_pool/comfort IDs → display name + slug.
@@ -661,22 +669,52 @@ class PipelineRunner:
                     self._name_slug(pool_entry)
                 if entry.get("comfort"):
                     self._name_slug(entry["comfort"])
+
+                cid = p.get("championId")
+                cc = riot_scout.current_champ_stats(
+                    fp, (account or {}).get("mastery"), cid)
+                # Fall back to a direct mastery lookup when the current champ is
+                # outside the player's top-5 mastery (best-effort, never fatal).
+                if cc.get("mastery_points") is None and cid:
+                    try:
+                        m = riot_api.get_mastery_by_champion(pu, cid)
+                        if m:
+                            cc["mastery_points"] = m.get("championPoints")
+                            cc["mastery_level"] = m.get("championLevel")
+                    except Exception:
+                        log.debug("by-champion mastery lookup failed", exc_info=True)
+
                 name = (p.get("riotId") or "").split("#")[0] or p.get("summonerName", "")
                 entry["name"] = name
                 entry["puuid"] = pu
-                entry["champion_id"] = p.get("championId")
-                entry["rank"] = rank
+                entry["champion_id"] = cid
+                entry["rank"] = (account or {}).get("rank", "")
+                entry["account"] = account or {}
+                entry["current_champ"] = cc
+                entry["premade_group"] = group_of.get(pu)
                 entry["side"] = "ally" if p.get("teamId") == my_team_id else "enemy"
                 entry["position"] = (p.get("teamPosition") or "").lower()
                 players.append(entry)
 
-            self._on_live_scout(players)
+            # Resolve premade partner names now that every entry has a name.
+            name_by_pu = {p["puuid"]: p.get("name", "") for p in players}
+            for entry in players:
+                g = entry.get("premade_group")
+                if g is not None:
+                    entry["premade_partners"] = [
+                        name_by_pu[x] for x in groups[g]
+                        if x != entry["puuid"] and name_by_pu.get(x)
+                    ]
+
+            self._on_live_scout(players, premade_groups=len(groups))
         except Exception:
             log.exception("_do_live_scout failed")
 
-    def _on_live_scout(self, players: list[dict]) -> None:
+    def _on_live_scout(self, players: list[dict], premade_groups: int = 0) -> None:
         """Merge Riot-scouted players into the scout state. Existing ally LCU
-        fingerprints are kept (they're richer); enemies are new entries."""
+        fingerprints are kept (they're richer), but the Riot-only fields — rank,
+        account summary, premade group, and current-champ stats — are overlaid
+        onto them so the live board has the full read for everyone."""
         current = self.state.snapshot().get("scout") or {}
         existing: list[dict] = current.get("players") or []
         by_puuid: dict[str, dict] = {
@@ -688,10 +726,17 @@ class PipelineRunner:
             pu = p.get("puuid") or ""
             seen.add(pu)
             if pu and pu in by_puuid and p.get("side") == "ally":
-                # Keep richer LCU fingerprint; add rank from Riot if absent.
-                entry = by_puuid[pu]
-                if not entry.get("rank"):
-                    entry = {**entry, "rank": p.get("rank", "")}
+                # Keep the richer LCU fingerprint; overlay the Riot-only fields.
+                base = by_puuid[pu]
+                entry = {
+                    **base,
+                    "rank": base.get("rank") or p.get("rank", ""),
+                    "account": p.get("account") or base.get("account"),
+                    "current_champ": p.get("current_champ"),
+                    "premade_group": p.get("premade_group"),
+                    "premade_partners": p.get("premade_partners"),
+                    "champion_id": p.get("champion_id", base.get("champion_id")),
+                }
                 merged.append(entry)
             else:
                 merged.append(p)
@@ -701,10 +746,12 @@ class PipelineRunner:
             if pu not in seen:
                 merged.append(p)
         self.state.set("scout", {**current, "players": merged,
+                                  "premade_groups": premade_groups,
                                   "ready": True, "at": time.time()})
         enemies = sum(1 for p in merged if p.get("side") == "enemy"
                       and p.get("games_analyzed", 0) > 0)
-        log.info("Live scout: %d enemy player(s) profiled via Riot API", enemies)
+        log.info("Live scout: %d enemy profiled, %d premade group(s)",
+                 enemies, premade_groups)
 
     def _live_loop(self) -> None:
         """Poll the Live Client Data API at a conservative cadence and publish a

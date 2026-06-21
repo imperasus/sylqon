@@ -110,11 +110,44 @@ def _player_name(p: dict) -> str:
     return ""
 
 
+def _spell_names(p: dict) -> list[str]:
+    """The two summoner spell display names for a player (e.g. ['Flash','Ignite'])."""
+    s = p.get("summonerSpells") or {}
+    out = []
+    for key in ("summonerSpellOne", "summonerSpellTwo"):
+        name = ((s.get(key) or {}).get("displayName") or "").strip()
+        if name:
+            out.append(name)
+    return out
+
+
+def _item_ids(p: dict) -> list[int]:
+    """Live item IDs in inventory-slot order (Live Client Data ``items``)."""
+    items = p.get("items") or []
+    out = []
+    for it in sorted(items, key=lambda i: i.get("slot", 0)):
+        iid = it.get("itemID")
+        if iid:
+            out.append(int(iid))
+    return out
+
+
+def _runes(p: dict) -> dict:
+    """Keystone + primary/secondary tree display names for a player."""
+    r = p.get("runes") or {}
+    return {
+        "keystone": ((r.get("keystone") or {}).get("displayName") or "").strip(),
+        "primary": ((r.get("primaryRuneTree") or {}).get("displayName") or "").strip(),
+        "secondary": ((r.get("secondaryRuneTree") or {}).get("displayName") or "").strip(),
+    }
+
+
 def _parse_roster(all_players: list[dict], my_team: str) -> list[dict]:
     """All ten players with their LIVE stats, tagged ally/enemy relative to me.
     Everything here is already on-screen in-game (Live Client Data ``allPlayers``)
-    — champion, level, K/D/A, CS — so it is read-only and ToS-safe. Enemy *history*
-    (puuid) is not exposed by Riot, so this is the live read, not a fingerprint."""
+    — champion, level, K/D/A, CS, items, summoner spells, runes — so it is
+    read-only and ToS-safe. Enemy *history* (puuid) is not exposed by Riot, so
+    this is the live read, not a fingerprint."""
     out: list[dict] = []
     for p in all_players:
         scores = p.get("scores") or {}
@@ -129,8 +162,13 @@ def _parse_roster(all_players: list[dict], my_team: str) -> list[dict]:
             "deaths": int(scores.get("deaths") or 0),
             "assists": int(scores.get("assists") or 0),
             "cs": int(scores.get("creepScore") or 0),
+            "ward_score": float(scores.get("wardScore") or 0.0),
             "level": int(p.get("level") or 0),
             "is_dead": bool(p.get("isDead")),
+            "respawn_timer": float(p.get("respawnTimer") or 0.0),
+            "items": _item_ids(p),
+            "spells": _spell_names(p),
+            "runes": _runes(p),
         })
     return out
 

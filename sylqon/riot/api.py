@@ -54,13 +54,22 @@ def get_ranked_stats(puuid: str) -> list | None:
     return _get(f"{base}/lol/league/v4/entries/by-puuid/{puuid}")
 
 
-def get_match_ids(puuid: str, count: int | None = None) -> list[str]:
-    """MATCH-V5: newest ranked solo match IDs for a puuid."""
+def get_match_ids(puuid: str, count: int | None = None,
+                  queue: int | None = None) -> list[str]:
+    """MATCH-V5: newest match IDs for a puuid.
+
+    ``queue`` filters to a single queue id (e.g. 420 ranked solo); when ``None``
+    (the default) all queues are returned so Normal Draft games count too — the
+    caller filters to Summoner's Rift queues when normalizing. Most players queue
+    with their premade in normals, so this also feeds premade detection."""
     base = _MASS.format(region=config.RIOT_API_MASS_REGION)
     count = count or config.RIOT_MATCH_COUNT
+    params: dict = {"count": count}
+    if queue is not None:
+        params["queue"] = queue
     result = _get(
         f"{base}/lol/match/v5/matches/by-puuid/{puuid}/ids",
-        params={"queue": 420, "count": count},   # 420 = ranked solo/duo
+        params=params,
     )
     return result if isinstance(result, list) else []
 
@@ -77,4 +86,15 @@ def get_top_mastery(puuid: str, count: int = 5) -> list | None:
     return _get(
         f"{base}/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top",
         params={"count": count},
+    )
+
+
+def get_mastery_by_champion(puuid: str, champion_id: int) -> dict | None:
+    """CHAMPION-MASTERY-V4: mastery for one specific champion (used to surface
+    mastery on the champ a player is currently on when it's outside their top-N).
+    Returns None when the player has no mastery entry for that champion."""
+    base = _PLATFORM.format(region=config.RIOT_API_REGION)
+    return _get(
+        f"{base}/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}"
+        f"/by-champion/{champion_id}"
     )

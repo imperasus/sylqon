@@ -6,15 +6,18 @@ import HomeCockpit from "./components/HomeCockpit.jsx";
 import DraftCockpit from "./components/DraftCockpit.jsx";
 import PostlockCockpit from "./components/PostlockCockpit.jsx";
 import PlayersView from "./components/PlayersView.jsx";
+import LiveBoard from "./components/LiveBoard.jsx";
 import MatchAnalysisModal from "./components/MatchAnalysisModal.jsx";
 
 /* Loadout ↔ Players toggle for the post-lock / in-game phase. The Players view
-   surfaces the lobby scout (allies now, enemies once the game reveals them). */
-function PostlockTabs({ view, onChange, scout }) {
+   surfaces the lobby scout pre-game, then becomes the full 10-player live board
+   once the game loads (a live dot flags that it's showing live data). */
+function PostlockTabs({ view, onChange, scout, live }) {
   const scouted = (scout?.players || []).filter((p) => !p.hidden && p.games_analyzed > 0).length;
+  const inGame = !!live?.active;
   const tabs = [
     { key: "loadout", label: "Loadout", icon: Swords },
-    { key: "players", label: "Players", icon: Users, badge: scouted || null },
+    { key: "players", label: "Players", icon: Users, badge: scouted || null, live: inGame },
   ];
   return (
     <div className="frost flex w-fit items-center gap-1 px-1.5 py-1">
@@ -26,6 +29,7 @@ function PostlockTabs({ view, onChange, scout }) {
               ${on ? "bg-accent/18 text-accent-bright" : "text-white/50 hover:bg-white/5 hover:text-white/80"}`}>
             <t.icon className="h-4 w-4" />
             {t.label}
+            {t.live && <span className="h-2 w-2 rounded-full bg-bad pulse-soft" title="live game" />}
             {t.badge != null && (
               <span className="rounded-full bg-white/10 px-1.5 text-[10px] font-mono text-white/60">{t.badge}</span>
             )}
@@ -80,11 +84,13 @@ export default function App() {
           {mode === "draft" && <DraftCockpit state={state} />}
           {mode === "postlock" && (
             <div className="flex h-full min-h-0 flex-col gap-2.5">
-              <PostlockTabs view={postlockView} onChange={setPostlockView} scout={state?.scout} />
+              <PostlockTabs view={postlockView} onChange={setPostlockView} scout={state?.scout} live={state?.live} />
               <div className="min-h-0 flex-1">
                 {postlockView === "loadout"
                   ? <PostlockCockpit state={state} act={act} api={api} />
-                  : <PlayersView state={state} />}
+                  : state?.live?.active
+                    ? <LiveBoard scout={state?.scout} live={state.live} patch={state?.cache?.patch || "16.12.1"} />
+                    : <PlayersView state={state} />}
               </div>
             </div>
           )}
