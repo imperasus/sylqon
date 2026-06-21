@@ -142,7 +142,7 @@ function ProBuilds({ champion, role, patch }) {
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {(b.build?.items || []).map((it, j) => (
                 <img key={`${it.id}-${j}`} src={itemUrl(patch, it.id)} alt={it.name} title={it.name}
-                     className="h-9 w-9 rounded-md ring-1 ring-white/12" draggable={false} />
+                     className="h-9 w-9 rounded-md ring-1 ring-white/12" draggable={false} loading="lazy" />
               ))}
               {b.build?.keystone && (
                 <span className="ml-1 rounded border border-gold/30 bg-gold/10 px-1.5 py-0.5 text-[11px] text-gold-bright">
@@ -235,7 +235,7 @@ export default function ChampionDetailModal({ champion, role, patch, onClose }) 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-4" onClick={onClose}>
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 8 }}
         onClick={(e) => e.stopPropagation()}
         className="glass glow-gold relative flex max-h-[88vh] w-full max-w-3xl flex-col gap-4 overflow-hidden rounded-2xl border border-gold/30 p-5"
       >
@@ -249,7 +249,7 @@ export default function ChampionDetailModal({ champion, role, patch, onClose }) 
           <ChampPortrait slug={champion.slug} patch={patch} size="h-14 w-14" accent="gold" round />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-display text-[20px] font-bold tracking-wider text-white">{champion.name}</span>
+              <span className="truncate font-display text-[20px] font-bold tracking-wider text-white">{champion.name}</span>
               {tier && <span className={`rounded border px-1.5 py-px text-[12px] font-bold ${tier.cls} ${tier.glow}`}>{tier.label}</span>}
               <span className="text-[12px] uppercase tracking-widest text-white/35">{ROLE_LABELS[role] || role}</span>
             </div>

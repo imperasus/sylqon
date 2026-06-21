@@ -29,7 +29,7 @@ const RING = {
 
 /* Champion portrait with optional accent ring. */
 export function ChampPortrait({ slug, patch, size = "h-12 w-12", accent = "white",
-                                title, round = false }) {
+                                title, round = false, lazy = true }) {
   const ring = RING[accent] || RING.white;
   const shape = round ? "rounded-full" : "rounded-md";
   if (!slug) {
@@ -46,6 +46,7 @@ export function ChampPortrait({ slug, patch, size = "h-12 w-12", accent = "white
       title={title}
       className={`${size} ${shape} shrink-0 border ${ring} object-cover`}
       draggable={false}
+      loading={lazy ? "lazy" : "eager"}
     />
   );
 }
@@ -66,7 +67,7 @@ export function ThreatBadge({ threat }) {
 
 const TITLE_COLOR = {
   accent: "text-accent/85",
-  gold: "text-accent/85",
+  gold: "text-gold-bright/85",
   ally: "text-ally/85",
   enemy: "text-enemy/85",
   white: "text-white/50",
@@ -157,7 +158,7 @@ export function EmptyState({ icon: Icon, label, hint }) {
     <div className="flex h-full flex-col items-center justify-center gap-2 text-white/30">
       {Icon && <Icon className="h-7 w-7" />}
       <span className="font-display text-[13px] tracking-[0.22em]">{label}</span>
-      {hint && <span className="max-w-[240px] text-center text-[13px] text-white/25">{hint}</span>}
+      {hint && <span className="max-w-[240px] text-center text-[13px] text-white/40">{hint}</span>}
     </div>
   );
 }

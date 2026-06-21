@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import {
   Crown, History, Plus, Search, Sparkles, Star, TrendingUp, X,
 } from "lucide-react";
@@ -72,8 +73,8 @@ function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
   const top = matches[0];
 
   return (
-    <Panel title="YOUR POOL" icon={Star} right={<Chip tone="muted">{ROLE_LABELS[role]}</Chip>} className="gap-2.5">
-      <div className="scroll-thin -mr-1 flex max-h-[40%] min-h-[72px] flex-col gap-1 overflow-y-auto pr-1">
+    <Panel title="YOUR POOL" icon={Star} right={<Chip tone="muted">{ROLE_LABELS[role]}</Chip>} className="gap-2.5 min-w-0">
+      <div className="scroll-thin -mr-1 flex max-h-44 min-h-[72px] flex-col gap-1 overflow-y-auto pr-1">
         {current.length === 0
           ? <span className="px-1 text-[12px] text-white/30">No champions for {ROLE_LABELS[role]} — search below.</span>
           : current.map((name) => (
@@ -88,7 +89,7 @@ function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
             onKeyDown={(e) => { if (e.key === "Enter" && top) add(top.name); }}
             className="w-full rounded-md border border-white/10 bg-black/30 py-1.5 pr-2 pl-7 text-[13px] text-white/80 outline-none placeholder:text-white/25 focus:border-accent/40" />
           {matches.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-accent/30 bg-bg-2/98 shadow-xl">
+            <div className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-accent/30 bg-bg-2/98 shadow-xl">
               {matches.map((c) => (
                 <button key={c.slug} onClick={() => add(c.name)}
                   className="flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left hover:bg-accent/10">
@@ -140,7 +141,7 @@ function MetaTable({ role, patch, pool, save, onOpen }) {
 
   return (
     <Panel title="PATCH META" icon={TrendingUp} accent="white"
-           right={<Chip tone="muted">op.gg · {ROLE_LABELS[role]}</Chip>} className="gap-2">
+           right={<Chip tone="muted">op.gg · {ROLE_LABELS[role]}</Chip>} className="gap-2 min-w-0">
       {rows.length === 0 ? (
         <EmptyState icon={TrendingUp} label="NO META DATA" hint="Hit SYNC to pull the tier list from op.gg." />
       ) : (
@@ -189,10 +190,14 @@ function MetaTable({ role, patch, pool, save, onOpen }) {
 /* -------------------------------------------------------------- matches */
 function MatchesPanel({ patch }) {
   const [matches, setMatches] = useState([]);
+  const [matchesLoading, setMatchesLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    const load = () => fetchRecentMatches(10).then((r) => { if (!cancelled) setMatches(r.matches || []); }).catch(() => {});
+    const load = () => fetchRecentMatches(10)
+      .then((r) => { if (!cancelled) setMatches(r.matches || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setMatchesLoading(false); });
     load();
     const t = setInterval(load, 30000);
     return () => { cancelled = true; clearInterval(t); };
@@ -200,8 +205,14 @@ function MatchesPanel({ patch }) {
 
   return (
     <Panel title="RECENT GAMES" icon={History} accent="white"
-           right={<Chip tone="muted">click for AI review</Chip>} className="gap-1">
-      {matches.length === 0 ? (
+           right={<Chip tone="muted">click for AI review</Chip>} className="gap-1 min-w-0">
+      {matchesLoading ? (
+        <div className="flex flex-col gap-2 px-1 py-2">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-10 rounded-md bg-white/5 animate-pulse" />
+          ))}
+        </div>
+      ) : matches.length === 0 ? (
         <EmptyState icon={History} label="NO GAMES" hint="Recent Summoner's Rift games show here when the client is connected." />
       ) : (
         <div className="scroll-thin -mr-1 flex-1 space-y-0.5 overflow-y-auto pr-1">
@@ -225,9 +236,11 @@ function MatchesPanel({ patch }) {
           })}
         </div>
       )}
-      {selected && (
-        <MatchAnalysisModal match={selected} patch={patch} onClose={() => setSelected(null)} />
-      )}
+      <AnimatePresence>
+        {selected && (
+          <MatchAnalysisModal match={selected} patch={patch} onClose={() => setSelected(null)} />
+        )}
+      </AnimatePresence>
     </Panel>
   );
 }
@@ -257,9 +270,11 @@ export default function HomeCockpit({ state }) {
         <MatchesPanel patch={patch} />
       </div>
 
-      {detail && (
-        <ChampionDetailModal champion={detail} role={role} patch={patch} onClose={() => setDetail(null)} />
-      )}
+      <AnimatePresence>
+        {detail && (
+          <ChampionDetailModal champion={detail} role={role} patch={patch} onClose={() => setDetail(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

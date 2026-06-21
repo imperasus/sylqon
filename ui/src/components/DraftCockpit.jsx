@@ -45,7 +45,7 @@ function ReasonTag({ children }) {
   );
 }
 
-const MINI_LABEL = { good: "text-good/80", ally: "text-ally/80", enemy: "text-enemy/80" };
+const MINI_LABEL = { good: "text-good/80", ally: "text-ally/80", enemy: "text-enemy/80", default: "text-white/60" };
 
 function miniTip(it, isCounter) {
   const bits = [`${it.name} — pool score ${it.score > 0 ? "+" : ""}${it.score}`];
@@ -59,7 +59,7 @@ function MiniPickList({ label, tone, items, patch, isCounter }) {
   if (!items?.length) return null;
   return (
     <div className="mt-0.5 ml-2 rounded-md border border-white/[0.06] bg-white/[0.012] px-1.5 py-1">
-      <div className={`mb-0.5 text-[9px] font-bold tracking-[0.18em] ${MINI_LABEL[tone] || "text-white/45"}`}
+      <div className={`mb-0.5 text-[9px] font-bold tracking-[0.18em] ${MINI_LABEL[tone] || "text-white/60"}`}
            title="Best picks from your pool for this matchup">
         {label} <span className="text-white/25">· YOUR POOL</span>
       </div>
@@ -68,7 +68,7 @@ function MiniPickList({ label, tone, items, patch, isCounter }) {
           const edge = it.edge != null
             ? (isCounter ? `${it.edge > 0 ? "+" : ""}${it.edge}` : `${it.edge}`) : null;
           return (
-            <div key={it.name} title={miniTip(it, isCounter)} className="flex items-center gap-1.5">
+            <div key={it.name} title={miniTip(it, isCounter)} className="flex min-w-0 items-center gap-1.5">
               <ChampPortrait slug={it.slug} patch={patch} size="h-5 w-5" title={it.name} />
               <span className="truncate text-[11px] text-white/75">{it.name}</span>
               {it.reasons?.[0] && <ReasonTag>{it.reasons[0]}</ReasonTag>}
@@ -171,7 +171,7 @@ function PlayerRow({ pick, patch, side, isMe }) {
         </div>
       </div>
       {side === "enemy" && pick.threats?.length > 0 && (
-        <div className="flex max-w-[70px] flex-wrap justify-end gap-0.5">
+        <div className="flex max-w-[4.5rem] flex-wrap justify-end gap-0.5">
           {pick.threats.slice(0, 2).map((t) => <ThreatBadge key={t} threat={t} />)}
         </div>
       )}
@@ -537,7 +537,7 @@ export default function DraftCockpit({ state }) {
                 <span key={b.name} title={b.reason}
                       className="flex items-center gap-1 rounded border border-white/10 bg-white/[0.02] px-1 py-0.5">
                   <ChampPortrait slug={b.slug} patch={patch} size="h-6 w-6" title={b.name} />
-                  <span className="text-[12px] text-white/75">{b.name}</span>
+                  <span className="max-w-[80px] truncate text-[12px] text-white/75">{b.name}</span>
                   {b.tier != null && <span className="text-[10px] text-white/40">T{b.tier}</span>}
                 </span>
               ))}

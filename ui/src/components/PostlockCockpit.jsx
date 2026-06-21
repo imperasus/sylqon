@@ -271,7 +271,7 @@ function ItemCell({ item, patch, added, small }) {
              className={`${box} rounded-md ${added ? "ring-2 ring-accent" : ROLE_STARTER_IDS.has(item.id) ? "ring-2 ring-ally/70" : "ring-1 ring-white/12"}`} draggable={false} />
         {added && <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-accent font-mono text-[10px] font-bold text-bg">+</span>}
       </div>
-      <span className="line-clamp-1 max-w-[48px] text-center text-[10px] text-white/40">{item.name}</span>
+      <span className="line-clamp-1 max-w-[3.75rem] text-center text-[10px] text-white/40">{item.name}</span>
     </div>
   );
 }
@@ -376,7 +376,7 @@ function RuneTree({ title, styleId, ids, icons, accent }) {
       {ids.map((id, i) => (
         <div key={`${id}-${i}`} className={`flex items-center gap-2 ${accent === "primary" && i === 0 ? "py-0.5" : ""}`}>
           <Perk id={id} icons={icons} keystone={accent === "primary" && i === 0} />
-          <span className={`text-[12px] leading-tight ${accent === "primary" && i === 0 ? "font-semibold text-accent-bright" : "text-white/60"}`}>{icons[id]?.name || "—"}</span>
+          <span className={`min-w-0 truncate text-[12px] leading-tight ${accent === "primary" && i === 0 ? "font-semibold text-accent-bright" : "text-white/60"}`}>{icons[id]?.name || "—"}</span>
         </div>
       ))}
     </div>
@@ -501,7 +501,7 @@ export default function PostlockCockpit({ state, api }) {
       </div>
     );
   }
-  const activeBuild = { optimized: active, diff: activeIndex === 0 ? build.diff : EMPTY_DIFF };
+  const activeBuild = { optimized: active, diff: activeIndex === 0 ? (build.diff ?? EMPTY_DIFF) : EMPTY_DIFF };
 
   const header = (
     <div className="flex items-center gap-3">

@@ -62,7 +62,7 @@ function AllyCard({ p, champ, patch }) {
             <span className="truncate text-[12px] font-bold text-white/90">{p.name}</span>
             {p.is_self && <span className="text-[8px] font-bold tracking-widest text-accent">YOU</span>}
           </div>
-          <div className="text-[9px] font-bold tracking-widest text-white/40">
+          <div className="text-[10px] font-bold tracking-widest text-white/50">
             {ROLE_LABELS[p.position || p.main_role] || "—"} · {p.games_analyzed}g
           </div>
         </div>

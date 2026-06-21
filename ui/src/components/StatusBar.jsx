@@ -19,7 +19,8 @@ function useAppVersion() {
 
 function Dot({ ok }) {
   return (
-    <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-good" : "bg-white/25"} ${ok ? "" : ""}`} />
+    <span title={ok ? "Connected" : "Disconnected"}
+          className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-good" : "bg-white/25"}`} />
   );
 }
 
@@ -74,7 +75,7 @@ export default function StatusBar({ state, mode, act, api, demoActive }) {
             title="League client connection" />
       <Stat icon={Cpu} ok={ollama.available} label={ollama.processing ? "thinking…" : (ollama.model || "Ollama")}
             title="Ollama LLM" />
-      <span className="font-mono text-[12px] tracking-wide text-white/35">{patch}</span>
+      <span className="font-mono text-[12px] tracking-wide text-white/50">{patch}</span>
 
       <div className="ml-auto flex items-center gap-2">
         <Button

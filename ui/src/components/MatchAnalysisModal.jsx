@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { AlertTriangle, Lightbulb, Loader2, ThumbsUp, X } from "lucide-react";
 import { fetchMatchAnalysis } from "../api.js";
 import { ROLE_LABELS } from "../assets.js";
@@ -43,8 +44,12 @@ export default function MatchAnalysisModal({ match, patch, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()}
-           className="glass glow-gold relative flex max-h-[86vh] w-full max-w-2xl flex-col gap-4 overflow-hidden rounded-2xl border border-accent/30 p-5">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+        transition={{ duration: 0.18 }}
+        onClick={(e) => e.stopPropagation()}
+        className="glass glow-gold relative flex max-h-[86vh] w-full max-w-2xl flex-col gap-4 overflow-hidden rounded-2xl border border-accent/30 p-5"
+      >
         <button onClick={onClose}
                 className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-md border border-white/15 text-white/50 hover:border-accent/40 hover:text-accent-bright">
           <X className="h-4 w-4" />
@@ -55,7 +60,7 @@ export default function MatchAnalysisModal({ match, patch, onClose }) {
           <ChampPortrait slug={match.slug} patch={patch} size="h-14 w-14" accent={win ? "accent" : "enemy"} round />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-display text-[20px] font-bold tracking-wider text-white">{match.champion}</span>
+              <span className="truncate font-display text-[20px] font-bold tracking-wider text-white">{match.champion}</span>
               <WLPill win={win} />
               <span className="text-[12px] uppercase tracking-widest text-white/35">{ROLE_LABELS[match.role] || match.role}</span>
             </div>
@@ -72,10 +77,13 @@ export default function MatchAnalysisModal({ match, patch, onClose }) {
         )}
 
         {!loading && unavailable && (
-          <div className="py-6 text-[13px] text-white/45">
-            {data.error
-              ? "Az elemzés nem érhető el ehhez a meccshez."
-              : (data.detail || "Az Ollama jelenleg offline; az elemzés nem generálható.")}
+          <div className="flex items-center gap-2 py-6 text-[13px] text-amber-400/80">
+            <AlertTriangle size={15} className="shrink-0" />
+            <span>
+              {data.error
+                ? "Az elemzés nem érhető el ehhez a meccshez."
+                : (data.detail || "Az Ollama jelenleg offline; az elemzés nem generálható.")}
+            </span>
           </div>
         )}
 
@@ -87,7 +95,7 @@ export default function MatchAnalysisModal({ match, patch, onClose }) {
             <Block icon={Lightbulb} accent="accent" title="JAVASLATOK" items={data.tips} mark="›" markCls="text-accent" />
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
