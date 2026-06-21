@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.3.2](https://github.com/imperasus/sylqon/compare/v1.3.1...v1.3.2) (2026-06-21)
+
+
+### Bug Fixes
+
+* show LiveBoard as soon as phase is InProgress, not just when live.active ([ce3eb8d](https://github.com/imperasus/sylqon/commit/ce3eb8d89358aa227eeed21318c2b7f4c8fa6955))
+
 ### [1.3.1](https://github.com/imperasus/sylqon/compare/v1.3.0...v1.3.1) (2026-06-21)
 
 ### [1.0.1](https://github.com/imperasus/sylqon/compare/v1.0.0...v1.0.1) (2026-06-16)
