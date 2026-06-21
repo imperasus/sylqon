@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Swords, Users } from "lucide-react";
 import { useSylqon } from "./api.js";
 import StatusBar from "./components/StatusBar.jsx";
@@ -78,6 +78,54 @@ export default function App() {
   // Data API (port 2999) may take a few seconds to respond after the game starts,
   // so relying solely on live.active would delay the switch unnecessarily.
   const isInGame = state?.lcu?.phase === "InProgress" || state?.live?.active;
+
+  // ------------------------------------------------------------------ debug
+  const prevPhase = useRef(null);
+  const prevLiveActive = useRef(null);
+  const prevMode = useRef(null);
+  const prevIsInGame = useRef(null);
+
+  useEffect(() => {
+    if (!state) return;
+    const phase = state?.lcu?.phase ?? null;
+    const liveActive = state?.live?.active ?? false;
+    const liveGameTime = state?.live?.game_time ?? 0;
+
+    if (phase !== prevPhase.current) {
+      console.log(
+        `%c[Sylqon] LCU phase: ${prevPhase.current ?? "(none)"} → ${phase}`,
+        "color: #7dd3fc; font-weight: bold"
+      );
+      prevPhase.current = phase;
+    }
+
+    if (liveActive !== prevLiveActive.current) {
+      console.log(
+        `%c[Sylqon] live.active: ${prevLiveActive.current ?? "(none)"} → ${liveActive}` +
+        (liveActive ? ` (game_time: ${liveGameTime.toFixed(1)}s)` : ""),
+        liveActive ? "color: #4ade80; font-weight: bold" : "color: #f87171; font-weight: bold"
+      );
+      prevLiveActive.current = liveActive;
+    }
+
+    if (mode !== prevMode.current) {
+      console.log(
+        `%c[Sylqon] mode: ${prevMode.current ?? "(none)"} → ${mode}`,
+        "color: #e879f9; font-weight: bold"
+      );
+      prevMode.current = mode;
+    }
+
+    if (isInGame !== prevIsInGame.current) {
+      console.log(
+        `%c[Sylqon] isInGame: ${prevIsInGame.current ?? "(none)"} → ${isInGame}` +
+        ` (phase=${phase}, live.active=${liveActive})`,
+        isInGame ? "color: #fbbf24; font-weight: bold" : "color: #94a3b8; font-weight: bold"
+      );
+      prevIsInGame.current = isInGame;
+    }
+  }, [state, mode, isInGame]);
+  // ---------------------------------------------------------------- /debug
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
