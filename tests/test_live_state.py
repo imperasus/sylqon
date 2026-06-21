@@ -112,6 +112,59 @@ def test_dict_serializable():
     assert "cs_benchmark" in d and "objective_timers" in d
 
 
+# --------------------------------------------- locale-independent build read
+# A non-English (Hungarian) client localizes every ``displayName``. Spells must
+# still resolve via ``rawDisplayName`` and runes via their numeric ``id`` so the
+# UI's English-keyed icon/abbreviation lookups keep working.
+LOCALIZED = {
+    "gameData": {"gameTime": 65.0},
+    "activePlayer": {"riotIdGameName": "Imperasus", "level": 2},
+    "allPlayers": [
+        {"riotIdGameName": "Imperasus", "championName": "Yuumi", "team": "ORDER",
+         "position": "UTILITY", "level": 2, "scores": {"creepScore": 0},
+         "items": [
+             {"itemID": 3850, "slot": 0}, {"itemID": 2003, "slot": 1},
+             {"itemID": 0, "slot": 2},
+         ],
+         "summonerSpells": {
+             "summonerSpellOne": {"displayName": "Tüzes csapás",
+                 "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"},
+             "summonerSpellTwo": {"displayName": "Felvillanás",
+                 "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"},
+         },
+         "runes": {
+             "keystone": {"displayName": "Aery megidézése", "id": 8214},
+             "primaryRuneTree": {"displayName": "Varázslat", "id": 8200},
+             "secondaryRuneTree": {"displayName": "Elszántság", "id": 8400},
+         }},
+    ],
+}
+
+
+def test_roster_resolves_localized_spells_to_english():
+    me = parse_live_state(LOCALIZED).roster[0]
+    # Hungarian displayNames, but rawDisplayName resolves to canonical English.
+    assert me["spells"] == ["Ignite", "Flash"]
+
+
+def test_roster_resolves_localized_runes_by_id():
+    me = parse_live_state(LOCALIZED).roster[0]
+    assert me["runes"]["keystone"] == "Summon Aery"   # id 8214
+    assert me["runes"]["primary"] == "Sorcery"        # style 8200
+    assert me["runes"]["secondary"] == "Resolve"      # style 8400
+
+
+def test_roster_items_drop_empty_slots_in_order():
+    me = parse_live_state(LOCALIZED).roster[0]
+    assert me["items"] == [3850, 2003]   # slot 2 (itemID 0) dropped
+
+
+def test_runes_fall_back_to_displayname_for_unknown_id():
+    from sylqon.livegame.state import _runes
+    r = _runes({"runes": {"keystone": {"displayName": "Brand New Rune", "id": 99999}}})
+    assert r["keystone"] == "Brand New Rune"
+
+
 if __name__ == "__main__":
     import pytest
 

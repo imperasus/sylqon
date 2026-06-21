@@ -76,7 +76,7 @@ function Build({ p, patch }) {
   );
 }
 
-function PlayerCard({ p, patch }) {
+function PlayerCard({ p, patch, gameTime = 0 }) {
   const acc = p.account || {};
   const solo = acc.solo;
   const cc = p.current_champ || {};
@@ -90,9 +90,14 @@ function PlayerCard({ p, patch }) {
 
   const liveKda = ((p.kills + p.assists) / Math.max(1, p.deaths)).toFixed(1);
   const csTarget = ROLE_CS_TARGET[p.role] ?? 7;
-  const csDelta = p.role === "utility" ? null : +(p.cs_per_min - csTarget).toFixed(1);
-  const csTone = csDelta == null ? "text-white/30"
-    : csDelta >= 0.3 ? "text-good" : csDelta <= -0.3 ? "text-bad" : "text-white/45";
+  const csRate = (p.cs_per_min || 0).toFixed(1);
+  // Benchmark coloring only once laning is underway (~3 min). Before that everyone
+  // is at 0 CS and a red "behind" read would just be alarming noise. Support CS
+  // isn't a meaningful gauge, so it stays neutral too.
+  const benchmark = gameTime >= 180 && p.role !== "utility";
+  const csTone = !benchmark ? "text-white/40"
+    : p.cs_per_min - csTarget >= 0.3 ? "text-good"
+    : p.cs_per_min - csTarget <= -0.3 ? "text-bad" : "text-white/40";
 
   const seasonWR = solo?.win_rate != null
     ? `${pct(solo.win_rate)} · ${solo.games}g`
@@ -160,8 +165,8 @@ function PlayerCard({ p, patch }) {
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/8 pt-1 font-mono text-[10.5px]">
         <span className="font-bold text-white/80">{p.kills}/{p.deaths}/{p.assists}</span>
         <span className="text-white/35">{p.cs} CS</span>
-        <span className={csTone} title="CS/min vs role target">
-          {csDelta == null ? "—" : `${csDelta >= 0 ? "+" : ""}${csDelta}`} cs/m
+        <span className={csTone} title={`CS/min (role target ${csTarget})`}>
+          {csRate} cs/m
         </span>
         <span className="mx-0.5 h-3 w-px bg-white/12" />
         <span className="text-white/45" title="games · win-rate · mastery on the champ they're on now">
@@ -356,7 +361,7 @@ export default function LiveBoard({ scout, live, patch }) {
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_0.85fr_1fr] gap-2">
         <div className="scroll-thin flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
           <div className="t-label text-ally/70 flex items-center gap-1"><Users className="h-3.5 w-3.5" /> YOUR TEAM</div>
-          {ordered("ally").map((p) => <PlayerCard key={`a-${p.name}`} p={p} patch={patch} />)}
+          {ordered("ally").map((p) => <PlayerCard key={`a-${p.name}`} p={p} patch={patch} gameTime={live?.game_time} />)}
         </div>
 
         <div className="scroll-thin flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
@@ -382,7 +387,7 @@ export default function LiveBoard({ scout, live, patch }) {
 
         <div className="scroll-thin flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
           <div className="t-label text-enemy/70 flex items-center gap-1"><Users className="h-3.5 w-3.5" /> ENEMY TEAM</div>
-          {ordered("enemy").map((p) => <PlayerCard key={`e-${p.name}`} p={p} patch={patch} />)}
+          {ordered("enemy").map((p) => <PlayerCard key={`e-${p.name}`} p={p} patch={patch} gameTime={live?.game_time} />)}
         </div>
       </div>
     </div>

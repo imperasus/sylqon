@@ -110,12 +110,35 @@ def _player_name(p: dict) -> str:
     return ""
 
 
+# Live Client Data localizes ``displayName`` to the client language, so we resolve
+# summoner spells from the locale-independent ``rawDisplayName`` token
+# (e.g. "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName") to the canonical
+# English name the UI's icon lookup expects. displayName is only a last resort.
+_SPELL_RAW = {
+    "SummonerFlash": "Flash", "SummonerHeal": "Heal", "SummonerHaste": "Ghost",
+    "SummonerBoost": "Cleanse", "SummonerExhaust": "Exhaust",
+    "SummonerBarrier": "Barrier", "SummonerDot": "Ignite",
+    "SummonerTeleport": "Teleport", "SummonerSmite": "Smite",
+    "SummonerMana": "Clarity", "SummonerSnowball": "Snowball",
+}
+
+
+def _spell_from_raw(raw: str) -> str:
+    for token, name in _SPELL_RAW.items():
+        if token in raw:
+            return name
+    return ""
+
+
 def _spell_names(p: dict) -> list[str]:
-    """The two summoner spell display names for a player (e.g. ['Flash','Ignite'])."""
+    """The two summoner spells as canonical English names (e.g. ['Flash','Ignite']),
+    resolved locale-independently so non-English clients map to icons correctly."""
     s = p.get("summonerSpells") or {}
     out = []
     for key in ("summonerSpellOne", "summonerSpellTwo"):
-        name = ((s.get(key) or {}).get("displayName") or "").strip()
+        spell = s.get(key) or {}
+        name = (_spell_from_raw(spell.get("rawDisplayName") or "")
+                or (spell.get("displayName") or "").strip())
         if name:
             out.append(name)
     return out
@@ -132,13 +155,21 @@ def _item_ids(p: dict) -> list[int]:
     return out
 
 
+def _rune_name(node: dict, table: dict) -> str:
+    """Resolve a rune/style node to its canonical English name by id (locale-
+    independent), falling back to the localized displayName if the id is unknown."""
+    node = node or {}
+    return table.get(node.get("id"), (node.get("displayName") or "").strip())
+
+
 def _runes(p: dict) -> dict:
-    """Keystone + primary/secondary tree display names for a player."""
+    """Keystone + primary/secondary tree names for a player, resolved by id so
+    non-English clients still yield canonical English names the UI can map."""
     r = p.get("runes") or {}
     return {
-        "keystone": ((r.get("keystone") or {}).get("displayName") or "").strip(),
-        "primary": ((r.get("primaryRuneTree") or {}).get("displayName") or "").strip(),
-        "secondary": ((r.get("secondaryRuneTree") or {}).get("displayName") or "").strip(),
+        "keystone": _rune_name(r.get("keystone"), static.RUNE_BY_ID),
+        "primary": _rune_name(r.get("primaryRuneTree"), static.STYLE_BY_ID),
+        "secondary": _rune_name(r.get("secondaryRuneTree"), static.STYLE_BY_ID),
     }
 
 
