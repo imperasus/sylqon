@@ -14,6 +14,9 @@ const ROLE_CS_TARGET = { top: 7.5, jungle: 5.5, middle: 8.0, bottom: 8.5, utilit
 const PREMADE_PALETTE = ["#b6a4ff", "#ffc46b", "#ff8fae", "#5fd0ff", "#8ef0a8"];
 const premadeColor = (g) => PREMADE_PALETTE[g % PREMADE_PALETTE.length];
 const premadeLetter = (g) => String.fromCharCode(65 + (g % 26));
+/* Party size → pill label. Groups can be any size from a duo to a full 5-stack. */
+const PREMADE_LABEL = { 2: "DUO", 3: "TRIO", 4: "QUAD", 5: "5-STACK" };
+const premadeLabel = (size) => PREMADE_LABEL[size] || "PARTY";
 
 /* Rune tree → accent color for the keystone chip (matches the in-app palette). */
 const TREE_COLOR = {
@@ -148,7 +151,7 @@ function PlayerCard({ p, patch }) {
             <span className="shrink-0 rounded px-1.5 py-px text-[9px] font-bold"
                   title={partners.length ? `premade with ${partners.join(", ")}` : "premade"}
                   style={{ color: "#0c1020", background: premadeColor(p.premade_group) }}>
-              {partners.length >= 2 ? "TRIO" : "DUO"} {premadeLetter(p.premade_group)}
+              {premadeLabel(partners.length + 1)} {premadeLetter(p.premade_group)}
             </span>
           )}
       </div>
