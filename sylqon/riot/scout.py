@@ -28,6 +28,37 @@ _ROLE_MAP = {
 }
 
 
+def _mastery_comfort(mastery: list | None) -> dict | None:
+    """Build a comfort dict from the top mastery entry."""
+    if not mastery or not isinstance(mastery, list):
+        return None
+    top = mastery[0]
+    return {
+        "champion_id": top.get("championId", 0),
+        "mastery_points": top.get("championPoints", 0),
+        "mastery_level": top.get("championLevel", 0),
+        "games": None,
+        "win_rate": None,
+        "share": None,
+    }
+
+
+def _mastery_pool(mastery: list | None) -> list[dict]:
+    """Top mastery champions as a pool list (no games/WR — mastery only)."""
+    if not mastery:
+        return []
+    return [
+        {
+            "champion_id": m.get("championId", 0),
+            "mastery_points": m.get("championPoints", 0),
+            "mastery_level": m.get("championLevel", 0),
+            "games": None,
+            "win_rate": None,
+        }
+        for m in mastery
+    ]
+
+
 def _solo_entry(entries: list | None) -> dict | None:
     if not entries:
         return None
@@ -91,13 +122,17 @@ def scout_puuid(puuid: str) -> tuple[PlayerFingerprint, str]:
     if not puuid or not config.RIOT_API_KEY:
         return PlayerFingerprint(), ""
 
-    entries = api.get_ranked_stats(puuid)
+    import concurrent.futures as _cf
+    with _cf.ThreadPoolExecutor(max_workers=3) as ex:
+        f_rank    = ex.submit(api.get_ranked_stats, puuid)
+        f_mastery = ex.submit(api.get_top_mastery, puuid, 5)
+        f_ids     = ex.submit(api.get_match_ids, puuid, config.RIOT_MATCH_COUNT)
+        entries   = f_rank.result()
+        mastery   = f_mastery.result()
+        match_ids = f_ids.result() or []
+
     solo = _solo_entry(entries)
     rl = rank_label(solo)
-
-    match_ids = api.get_match_ids(puuid, count=config.RIOT_MATCH_COUNT)
-    if not match_ids:
-        return PlayerFingerprint(), rl
 
     games: list[dict] = []
     for mid in match_ids:
@@ -108,6 +143,29 @@ def scout_puuid(puuid: str) -> tuple[PlayerFingerprint, str]:
                 games.append(norm)
 
     fp = fingerprint(games)
+
+    if mastery:
+        mastery_c = _mastery_comfort(mastery)
+        mastery_p = _mastery_pool(mastery)
+
+        if mastery_c:
+            history_comfort = fp.comfort or {}
+            if (history_comfort.get("champion_id") == mastery_c["champion_id"]
+                    and history_comfort.get("win_rate") is not None):
+                mastery_c["win_rate"] = history_comfort["win_rate"]
+                mastery_c["games"]    = history_comfort["games"]
+                mastery_c["share"]    = history_comfort["share"]
+            fp.comfort = mastery_c
+
+        history_ids = {e["champion_id"] for e in fp.champion_pool}
+        for m in mastery_p:
+            if m["champion_id"] not in history_ids:
+                fp.champion_pool.append(m)
+        fp.champion_pool.sort(
+            key=lambda e: (e.get("games") is None, -(e.get("games") or 0))
+        )
+        fp.champion_pool = fp.champion_pool[:5]
+
     return fp, rl
 
 

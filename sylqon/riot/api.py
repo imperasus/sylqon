@@ -69,3 +69,12 @@ def get_match(match_id: str) -> dict | None:
     """MATCH-V5: full match object."""
     base = _MASS.format(region=config.RIOT_API_MASS_REGION)
     return _get(f"{base}/lol/match/v5/matches/{match_id}")
+
+
+def get_top_mastery(puuid: str, count: int = 5) -> list | None:
+    """CHAMPION-MASTERY-V4: top N champions by mastery points for a puuid."""
+    base = _PLATFORM.format(region=config.RIOT_API_REGION)
+    return _get(
+        f"{base}/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top",
+        params={"count": count},
+    )

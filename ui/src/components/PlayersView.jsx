@@ -91,9 +91,14 @@ function AllyCard({ p, champ, patch }) {
           <span className={`shrink-0 font-mono text-[10px] ${f.streak > 0 ? "text-good/80" : "text-enemy/80"}`}>{streakLabel(f.streak)}</span>
         )}
         {p.comfort?.champion && (
-          <div className="flex shrink-0 items-center gap-1" title={`mains ${p.comfort.champion}`}>
+          <div className="flex shrink-0 items-center gap-1"
+               title={`mains ${p.comfort.champion}${p.comfort.mastery_points ? ` · ${(p.comfort.mastery_points / 1000).toFixed(0)}k mastery` : ""}`}>
             <ChampPortrait slug={p.comfort.slug} patch={patch} size="h-5 w-5" round title={p.comfort.champion} />
-            {p.comfort.win_rate != null && <span className="font-mono text-[10px] text-white/50">{pct(p.comfort.win_rate)}</span>}
+            {p.comfort.win_rate != null
+              ? <span className="font-mono text-[10px] text-white/50">{pct(p.comfort.win_rate)}</span>
+              : p.comfort.mastery_points
+                ? <span className="font-mono text-[10px] text-white/35">{(p.comfort.mastery_points / 1000).toFixed(0)}k</span>
+                : null}
           </div>
         )}
       </div>
