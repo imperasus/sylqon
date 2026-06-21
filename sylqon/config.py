@@ -6,6 +6,13 @@ import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# Load .env from project root if present (dev convenience; prod uses real env vars).
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv(PROJECT_ROOT / ".env", override=True)
+except ImportError:
+    pass
 DATA_DIR = PROJECT_ROOT / "sylqon" / "data"
 # Writable runtime dir. Overridable via SYLQON_CACHE_DIR so a packaged build
 # (where PROJECT_ROOT may be a read-only bundle) can redirect it to a writable
@@ -86,6 +93,8 @@ RIOT_API_REGION: str = os.getenv("RIOT_API_REGION", "euw1")
 RIOT_API_MASS_REGION: str = os.getenv("RIOT_API_MASS_REGION", "europe")
 # Recent ranked solo games to pull per player during live-game scouting.
 RIOT_MATCH_COUNT: int = int(os.getenv("RIOT_MATCH_COUNT", 40))
+# The account owner's PUUID (key-specific — regenerate when the API key changes).
+RIOT_SELF_PUUID: str = os.getenv("RIOT_SELF_PUUID", "")
 
 # --- LCU --------------------------------------------------------------------
 LCU_LOCKFILE_OVERRIDE = os.getenv("LOL_LOCKFILE", "")

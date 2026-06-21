@@ -228,6 +228,31 @@ def live_demo_stop() -> dict:
     return runner.stop_live_demo()
 
 
+@app.post("/api/live/demo/last-match")
+def live_demo_last_match() -> dict:
+    """Populate the live state with end-of-game stats from the account owner's
+    last ranked match. Useful for testing PlayersView without a running game.
+    Requires RIOT_API_KEY and RIOT_SELF_PUUID to be configured."""
+    from sylqon.riot import api as riot_api
+    from sylqon.livegame.demo import match_to_live_state
+
+    puuid = config.RIOT_SELF_PUUID
+    if not puuid or not config.RIOT_API_KEY:
+        return {"ok": False, "detail": "RIOT_API_KEY or RIOT_SELF_PUUID not set"}
+
+    match_ids = riot_api.get_match_ids(puuid, 1)
+    if not match_ids:
+        return {"ok": False, "detail": "no recent ranked matches found"}
+
+    match = riot_api.get_match(match_ids[0])
+    if not match:
+        return {"ok": False, "detail": f"failed to fetch {match_ids[0]}"}
+
+    snap = match_to_live_state(match, puuid)
+    runner.state.set("live", snap.to_dict())
+    return {"ok": True, "match_id": match_ids[0], "players": len(snap.roster)}
+
+
 @app.get("/overlay")
 def overlay_page():
     """Serve the SPA for the minimal overlay route (OBS browser source). The
