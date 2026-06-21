@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.3.4](https://github.com/imperasus/sylqon/compare/v1.3.3...v1.3.4) (2026-06-21)
+
+
+### Features
+
+* **live:** show the local player's own rank from the LCU ([a3f0076](https://github.com/imperasus/sylqon/commit/a3f0076f429ca03d075669818b02d9ccefe7949f))
+
+
+### Bug Fixes
+
+* **live:** correct spell/rune display on non-English clients + CS/min readout ([91be5b6](https://github.com/imperasus/sylqon/commit/91be5b61949d9bb90bf45e8d4b437da5898afa27))
+
 ### [1.3.3](https://github.com/imperasus/sylqon/compare/v1.3.2...v1.3.3) (2026-06-21)
 
 
