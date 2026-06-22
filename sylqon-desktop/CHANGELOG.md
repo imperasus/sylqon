@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.3.5](https://github.com/imperasus/sylqon/compare/v1.3.4...v1.3.5) (2026-06-22)
+
+
+### Bug Fixes
+
+* **live:** render the live board mid-game without a captured lobby ([dec8855](https://github.com/imperasus/sylqon/commit/dec8855b591b80bd82e7eb35c93e4e3ac48d3d63))
+* **riot:** use RIOT_SELF_PUUID when the LCU returns a non-PUUID id ([b4d5ad7](https://github.com/imperasus/sylqon/commit/b4d5ad733ed8e24c4303134f0a000be39d308112))
+
+
+### Performance
+
+* **riot:** lower default RIOT_MATCH_COUNT to 20 ([4d1b3cc](https://github.com/imperasus/sylqon/commit/4d1b3cc98f097882668a959e9b44866aa22aea52))
+
 ### [1.3.4](https://github.com/imperasus/sylqon/compare/v1.3.3...v1.3.4) (2026-06-21)
 
 
