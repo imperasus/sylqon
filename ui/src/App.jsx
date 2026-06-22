@@ -43,6 +43,10 @@ function PostlockTabs({ view, onChange, scout, live }) {
 /* Single-screen cockpit: the body is driven purely by the live phase — no tabs.
    Idle → Home, champ select → Draft, locked/injected → Postlock. */
 function deriveMode(state) {
+  // A live game forces the in-game cockpit even if we never saw champ select
+  // (e.g. the backend was started mid-game, or the lobby was cleared) — the live
+  // board only needs live + scout state, not a captured lobby.
+  if (state?.lcu?.phase === "InProgress" || state?.live?.active) return "postlock";
   const lobby = state?.lobby;
   if (!lobby) return "home";
   const injected = state?.injection?.status === "ok";
@@ -126,6 +130,19 @@ export default function App() {
     }
   }, [state, mode, isInGame]);
   // ---------------------------------------------------------------- /debug
+
+  // Auto-focus the live board when a game is in progress, so the dashboard lands
+  // on it without a click. Only switches once per game — the user can still flip
+  // back to Loadout and it won't yank them away again.
+  const autoFocusedLive = useRef(false);
+  useEffect(() => {
+    if (isInGame && !autoFocusedLive.current) {
+      setPostlockView("players");
+      autoFocusedLive.current = true;
+    } else if (!isInGame) {
+      autoFocusedLive.current = false;
+    }
+  }, [isInGame]);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
