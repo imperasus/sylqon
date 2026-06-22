@@ -11,8 +11,10 @@ returns ``None`` so the caller falls back to the seed build.
 from __future__ import annotations
 
 import logging
+import time
 
 import requests
+from requests.adapters import HTTPAdapter
 
 from sylqon import config
 
@@ -31,6 +33,46 @@ _POSITION = {
 
 _HEADERS = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 
+# Shared connection pool — reused by the live fetch *and* the full sync
+# (``mcp.opgg_http`` imports this module's helpers), so neither pays a fresh
+# TLS handshake per request. Sized for the full sync's worker pool.
+_SESSION = requests.Session()
+_SESSION.mount("https://", HTTPAdapter(pool_connections=4, pool_maxsize=16))
+
+
+def _request_json(url: str, *, timeout: int | None = None,
+                  retries: int | None = None):
+    """GET ``url`` and return parsed JSON, with a short exponential backoff on
+    transient failures (timeout / connection drop / 5xx). 4xx and malformed JSON
+    are not retried. Returns ``None`` once retries are exhausted, so every caller
+    degrades gracefully to its seed/cache fallback."""
+    timeout = timeout or config.OPGG_TIMEOUT_SECONDS
+    retries = config.OPGG_RETRIES if retries is None else retries
+    delay = 0.5
+    last_exc: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            resp = _SESSION.get(url, headers=_HEADERS, timeout=timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            last_exc = exc
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else 0
+            if not 500 <= status < 600:
+                log.warning("op.gg GET %s failed (HTTP %s)", url, status)
+                return None
+            last_exc = exc
+        except ValueError as exc:  # malformed JSON — a retry won't fix it
+            log.warning("op.gg GET %s returned bad JSON: %s", url, exc)
+            return None
+        if attempt < retries:
+            time.sleep(delay)
+            delay *= 2
+    log.warning("op.gg GET %s failed after %d attempt(s): %s",
+                url, retries + 1, last_exc)
+    return None
+
 
 def fetch_opgg_payload(champion_id: int, role: str,
                        region: str | None = None) -> dict | None:
@@ -42,13 +84,8 @@ def fetch_opgg_payload(champion_id: int, role: str,
         return None
     region = region or config.OPGG_REGION
     url = _BASE.format(region=region, cid=champion_id, pos=pos)
-    try:
-        resp = requests.get(url, headers=_HEADERS, timeout=config.OPGG_TIMEOUT_SECONDS)
-        resp.raise_for_status()
-        data = (resp.json() or {}).get("data")
-    except (requests.RequestException, ValueError) as exc:
-        log.warning("op.gg live fetch failed for %s %s: %s", champion_id, role, exc)
-        return None
+    raw = _request_json(url)
+    data = raw.get("data") if isinstance(raw, dict) else None
     if not isinstance(data, dict):
         return None
     return _shape_payload(data, role)

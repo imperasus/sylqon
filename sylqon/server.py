@@ -275,18 +275,6 @@ def inject_variant(req: InjectVariantRequest) -> dict:
     return runner.inject_variant(req.index)
 
 
-@app.post("/api/sync")
-def manual_sync() -> dict:
-    return runner.manual_sync()
-
-
-@app.post("/api/sync/full")
-def full_sync() -> dict:
-    """Trigger a full op.gg → SQLite sync (all champions/roles) in the background.
-    Progress is published to ``state.sync``."""
-    return runner.start_full_sync()
-
-
 @app.post("/api/pro-build")
 def pro_build(req: ProBuildReq) -> dict:
     """Store one pro/esports player's build for a champion+role (Claude-driven via

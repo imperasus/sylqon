@@ -27,9 +27,13 @@ POSTing the parsed results to the ingest endpoints, in this order:
                           items:[{id,name}], skill_order, spell1, spell2, keystone}
    Read back via GET /api/pro-builds?champion=&role= (shown in the champion modal).
 
-The whole-universe meta/counters/synergies/builds (steps 1-3) can also run
-unattended via :func:`run_full_sync` (direct op.gg HTTP, no MCP). Trigger it from
-the dashboard (POST /api/sync/full) or `python -m sylqon.mcp.sync`.
+The whole-universe meta/counters/synergies/builds (steps 1-3) run unattended via
+:func:`run_full_sync` (direct op.gg HTTP, no MCP, fetched concurrently over a
+shared keep-alive session). There is no manual trigger: the runtime fires one
+automatically whenever the live patch differs from the last synced patch —
+including the first run, where nothing is synced yet (see ``AUTO_FULL_SYNC`` and
+``Runtime._maybe_auto_full_sync``). ``python -m sylqon.mcp.sync`` stays available
+as a dev/CLI entry point.
 
 The pure normalize/upsert logic lives in :mod:`sylqon.mcp.ingest`; the
 FastAPI request models live in :mod:`sylqon.server`. This module is the
@@ -39,6 +43,7 @@ from __future__ import annotations
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
 log = logging.getLogger(__name__)
@@ -94,9 +99,12 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
     tiers/win/pick, counters, synergies and builds.
 
     Pulls straight from op.gg's champion API via :mod:`sylqon.mcp.opgg_http`,
-    so it runs unattended (a few minutes for ~all champions). Idempotent — safe
-    to re-run each patch. ``progress(done, total)`` is called periodically.
+    fetching champion-roles concurrently (``OPGG_SYNC_WORKERS`` over a shared
+    keep-alive session) while DB writes stay single-threaded. Runs unattended;
+    idempotent — safe to re-run each patch. ``progress(done, total)`` is called
+    periodically.
     """
+    from sylqon import config
     from sylqon.cache.opgg import opgg_to_build
     from sylqon.data.catalog import Catalog
     from sylqon.db.migrate import seed_champions
@@ -139,17 +147,36 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
             counts["champions"] += 1
         session.commit()
 
-        # 2) per champion x role: build + counters + synergies
-        total = sum(len(p) for p in meta.values())
+        # 2) per champion x role: build + counters + synergies. The network
+        # fetches run in a small thread pool over the shared keep-alive session;
+        # the DB writes stay on this thread (the SQLAlchemy session isn't shared).
+        tasks = [(cid, p["role"]) for cid, positions in meta.items()
+                 if rows.get(cid) is not None for p in positions]
+        total = len(tasks)
         done = 0
-        for cid, positions in meta.items():
-            champ = rows.get(cid)
-            if champ is None:
-                continue
-            for p in positions:
-                role = p["role"]
+
+        def fetch_one(task: tuple[int, str]):
+            cid, role = task
+            try:
+                payload, counters = opgg_http.fetch_detail(cid, role, region)
+                synergies = opgg_http.fetch_synergies(cid, role, region)
+            except Exception:
+                log.warning("op.gg fetch failed for cid=%s %s", cid, role, exc_info=True)
+                payload, counters, synergies = None, [], []
+            if sleep:
+                time.sleep(sleep)  # per-worker politeness delay
+            return cid, role, payload, counters, synergies
+
+        workers = max(1, config.OPGG_SYNC_WORKERS)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(fetch_one, t) for t in tasks]
+            for fut in as_completed(futures):
+                cid, role, payload, counters, synergies = fut.result()
+                champ = rows.get(cid)
+                if champ is None:
+                    done += 1
+                    continue
                 try:
-                    payload, counters = opgg_http.fetch_detail(cid, role, region)
                     if payload:
                         build = opgg_to_build(payload, catalog)
                         if build and ingest.mirror_build(session, champ.name, role, build,
@@ -162,7 +189,7 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
                         adv = max(-10.0, min(10.0, (0.5 - c["opp_winrate"]) * 100))
                         ingest.upsert_counter(session, champ.id, other.id, role, round(adv, 2))
                         counts["counters"] += 1
-                    for s in opgg_http.fetch_synergies(cid, role, region):
+                    for s in synergies:
                         ally = rows.get(s["synergy_champion_id"])
                         if ally is None:
                             continue
@@ -178,7 +205,6 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
                     log.info("synced %d/%d champion-roles", done, total)
                     if progress:
                         progress(done, total)
-                time.sleep(sleep)
         session.commit()
     finally:
         session.close()

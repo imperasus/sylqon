@@ -195,7 +195,11 @@ port 5173) alongside the Python server; CORS is preconfigured.
 | `OLLAMA_TIMEOUT` | `45` | Per-call timeout (seconds). |
 | `OPGG_REGION` | `na` | Region for live op.gg fetch (meta is region-agnostic). |
 | `OPGG_TIMEOUT` | `12` | op.gg fetch timeout (seconds). |
+| `OPGG_RETRIES` | `2` | Retries on transient op.gg failures (timeout/5xx). |
+| `OPGG_SYNC_WORKERS` | `6` | Parallel network workers for the full sync. |
 | `AG_CACHE_TTL` | `86400` | Build cache freshness window (seconds). |
+| `BUILD_WARM_INTERVAL` | `3600` | Background build warm-up cadence (seconds); `0` disables. |
+| `SYLQON_AUTO_FULL_SYNC` | `1` | Auto-run a full sync when the patch changes (`0` disables). |
 | `LOL_LOCKFILE` | — | Override path to the League client lockfile. |
 
 ---

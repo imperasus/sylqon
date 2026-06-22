@@ -53,8 +53,6 @@ export function useSylqon() {
     busy,
     inject: (variant) => action("inject", "/api/inject", { variant }),
     injectVariant: (index) => action("inject", "/api/inject/variant", { index }),
-    sync: () => action("sync", "/api/sync", {}),
-    syncFull: () => action("syncFull", "/api/sync/full", {}),
     startDemo: () => action("demo", "/api/demo", {}),
     stopDemo: () => action("demo", "/api/demo", null),
   };

@@ -55,16 +55,25 @@ class MetaCache:
         tmp.replace(config.META_CACHE_PATH)
 
     # -- read path (live match, must never touch the network) ----------------
-    def get_build(self, champion: str, role: str) -> tuple[dict, str]:
+    def get_build(self, champion: str, role: str,
+                  current_patch: str | None = None) -> tuple[dict, str]:
         """Returns (build, source). Order: fresh cache -> stale cache ->
-        champion seed -> role-default seed."""
+        champion seed -> role-default seed.
+
+        A cached build is ``"cache"`` only when it is within the TTL *and* (when
+        ``current_patch`` is given) was built on that patch; otherwise it is
+        ``"cache-stale"`` so the caller can refresh it. Entries written before
+        per-build patch tracking have no patch and fall back to the TTL check."""
         key = build_key(champion, role)
         with self._lock:
             entry = self._data["builds"].get(key)
         if entry and entry.get("build"):
             age = time.time() - entry.get("updated_at", 0)
-            source = "cache" if age <= config.CACHE_TTL_SECONDS else "cache-stale"
-            return entry["build"], source
+            entry_patch = entry.get("patch")
+            patch_ok = (current_patch is None or entry_patch is None
+                        or entry_patch == current_patch)
+            fresh = age <= config.CACHE_TTL_SECONDS and patch_ok
+            return entry["build"], "cache" if fresh else "cache-stale"
 
         seeded = self._seed.get("champions", {}).get(key)
         if seeded:
@@ -86,6 +95,7 @@ class MetaCache:
             entry: dict = {
                 "updated_at": time.time(),
                 "source": source,
+                "patch": patch,
                 "build": build,
             }
             if raw_payload is not None:
@@ -209,20 +219,34 @@ class MetaCache:
 
     def refresh_targets(self, current_patch: str) -> list[tuple[str, str]]:
         """Keys needing a re-search: tracked or seeded champions whose cache
-        entry is missing, stale, or from an older patch."""
+        entry is missing, stale (past the TTL), or from an older patch.
+
+        Patch is checked per build entry (not the cache-wide patch field), so a
+        single fresh live fetch on the new patch doesn't mask the rest of the
+        pool still sitting on the previous one."""
         now = time.time()
         with self._lock:
             keys = set(self._data["tracked"]) | set(self._seed.get("champions", {}))
-            patch_changed = self._data.get("patch") != current_patch
             out = []
             for key in sorted(keys):
                 entry = self._data["builds"].get(key)
                 fresh = (
                     entry
-                    and not patch_changed
+                    and entry.get("patch") == current_patch
                     and (now - entry.get("updated_at", 0)) <= config.CACHE_TTL_SECONDS
                 )
                 if not fresh:
                     champ, _, role = key.partition("|")
                     out.append((champ, role))
             return out
+
+    # -- full-sync patch marker (drives the auto-sync on patch change) -------
+    def get_synced_patch(self) -> str:
+        """The patch the SQLite scoring universe was last fully synced for."""
+        with self._lock:
+            return self._data.get("synced_patch", "")
+
+    def set_synced_patch(self, patch: str) -> None:
+        with self._lock:
+            self._data["synced_patch"] = patch
+            self._save()

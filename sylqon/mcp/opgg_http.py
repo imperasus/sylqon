@@ -13,17 +13,10 @@ result so the sync can skip and continue.
 """
 from __future__ import annotations
 
-import logging
-
-import requests
-
 from sylqon import config
-from sylqon.cache.opgg_fetch import _shape_payload
-
-log = logging.getLogger(__name__)
+from sylqon.cache.opgg_fetch import _request_json, _shape_payload
 
 _BASE = "https://lol-api-champion.op.gg/api/{region}/champions"
-_HEADERS = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 
 # our role <-> op.gg position token
 _ROLE_TO_POS = {"top": "TOP", "jungle": "JUNGLE", "middle": "MID",
@@ -34,14 +27,10 @@ _POS_TO_ROLE = {"TOP": "top", "JUNGLE": "jungle", "MID": "middle",
 
 
 def _get(url: str, timeout: int | None = None):
-    try:
-        resp = requests.get(url, headers=_HEADERS,
-                            timeout=timeout or config.OPGG_TIMEOUT_SECONDS)
-        resp.raise_for_status()
-        return (resp.json() or {}).get("data")
-    except (requests.RequestException, ValueError) as exc:
-        log.warning("op.gg GET failed %s: %s", url, exc)
-        return None
+    """Fetch ``url`` over the shared session (keep-alive + retry/backoff) and
+    return its ``data`` payload, or ``None`` on failure."""
+    raw = _request_json(url, timeout=timeout)
+    return raw.get("data") if isinstance(raw, dict) else None
 
 
 def fetch_all_meta(region: str | None = None) -> dict[int, list[dict]]:

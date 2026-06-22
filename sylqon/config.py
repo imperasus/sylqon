@@ -59,6 +59,24 @@ OLLAMA_OPTIONS = {
 # no cached build. The meta build is essentially region-agnostic; "na" is fine.
 OPGG_REGION = os.getenv("OPGG_REGION", "na")
 OPGG_TIMEOUT_SECONDS = int(os.getenv("OPGG_TIMEOUT", 12))
+# Retries for transient op.gg failures (timeout / connection drop / 5xx) before
+# falling back to seed/cache. 4xx and malformed JSON are never retried.
+OPGG_RETRIES = int(os.getenv("OPGG_RETRIES", 2))
+# Parallel network workers for the full op.gg -> SQLite sync. Kept modest so the
+# undocumented API isn't hammered; the DB writes stay single-threaded.
+OPGG_SYNC_WORKERS = int(os.getenv("OPGG_SYNC_WORKERS", 6))
+# Background build warm-up cadence (seconds); 0 disables. Periodically refreshes
+# the user's tracked + seeded champions when their build is stale or from an old
+# patch, so a current build is ready before champ select.
+BUILD_WARM_INTERVAL = int(os.getenv("BUILD_WARM_INTERVAL", 3600))
+# Auto-trigger a full sync when the live patch differs from the last synced patch
+# (so the scoring universe stays current with no manual trigger at all — including
+# the very first run, where nothing is synced yet).
+AUTO_FULL_SYNC = os.getenv("SYLQON_AUTO_FULL_SYNC", "1") == "1"
+# How often the runtime re-checks whether an auto full sync is due (seconds). The
+# check itself is cheap (a cached catalog read + a patch compare); the heavy
+# op.gg crawl only runs when the patch actually moved.
+AUTO_SYNC_CHECK_INTERVAL = int(os.getenv("SYLQON_AUTO_SYNC_CHECK_INTERVAL", 1800))
 
 # --- Live Client Data API (in-game overlay coach) ---------------------------
 # Riot's local in-game API. READ-ONLY: the overlay only ever GETs this endpoint

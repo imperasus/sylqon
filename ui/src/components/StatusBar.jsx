@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Cpu, Loader2, Play, RadioTower, RefreshCw, Square, Zap } from "lucide-react";
+import { Cpu, Loader2, Play, RadioTower, Square, Zap } from "lucide-react";
 import { Button } from "./shared.jsx";
 
 /** Installed desktop-app version (same value auto-update compares). Resolves via
@@ -78,16 +78,15 @@ export default function StatusBar({ state, mode, act, api, demoActive }) {
       <span className="font-mono text-[12px] tracking-wide text-white/50">{patch}</span>
 
       <div className="ml-auto flex items-center gap-2">
-        <Button
-          variant="primary"
-          icon={syncing ? undefined : RefreshCw}
-          onClick={() => act?.(() => api.syncFull())}
-          disabled={syncing}
-          title={sync.detail || "Sync the full champion universe from op.gg"}
-        >
-          {syncing && <Loader2 className="h-4 w-4 animate-spin" />}
-          {syncing ? (sync.total ? `${sync.done}/${sync.total}` : "SYNC…") : "SYNC"}
-        </Button>
+        {syncing && (
+          <div
+            className="flex items-center gap-1.5 rounded border border-accent/35 px-2 py-1 font-display text-[12px] font-bold tracking-[0.18em] text-accent/80"
+            title={sync.detail || "Auto-syncing the champion universe from op.gg"}
+          >
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {sync.total ? `SYNC ${sync.done}/${sync.total}` : "SYNC…"}
+          </div>
+        )}
         <Button
           variant={demoActive ? "danger" : "ghost"}
           icon={demoActive ? Square : Play}

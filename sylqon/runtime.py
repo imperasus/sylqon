@@ -187,6 +187,14 @@ class PipelineRunner:
         self._sync_lock = threading.Lock()
         self._stop = threading.Event()
         self._catalog_lcu_supplemented = False
+        # Build-cache freshness: a guard so a champion isn't refreshed twice
+        # concurrently, a throttle for the periodic background warm-up, and a
+        # throttle for the patch-change auto full-sync check.
+        self._refresh_lock = threading.Lock()
+        self._refreshing: set[tuple[str, str]] = set()
+        self._warm_lock = threading.Lock()
+        self._last_build_warm = 0.0
+        self._last_auto_sync_check = 0.0
         # In-game overlay coach: a dedicated read-only poller against the Live
         # Client Data API, spun up only while a game is InProgress.
         self._live_client = LiveClient()
@@ -266,6 +274,10 @@ class PipelineRunner:
         owns the champ-select WebSocket listener's lifecycle. The heavy draft
         processing is event-driven (see ``_on_session``); polling here is just
         the connection watchdog plus an injection-retry safety net."""
+        # Keep the scoring universe current with no manual trigger. Runs before
+        # the LCU gate so a fresh install populates the DB at startup, even with
+        # the League client closed (the sync only needs op.gg + Data Dragon).
+        self._maybe_auto_full_sync()
         self._refresh_system_status()
 
         if self.client is None or not self.client.is_alive():
@@ -296,13 +308,22 @@ class PipelineRunner:
                     log.info("Re-converted %d build(s) with newly available items",
                              reconverted)
                 self._catalog_lcu_supplemented = True
+                # A fresh LCU connection means the network is up — prompt the
+                # auto full-sync check to run on the next tick (it stays guarded
+                # and only crawls op.gg if the patch actually moved).
+                self._last_auto_sync_check = 0.0
             # Subscribe to gameflow phase pushes for instant transitions; the
             # seed below drives the first _handle_phase for the current phase.
             self._ensure_gameflow_bus()
 
         # Poll the phase as a safety net (and seed when the WS hasn't pushed yet);
         # the gameflow WS handles the same transition the instant it happens.
-        self._handle_phase(self.client.gameflow_phase())
+        phase = self.client.gameflow_phase()
+        self._handle_phase(phase)
+        # Proactively warm stale builds while idle in the client — never during a
+        # live game, so the warm-up fetches don't compete with anything.
+        if phase != "InProgress":
+            self._maybe_warm_builds()
 
     def _handle_phase(self, phase: str) -> None:
         """Drive all phase-dependent subsystems (event bus, live poller, state
@@ -1655,12 +1676,109 @@ class PipelineRunner:
         log.info("Live op.gg build cached for %s %s", champion, role)
         return build
 
+    def _refresh_build_async(self, champion: str, champion_id: int,
+                             role: str) -> None:
+        """Refresh one stale build off the hot path. Guarded so the same
+        champion+role is never refreshed twice concurrently."""
+        if not champion_id:
+            return
+        key = (champion, role)
+        with self._refresh_lock:
+            if key in self._refreshing:
+                return
+            self._refreshing.add(key)
+
+        def work() -> None:
+            try:
+                self._fetch_live_build(champion, champion_id, role)
+            except Exception:
+                log.exception("Background build refresh failed for %s %s",
+                              champion, role)
+            finally:
+                with self._refresh_lock:
+                    self._refreshing.discard(key)
+
+        threading.Thread(target=work, name="ag-build-refresh", daemon=True).start()
+
+    def _maybe_warm_builds(self) -> None:
+        """Periodically refresh the user's tracked + seeded builds that are stale
+        or from an old patch, so a current build is ready before champ select.
+        Throttled by ``BUILD_WARM_INTERVAL`` and guarded so only one warm-up runs
+        at a time; the fetches happen on a background thread."""
+        if not config.BUILD_WARM_INTERVAL:
+            return
+        if not self.catalog.patch or self.catalog.patch == "current":
+            return
+        now = time.time()
+        if now - self._last_build_warm < config.BUILD_WARM_INTERVAL:
+            return
+        if not self._warm_lock.acquire(blocking=False):
+            return
+        self._last_build_warm = now
+
+        def work() -> None:
+            try:
+                targets = self.store.refresh_targets(self.catalog.patch)
+                if not targets:
+                    return
+                log.info("Warming %d stale build(s) in the background", len(targets))
+                for champ, role in targets:
+                    if self._stop.is_set():
+                        break
+                    info = self.catalog.champion_by_name(champ)
+                    if not info:
+                        continue
+                    try:
+                        self._fetch_live_build(champ, int(info["key"]), role)
+                    except Exception:
+                        log.warning("Warm refresh failed for %s %s", champ, role,
+                                    exc_info=True)
+                    time.sleep(0.2)
+            finally:
+                self._warm_lock.release()
+
+        threading.Thread(target=work, name="ag-build-warm", daemon=True).start()
+
+    def _maybe_auto_full_sync(self) -> None:
+        """Keep the SQLite scoring universe current automatically — no manual
+        trigger anywhere. Whenever the live patch differs from the last synced
+        patch (including the very first run, where nothing is synced yet), kick
+        off a full op.gg → SQLite sync in the background.
+
+        Throttled by ``AUTO_SYNC_CHECK_INTERVAL`` and lock-guarded via
+        :meth:`start_full_sync`; needs no League client, so it can run the moment
+        the app starts."""
+        if not config.AUTO_FULL_SYNC:
+            return
+        now = time.time()
+        if now - self._last_auto_sync_check < config.AUTO_SYNC_CHECK_INTERVAL:
+            return
+        self._last_auto_sync_check = now
+        if self.state.snapshot().get("sync", {}).get("running"):
+            return
+
+        def work() -> None:
+            self.catalog.refresh_if_stale()
+            patch = self.catalog.short_patch
+            if not patch or patch == "current":
+                return  # offline at boot — retry on the next throttle window
+            synced = self.store.get_synced_patch()
+            if synced == patch:
+                return
+            log.info("Auto full sync: scoring DB stale for patch %s "
+                     "(last synced %s) — syncing from op.gg",
+                     patch, synced or "never")
+            self.start_full_sync()
+
+        threading.Thread(target=work, name="ag-auto-sync", daemon=True).start()
+
     def compile_loadout(self, ctx: MatchContext) -> loadout_mod.Loadout:
         """Cache read -> Ollama counter-analysis -> validated loadout, with
         every stage published to the dashboard."""
         with self._compile_lock:
             self.last_lane_plan = None  # drop any plan from a previous pick
-            candidate, source = self.store.get_build(ctx.my_champion, ctx.my_role)
+            candidate, source = self.store.get_build(
+                ctx.my_champion, ctx.my_role, self.catalog.patch)
             # No real data for this champion (only a generic seed fell out)?
             # Pull the current build straight from op.gg before the AI sees it.
             if source.startswith("seed"):
@@ -1668,6 +1786,12 @@ class PipelineRunner:
                                               ctx.my_role)
                 if live is not None:
                     candidate, source = live, "opgg-live"
+            elif source == "cache-stale":
+                # We have a usable (if old/off-patch) build — serve it now so the
+                # draft isn't delayed, and refresh it in the background so the next
+                # compile is current.
+                self._refresh_build_async(ctx.my_champion, ctx.my_champion_id,
+                                          ctx.my_role)
             log.info("Candidate build for %s %s from %s", ctx.my_champion, ctx.my_role, source)
 
             base = loadout_mod.from_candidate(candidate, ctx, source)
@@ -1867,10 +1991,6 @@ class PipelineRunner:
                           status="ok" if ok else "partial", at=time.time(), detail=detail)
         return {"ok": ok, "detail": detail}
 
-    def manual_sync(self) -> dict:
-        stats = self.store.stats()
-        return {"ok": True, "detail": f"{stats['builds']} builds in cache (OP.GG source)"}
-
     def start_full_sync(self) -> dict:
         """Kick off a full op.gg → SQLite sync (all champions, all roles) off the
         request thread, publishing progress to ``state.sync``. Guarded so only one
@@ -1890,6 +2010,10 @@ class PipelineRunner:
 
             try:
                 result = run_full_sync(progress=progress)
+                # Mark the patch we just synced so the auto-sync won't re-run
+                # until the next patch lands.
+                if not result.get("error"):
+                    self.store.set_synced_patch(self.catalog.short_patch)
                 # refresh the cache stats the dashboard shows
                 self._refresh_system_status()
                 self.state.update("sync", running=False, at=time.time(),
