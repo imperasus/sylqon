@@ -91,8 +91,11 @@ RIOT_API_KEY: str = os.getenv("RIOT_API_KEY", "")
 RIOT_API_REGION: str = os.getenv("RIOT_API_REGION", "euw1")
 # Mass region for MATCH-V5 (europe / americas / asia).
 RIOT_API_MASS_REGION: str = os.getenv("RIOT_API_MASS_REGION", "europe")
-# Recent ranked solo games to pull per player during live-game scouting.
-RIOT_MATCH_COUNT: int = int(os.getenv("RIOT_MATCH_COUNT", 40))
+# Recent games to pull per player during live-game scouting. Kept modest so the
+# 10-player live scout stays well under personal/dev Riot key rate limits (the
+# whole scout is fetched before results publish); raise via env with a production
+# key for richer fingerprints.
+RIOT_MATCH_COUNT: int = int(os.getenv("RIOT_MATCH_COUNT", 20))
 # The account owner's PUUID (key-specific — regenerate when the API key changes).
 RIOT_SELF_PUUID: str = os.getenv("RIOT_SELF_PUUID", "")
 
