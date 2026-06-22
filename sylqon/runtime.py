@@ -633,13 +633,26 @@ class PipelineRunner:
         self._live_thread.start()
         log.info("Live game poller started")
         # Kick off Riot API scouting for all 10 players via Spectator + MATCH.
-        if self._my_puuid:
+        puuid = self._riot_self_puuid()
+        if puuid:
             threading.Thread(
                 target=self._do_live_scout,
-                args=(self._my_puuid,),
+                args=(puuid,),
                 name="ag-live-scout",
                 daemon=True,
             ).start()
+        else:
+            log.info("Live scout skipped: no usable PUUID (set RIOT_SELF_PUUID)")
+
+    def _riot_self_puuid(self) -> str:
+        """The PUUID for Riot API calls. The LCU's current-summoner puuid is
+        normally the encrypted PUUID, but some clients hand back a short internal
+        UUID that SPECTATOR-V5 rejects with 400 — so fall back to the configured
+        RIOT_SELF_PUUID whenever the LCU value isn't a full encrypted PUUID."""
+        lcu = self._my_puuid or ""
+        if len(lcu) >= 70:
+            return lcu
+        return config.RIOT_SELF_PUUID or lcu
 
     def _stop_live_poller(self) -> None:
         """Tear the poller down on game end and clear the overlay state."""
