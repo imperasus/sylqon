@@ -134,3 +134,44 @@ LOG_PATH = Path(os.getenv("SYLQON_LOG_DIR", str(PROJECT_ROOT))) / "sylqon.log"
 # catalog rather than just the op.gg situational pool.
 OPEN_BUILD_MODE: bool = os.getenv("SYLQON_OPEN_BUILD", "0") == "1"
 OPEN_BUILD_CATALOG_LIMIT: int = int(os.getenv("SYLQON_OPEN_BUILD_CATALOG_LIMIT", "12"))
+
+# --- RAG item retrieval (experimental) --------------------------------------
+# Enhances OpenBuild's catalog suggestions: instead of the hand-maintained
+# ITEM_COUNTER_TAGS table (catalog.items_for_threat), the situational catalog
+# pool is sourced by semantic similarity between the enemy threat profile and
+# each item's real Data Dragon description. Requires SYLQON_OPEN_BUILD=1 (it
+# only feeds the open-build path) and a local embedding model in Ollama.
+# Fully graceful: if the index is missing or embedding fails, the build path
+# falls back to items_for_threat() automatically.
+RAG_ITEMS_MODE: bool = os.getenv("SYLQON_RAG_ITEMS", "0") == "1"
+# Local Ollama embedding model. nomic-embed-text is small, fast and offline.
+RAG_EMBED_MODEL: str = os.getenv("SYLQON_RAG_EMBED_MODEL", "nomic-embed-text")
+RAG_EMBED_TIMEOUT_SECONDS: int = int(os.getenv("SYLQON_RAG_EMBED_TIMEOUT", 30))
+# Prebuilt item embedding index (a pure derivative of the DDragon catalog, so it
+# lives next to ddragon_catalog.json and shares its patch lifecycle).
+RAG_ITEM_INDEX_PATH = CACHE_DIR / "item_embeddings.json"
+RAG_ITEM_LIMIT: int = int(os.getenv("SYLQON_RAG_ITEM_LIMIT", "12"))
+
+# Same idea for runes: grounds the flexible/secondary rune picks in real DDragon
+# rune descriptions instead of the hand-coded rune_directives(). Keystone stays
+# champion/meta-anchored — RAG only enriches the flex slots. Requires
+# SYLQON_OPEN_BUILD=1; falls back to rune_directives() on any failure.
+RAG_RUNES_MODE: bool = os.getenv("SYLQON_RAG_RUNES", "0") == "1"
+RAG_RUNE_INDEX_PATH = CACHE_DIR / "rune_embeddings.json"
+RAG_RUNE_LIMIT: int = int(os.getenv("SYLQON_RAG_RUNE_LIMIT", "6"))
+
+# Champion-kit grounding (Pattern B — factual, not counter-selection): embeds
+# every champion ability (passive + Q/W/E/R) from DDragon championFull.json and
+# injects a FACT SHEET of the real, matchup-relevant abilities into the lane-plan
+# prompt so the LLM references actual kits instead of hallucinating. Independent
+# of OpenBuild; falls back to an ungrounded plan on any failure.
+RAG_KIT_MODE: bool = os.getenv("SYLQON_RAG_KIT", "0") == "1"
+RAG_KIT_INDEX_PATH = CACHE_DIR / "kit_embeddings.json"
+RAG_KIT_LIMIT: int = int(os.getenv("SYLQON_RAG_KIT_LIMIT", "6"))
+
+# Scout + kit fusion: fuses each scouted ENEMY's behavioural fingerprint
+# (playstyle, comfort pick, recent form, premade) WITH their champion's key
+# ability (from the kit index) into a per-enemy block in the lane plan. Reuses
+# the kit index — no new index. Needs enemy scout data (present in-game / normal
+# draft; absent in ranked solo where enemies are anonymised → silently skipped).
+RAG_FUSION_MODE: bool = os.getenv("SYLQON_RAG_FUSION", "0") == "1"

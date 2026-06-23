@@ -6,10 +6,13 @@ Only active when SYLQON_OPEN_BUILD=1. The existing pipeline is untouched.
 from __future__ import annotations
 
 import json
+import logging
 
 from sylqon.data import static
 from sylqon.data.catalog import Catalog
 from sylqon.lcu.lobby import MatchContext
+
+log = logging.getLogger(__name__)
 
 
 def _active_threat_tags(threat: dict) -> list[str]:
@@ -29,6 +32,66 @@ def _active_threat_tags(threat: dict) -> list[str]:
         tags.append("mr")
     tags.append("percent_pen")  # always-on fallback
     return list(dict.fromkeys(tags))
+
+
+def _counter_items(ctx: MatchContext, candidate: dict, catalog: Catalog,
+                   threat: dict, fixed_ids: set[int], limit: int) -> list[dict]:
+    """Source the threat-aware catalog suggestions.
+
+    When ``SYLQON_RAG_ITEMS`` is on, retrieve semantically from the item
+    embedding index; on any failure (no index / embedder down / empty result)
+    fall back to the deterministic hand-tagged ``items_for_threat`` path. The
+    return shape is identical either way, so the rest of the prompt is unchanged.
+    """
+    from sylqon import config as cfg
+
+    if cfg.RAG_ITEMS_MODE:
+        try:
+            from sylqon.rag import item_retrieve
+
+            rag_items = item_retrieve.retrieve_counter_items(
+                threat,
+                champion=ctx.my_champion,
+                exclude_ids=fixed_ids,
+                limit=limit,
+            )
+            if rag_items:
+                log.debug("RAG retrieved %d catalog counter items", len(rag_items))
+                return rag_items
+            log.debug("RAG retrieval empty; falling back to items_for_threat")
+        except Exception as exc:  # never break the build path over RAG
+            log.warning("RAG item retrieval failed (%s); falling back", exc)
+
+    return catalog.items_for_threat(
+        _active_threat_tags(threat), exclude_ids=fixed_ids, limit=limit
+    )
+
+
+def _rune_doctrine_lines(threat: dict) -> list[str]:
+    """Base rune directives, optionally augmented with semantically-retrieved
+    threat-relevant flexible runes when ``SYLQON_RAG_RUNES`` is on (the keystone
+    stays anchored). Falls back silently to the base directives on any failure."""
+    from sylqon import config as cfg
+    from sylqon.ai.prompts import rune_directives
+
+    lines = list(rune_directives(threat))
+    if cfg.RAG_RUNES_MODE:
+        try:
+            from sylqon.rag import rune_retrieve
+
+            runes = rune_retrieve.retrieve_counter_runes(threat, limit=cfg.RAG_RUNE_LIMIT)
+            if runes:
+                picks = "; ".join(
+                    f"{r['name']} ({r['tree']})"
+                    + (f" — {r['description']}" if r.get("description") else "")
+                    for r in runes
+                )
+                lines.append("Threat-matched flexible/secondary rune options to prefer "
+                             "for the flex slots (keep the keystone as-is): " + picks)
+                log.debug("RAG retrieved %d counter runes", len(runes))
+        except Exception as exc:  # never break the build path over RAG
+            log.warning("RAG rune retrieval failed (%s); using base directives", exc)
+    return lines
 
 
 def _merge_pools(
@@ -71,7 +134,7 @@ def compile_open_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) ->
     """
     from sylqon import config as cfg
     from sylqon import loadout as loadout_mod
-    from sylqon.ai.prompts import threat_directives, rune_directives, _tag_label
+    from sylqon.ai.prompts import threat_directives, _tag_label
 
     threat = ctx.team_threat_summary()
     a1, a2 = loadout_mod.allowed_spells(candidate, ctx.my_role)
@@ -85,7 +148,7 @@ def compile_open_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) ->
         or "- none locked yet"
     )
     doctrine_lines = "\n".join(f"- {d}" for d in threat_directives(threat))
-    rune_lines = "\n".join(f"- {d}" for d in rune_directives(threat))
+    rune_lines = "\n".join(f"- {d}" for d in _rune_doctrine_lines(threat))
 
     boots = candidate.get("boots")
     core_items = candidate.get("core_items", [])
@@ -102,10 +165,8 @@ def compile_open_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) ->
     for item in core_items:
         fixed_ids.add(item["id"])
 
-    catalog_items = catalog.items_for_threat(
-        _active_threat_tags(threat),
-        exclude_ids=fixed_ids,
-        limit=cfg.OPEN_BUILD_CATALOG_LIMIT,
+    catalog_items = _counter_items(
+        ctx, candidate, catalog, threat, fixed_ids, cfg.OPEN_BUILD_CATALOG_LIMIT
     )
     merged_pool = _merge_pools(catalog_items, situational_pool, fixed_ids)
 

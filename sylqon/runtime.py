@@ -195,6 +195,10 @@ class PipelineRunner:
         self._warm_lock = threading.Lock()
         self._last_build_warm = 0.0
         self._last_auto_sync_check = 0.0
+        # RAG item embedding index: rebuilt once per patch in the background when
+        # SYLQON_RAG_ITEMS is enabled (guards the heavy embedding pass).
+        self._rag_index_lock = threading.Lock()
+        self._rag_index_patch = ""
         # In-game overlay coach: a dedicated read-only poller against the Live
         # Client Data API, spun up only while a game is InProgress.
         self._live_client = LiveClient()
@@ -278,6 +282,7 @@ class PipelineRunner:
         # the LCU gate so a fresh install populates the DB at startup, even with
         # the League client closed (the sync only needs op.gg + Data Dragon).
         self._maybe_auto_full_sync()
+        self._maybe_build_rag_index()
         self._refresh_system_status()
 
         if self.client is None or not self.client.is_alive():
@@ -1739,6 +1744,52 @@ class PipelineRunner:
 
         threading.Thread(target=work, name="ag-build-warm", daemon=True).start()
 
+    def _maybe_build_rag_index(self) -> None:
+        """Keep the RAG embedding indexes (items and/or runes) current with the
+        live patch.
+
+        Only does anything when ``SYLQON_RAG_ITEMS`` / ``SYLQON_RAG_RUNES`` is
+        enabled. Each ``ensure_*`` no-ops unless the patch or embed model changed,
+        so the heavy embedding pass runs at most once per patch; the per-session
+        ``_rag_index_patch`` short-circuit avoids even the cheap load/compare on
+        every tick. Needs no League client (catalog + Ollama only), so it can
+        build at startup."""
+        if not (config.RAG_ITEMS_MODE or config.RAG_RUNES_MODE or config.RAG_KIT_MODE):
+            return
+        if not self.catalog.patch or self.catalog.patch == "current":
+            return
+        if self._rag_index_patch == self.catalog.patch:
+            return
+        if not self._rag_index_lock.acquire(blocking=False):
+            return
+
+        def work() -> None:
+            try:
+                ok = True
+                if config.RAG_ITEMS_MODE:
+                    from sylqon.rag import item_index
+                    idx = item_index.ensure_index(self.catalog)
+                    ok = ok and bool(idx and idx.get("patch") == self.catalog.patch)
+                if config.RAG_RUNES_MODE:
+                    from sylqon.rag import rune_index
+                    ridx = rune_index.ensure_rune_index(self.catalog)
+                    ok = ok and bool(ridx and ridx.get("patch") == self.catalog.patch)
+                if config.RAG_KIT_MODE:
+                    from sylqon.rag import kit_index
+                    kidx = kit_index.ensure_kit_index(self.catalog)
+                    ok = ok and bool(kidx and kidx.get("patch") == self.catalog.patch)
+                if ok:
+                    # Mark done for this patch only when every enabled index is a
+                    # confirmed current build; a stale/None result leaves it unset
+                    # so a later tick retries.
+                    self._rag_index_patch = self.catalog.patch
+            except Exception:
+                log.warning("RAG index build failed", exc_info=True)
+            finally:
+                self._rag_index_lock.release()
+
+        threading.Thread(target=work, name="ag-rag-index", daemon=True).start()
+
     def _maybe_auto_full_sync(self) -> None:
         """Keep the SQLite scoring universe current automatically — no manual
         trigger anywhere. Whenever the live patch differs from the last synced
@@ -1913,7 +1964,8 @@ class PipelineRunner:
         try:
             from sylqon.ai.lane_plan import LaneCoach
             intel = self.state.snapshot().get("draft_intel")
-            plan = LaneCoach(self.engine).plan(ctx, self.last_matchup, intel)
+            scout_players = (self.state.snapshot().get("scout") or {}).get("players")
+            plan = LaneCoach(self.engine).plan(ctx, self.last_matchup, intel, scout_players)
         except Exception:
             log.exception("Lane-plan generation failed")
             return
