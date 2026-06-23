@@ -5,6 +5,7 @@ import {
 import { useStaticData } from "../api.js";
 import { DAMAGE_COLORS, ROLE_LABELS, ROLE_ORDER, pct } from "../assets.js";
 import { ChampPortrait, Chip, EmptyState, Panel, ThreatBadge } from "./shared.jsx";
+import { useElementRem } from "../hooks/useFitCount.js";
 
 /* Playstyle tag → chip tone (mirrors the draft-board scout strip). */
 const TAG_TONE = {
@@ -36,12 +37,14 @@ function Meter({ value, tone = "accent" }) {
 
 /* Full ally scouting card: portrait of the locked champ + the player's
    fingerprint (form, comfort, pool, KDA/CS, aggression). */
-function AllyCard({ p, champ, patch }) {
+/* detail: 2 = full · 1 = drop the pool/KDA/aggression row · 0 = drop tags too.
+   The column picks the level that fits all players without scrolling. */
+function AllyCard({ p, champ, patch, detail = 2 }) {
   if (p.hidden) {
     return (
       <div className="frost flex items-center gap-2 px-2.5 py-1.5 opacity-70">
         <Lock className="h-3.5 w-3.5 shrink-0 text-white/35" />
-        <span className="truncate text-[11px] text-white/45">{p.name} · history hidden</span>
+        <span className="truncate text-xs text-white/45">{p.name} · history hidden</span>
       </div>
     );
   }
@@ -59,14 +62,14 @@ function AllyCard({ p, champ, patch }) {
         <ChampPortrait slug={champ?.slug || p.comfort?.slug} patch={patch} size="h-7 w-7" accent={accent} title={champ?.name || p.comfort?.champion} />
         <div className="min-w-0 flex-1 leading-tight">
           <div className="flex items-center gap-1">
-            <span className="truncate text-[11px] font-bold text-white/90">{p.name}</span>
-            {p.is_self && <span className="text-[8px] font-bold tracking-widest text-accent">YOU</span>}
+            <span className="truncate text-xs font-bold text-white/90">{p.name}</span>
+            {p.is_self && <span className="text-3xs font-bold tracking-widest text-accent">YOU</span>}
           </div>
-          <div className="text-[9px] font-bold tracking-widest text-white/50">
+          <div className="text-3xs font-bold tracking-widest text-white/50">
             {ROLE_LABELS[p.position || p.main_role] || "—"} · {p.games_analyzed}g
           </div>
           {p.rank && (
-            <span className="text-[9px] font-bold tracking-widest text-amber/80">{p.rank}</span>
+            <span className="text-3xs font-bold tracking-widest text-amber/80">{p.rank}</span>
           )}
         </div>
         {flag && (
@@ -76,33 +79,34 @@ function AllyCard({ p, champ, patch }) {
         )}
       </div>
 
-      {tags.length > 0 && (
+      {detail >= 1 && tags.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {tags.map((t) => <Chip key={t} tone={TAG_TONE[t] || "muted"}>{t}</Chip>)}
         </div>
       )}
 
       <div className="flex items-center gap-2">
-        <span className={`w-9 shrink-0 font-mono text-[11px] font-bold tabular-nums ${wr != null && wr >= 0.5 ? "text-good" : "text-enemy/80"}`}>
+        <span className={`w-9 shrink-0 font-mono text-xs font-bold tabular-nums ${wr != null && wr >= 0.5 ? "text-good" : "text-enemy/80"}`}>
           {wr != null ? pct(wr) : "—"}
         </span>
         <Meter value={(wr ?? 0.5) * 100} tone={wr != null && wr >= 0.5 ? "good" : "amber"} />
         {streakLabel(f.streak) && (
-          <span className={`shrink-0 font-mono text-[10px] ${f.streak > 0 ? "text-good/80" : "text-enemy/80"}`}>{streakLabel(f.streak)}</span>
+          <span className={`shrink-0 font-mono text-2xs ${f.streak > 0 ? "text-good/80" : "text-enemy/80"}`}>{streakLabel(f.streak)}</span>
         )}
         {p.comfort?.champion && (
           <div className="flex shrink-0 items-center gap-1"
                title={`mains ${p.comfort.champion}${p.comfort.mastery_points ? ` · ${(p.comfort.mastery_points / 1000).toFixed(0)}k mastery` : ""}`}>
             <ChampPortrait slug={p.comfort.slug} patch={patch} size="h-5 w-5" round title={p.comfort.champion} />
             {p.comfort.win_rate != null
-              ? <span className="font-mono text-[10px] text-white/50">{pct(p.comfort.win_rate)}</span>
+              ? <span className="font-mono text-2xs text-white/50">{pct(p.comfort.win_rate)}</span>
               : p.comfort.mastery_points
-                ? <span className="font-mono text-[10px] text-white/35">{(p.comfort.mastery_points / 1000).toFixed(0)}k</span>
+                ? <span className="font-mono text-2xs text-white/35">{(p.comfort.mastery_points / 1000).toFixed(0)}k</span>
                 : null}
           </div>
         )}
       </div>
 
+      {detail >= 2 && (
       <div className="flex items-center gap-2 border-t border-white/8 pt-1">
         <div className="flex gap-0.5">
           {pool.map((c) => (
@@ -110,7 +114,7 @@ function AllyCard({ p, champ, patch }) {
                            title={`${c.champion} · ${c.games}g ${pct(c.win_rate)}`} />
           ))}
         </div>
-        <span className="ml-auto font-mono text-[10px] text-white/45" title="avg KDA · CS/min">
+        <span className="ml-auto font-mono text-2xs text-white/45" title="avg KDA · CS/min">
           {kda.ratio != null ? kda.ratio.toFixed(1) : "—"} KDA · {p.avg_cs_per_min ?? 0} cs
         </span>
         <div className="flex w-10 shrink-0 items-center gap-1" title="aggression">
@@ -118,6 +122,7 @@ function AllyCard({ p, champ, patch }) {
           <Meter value={(p.aggression ?? 0) * 100} tone="enemy" />
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -130,9 +135,9 @@ function EnemyCard({ e, scout, patch }) {
   }
   if (!e) {
     return (
-      <div className="frost flex min-h-[44px] items-center gap-2 px-2.5 opacity-40">
+      <div className="frost flex min-h-[2.75rem] items-center gap-2 px-2.5 opacity-40">
         <div className="h-7 w-7 rounded border border-dashed border-white/15" />
-        <span className="text-[10px] tracking-widest text-white/30">AWAITING</span>
+        <span className="text-2xs tracking-widest text-white/30">AWAITING</span>
       </div>
     );
   }
@@ -141,15 +146,15 @@ function EnemyCard({ e, scout, patch }) {
       <div className="flex items-center gap-2">
         <ChampPortrait slug={e.slug} patch={patch} size="h-8 w-8" accent="enemy" title={e.name} />
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate text-[12px] font-bold text-white/90">{e.name}</div>
-          <div className="flex items-center gap-1 text-[9px] font-bold tracking-widest text-white/40">
+          <div className="truncate text-sm font-bold text-white/90">{e.name}</div>
+          <div className="flex items-center gap-1 text-3xs font-bold tracking-widest text-white/40">
             <span>{ROLE_LABELS[e.role] || "—"}</span>
             {e.damage_type && e.damage_type !== "—" && (
               <span className={`rounded border px-0.5 ${DAMAGE_COLORS[e.damage_type] || ""}`}>{e.damage_type}</span>
             )}
           </div>
         </div>
-        <span className="flex shrink-0 items-center gap-1 text-[9px] font-bold tracking-wide text-white/30">
+        <span className="flex shrink-0 items-center gap-1 text-3xs font-bold tracking-wide text-white/30">
           <Lock className="h-3 w-3" /> SCOUT IN-GAME
         </span>
       </div>
@@ -177,17 +182,17 @@ function LivePlayerCard({ p, slug, patch, side = "enemy" }) {
           <ChampPortrait slug={slug} patch={patch} size="h-7 w-7" accent={side} title={p.champion} />
         </div>
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate text-[11px] font-bold text-white/85">{p.name || p.champion}</div>
-          <div className="text-[9px] font-bold tracking-widest text-white/40">
+          <div className="truncate text-xs font-bold text-white/85">{p.name || p.champion}</div>
+          <div className="text-3xs font-bold tracking-widest text-white/40">
             {ROLE_LABELS[p.role] || "—"} · {p.champion}
           </div>
           {p.rank && (
-            <span className="text-[9px] font-bold tracking-widest text-amber/80">{p.rank}</span>
+            <span className="text-3xs font-bold tracking-widest text-amber/80">{p.rank}</span>
           )}
         </div>
         {p.is_dead
           ? <Chip tone="bad">DEAD</Chip>
-          : <span className="shrink-0 text-[10px] font-bold text-white/40">Lv {p.level}</span>}
+          : <span className="shrink-0 text-2xs font-bold text-white/40">Lv {p.level}</span>}
       </div>
 
       {/* Deaths danger bar */}
@@ -199,7 +204,7 @@ function LivePlayerCard({ p, slug, patch, side = "enemy" }) {
       </div>
 
       {/* Row 2: K/D/A · KDA ratio · CS */}
-      <div className="flex items-center gap-2 border-t border-white/8 pt-1 text-[10px]">
+      <div className="flex items-center gap-2 border-t border-white/8 pt-1 text-2xs">
         <span className="font-mono font-bold text-white/70">{p.kills}/{p.deaths}/{p.assists}</span>
         <span className={`font-mono font-bold ${kdaColor}`}>{kda} KDA</span>
         <span className="ml-auto font-mono text-white/50">{p.cs} CS</span>
@@ -221,12 +226,12 @@ function LaneLadder({ allyByRole, enemyByRole, enemyScoutByRole, patch }) {
         const s = a?.recent_form?.streak || 0;
         const edge = es ? "even" : s >= 3 ? "ally" : s <= -3 ? "enemy" : "even";
         const edgeEl = edge === "ally"
-          ? <span className="text-[9px] font-bold text-good">◂ edge</span>
+          ? <span className="text-3xs font-bold text-good">◂ edge</span>
           : edge === "enemy"
-            ? <span className="text-[9px] font-bold text-enemy/80">risk ▸</span>
-            : <span className="text-[9px] text-white/35">even</span>;
+            ? <span className="text-3xs font-bold text-enemy/80">risk ▸</span>
+            : <span className="text-3xs text-white/35">even</span>;
         return (
-          <div key={role} className="flex items-center gap-2 rounded px-1.5 py-1 text-[11px] even:bg-white/[0.015]">
+          <div key={role} className="flex items-center gap-2 rounded px-1.5 py-1 text-xs even:bg-white/[0.015]">
             <span className="w-7 shrink-0 font-bold tracking-widest text-white/40">{ROLE_LABELS[role]}</span>
             <span className={`flex-1 truncate ${a?.is_self ? "text-accent-bright" : "text-ally/90"}`}>{a?.name || "—"}</span>
             <span className="w-12 shrink-0 text-center">{edgeEl}</span>
@@ -244,7 +249,7 @@ function LaneLadder({ allyByRole, enemyByRole, enemyScoutByRole, patch }) {
 function CompareRow({ label, mine, theirs }) {
   return (
     <div>
-      <div className="mb-0.5 flex items-center justify-between text-[10px]">
+      <div className="mb-0.5 flex items-center justify-between text-2xs">
         <span className="font-mono font-bold text-ally">{mine}</span>
         <span className="tracking-widest text-white/40">{label}</span>
         <span className="font-mono font-bold text-white/45">{theirs}</span>
@@ -288,7 +293,7 @@ function TeamRead({ allies }) {
       {flags.length > 0 && (
         <div className="flex flex-col gap-1 border-t border-white/8 pt-2">
           {flags.slice(0, 4).map((fl, i) => (
-            <div key={i} className="flex items-start gap-1.5 text-[11px] text-white/70">
+            <div key={i} className="flex items-start gap-1.5 text-xs text-white/70">
               <fl.icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${FLAG_ICON[fl.tone] || "text-accent"}`} />
               <span>{fl.text}</span>
             </div>
@@ -364,6 +369,7 @@ export default function PlayersView({ state }) {
     for (const p of liveEnemies) if (p.role) m[p.role] = { slug: slugOf[p.champion], name: p.champion };
     return m;
   }, [inGame, liveEnemies, enemyByRole, slugOf]);
+  const [allyColRef, allyColRem] = useElementRem();
 
   if (!lobby && allies.length === 0 && !liveActive) {
     return (
@@ -379,13 +385,18 @@ export default function PlayersView({ state }) {
   for (const p of allies) if (!p.position && !allyRoster.includes(p)) allyRoster.push(p);
   const enemyRoster = ROLE_ORDER.map((r) => enemyByRole[r] || null);
 
+  // Adapt ally-card detail to the column height so all teammates fit without
+  // scrolling (mirrors the live board). 1.5rem accounts for the column label.
+  const allyPerCard = allyRoster.length ? (allyColRem - 1.5) / allyRoster.length : 0;
+  const allyDetail = allyPerCard >= 5.5 ? 2 : allyPerCard >= 4.3 ? 1 : 0;
+
   const scoutedAllies = allies.filter((p) => !p.hidden && p.games_analyzed > 0).length;
   const scoutedEnemies = enemyScout.filter((p) => !p.hidden && p.games_analyzed > 0).length;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2.5">
       <div className="frost flex items-center gap-3 px-3 py-1.5">
-        <span className="flex items-center gap-1.5 text-[11px] font-bold tracking-widest text-accent/80">
+        <span className="flex items-center gap-1.5 text-xs font-bold tracking-widest text-accent/80">
           <Users className="h-4 w-4" /> LOBBY INTEL
         </span>
         <Chip tone="ally">{scoutedAllies}/5 allies</Chip>
@@ -393,33 +404,33 @@ export default function PlayersView({ state }) {
           {inGame ? `${liveEnemies.length}/5 enemies` : `${scoutedEnemies}/5 enemies`}
         </Chip>
         {!inGame && scoutedEnemies === 0 && (
-          <span className="flex items-center gap-1 text-[11px] text-white/40">
+          <span className="flex items-center gap-1 text-xs text-white/40">
             <Lock className="h-3.5 w-3.5" /> enemies appear in-game (Riot hides them in champ select)
           </span>
         )}
-        <span className="ml-auto text-[10px] text-white/30">
+        <span className="ml-auto text-2xs text-white/30">
           {inGame ? "live · Live Client Data" : scout?.at ? "scouted from LCU match history" : ""}
         </span>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_0.92fr_1fr] gap-2.5">
-        <div className="scroll-thin flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
+        <div ref={allyColRef} className="flex min-h-0 flex-col gap-1.5 overflow-hidden pr-0.5">
           <div className="t-label text-ally/70">YOUR TEAM</div>
           {allyRoster.length === 0
-            ? <div className="frost px-3 py-2 text-[12px] text-white/35">Scouting teammates…</div>
+            ? <div className="frost px-3 py-2 text-sm text-white/35">Scouting teammates…</div>
             : allyRoster.map((p) => (
-                <AllyCard key={p.name + (p.position || "")} p={p} champ={champByRole[p.position]} patch={patch} />
+                <AllyCard key={p.name + (p.position || "")} p={p} champ={champByRole[p.position]} patch={patch} detail={allyDetail} />
               ))}
         </div>
 
-        <div className="scroll-thin flex min-h-0 flex-col gap-2.5 overflow-y-auto pr-0.5">
+        <div className="scroll-thin flex min-h-0 flex-col gap-2.5 overflow-hidden pr-0.5">
           <LaneLadder allyByRole={allyByRole} enemyByRole={enemyLadderByRole}
                       enemyScoutByRole={enemyScoutByRole} patch={patch} />
           <TeamRead allies={allies} />
           {!inGame && (
             <div className="frost frost-accent flex items-start gap-2.5 p-2.5">
               <Eye className="mt-0.5 h-4 w-4 shrink-0 text-accent-bright" />
-              <div className="text-[11px] leading-snug text-white/70">
+              <div className="text-xs leading-snug text-white/70">
                 <div className="t-label text-accent/70">ENEMY INTEL</div>
                 <p className="mt-1">Enemies are hidden in champ select. Once the game loads, their live
                   champion + K/D/A/CS appear here from the read-only Live Client Data API. Riot doesn't
@@ -429,7 +440,7 @@ export default function PlayersView({ state }) {
           )}
         </div>
 
-        <div className="scroll-thin flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
+        <div className="flex min-h-0 flex-col gap-1.5 overflow-hidden pr-0.5">
           <div className="t-label text-enemy/70">ENEMY TEAM{inGame && <span className="text-white/30"> · live</span>}</div>
           {inGame
             ? [

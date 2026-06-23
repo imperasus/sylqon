@@ -25,13 +25,13 @@ function PostlockTabs({ view, onChange, scout, live }) {
         const on = t.key === view;
         return (
           <button key={t.key} onClick={() => onChange(t.key)}
-            className={`flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-bold tracking-wide transition-colors
+            className={`flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1 text-sm font-bold tracking-wide transition-colors
               ${on ? "bg-accent/18 text-accent-bright" : "text-white/50 hover:bg-white/5 hover:text-white/80"}`}>
             <t.icon className="h-4 w-4" />
             {t.label}
             {t.live && <span className="h-2 w-2 rounded-full bg-bad pulse-soft" title="live game" />}
             {t.badge != null && (
-              <span className="rounded-full bg-white/10 px-1.5 text-[10px] font-mono text-white/60">{t.badge}</span>
+              <span className="rounded-full bg-white/10 px-1.5 text-2xs font-mono text-white/60">{t.badge}</span>
             )}
           </button>
         );
@@ -145,8 +145,8 @@ export default function App() {
   }, [isInGame]);
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden">
-      <div className="mx-auto flex h-full w-full max-w-[1280px] flex-col gap-3 p-4">
+    <div className="app-shell relative h-screen w-screen overflow-hidden">
+      <div className="flex h-full w-full flex-col gap-3 p-4">
         <StatusBar state={state} mode={mode} act={act} api={api} demoActive={demoActive} />
 
         <main className="relative min-h-0 flex-1">
@@ -168,7 +168,7 @@ export default function App() {
       </div>
 
       {toast && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-md border border-accent/45 bg-bg-2/95 px-4 py-1.5 text-[11px] font-bold tracking-wide text-accent-bright">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-md border border-accent/45 bg-bg-2/95 px-4 py-1.5 text-xs font-bold tracking-wide text-accent-bright">
           {toast}
         </div>
       )}

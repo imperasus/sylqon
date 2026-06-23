@@ -1,6 +1,7 @@
-import { useMemo } from "react";
-import { Ban, Crown, EyeOff, Radar, Shuffle, Sparkles, Swords, Target } from "lucide-react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Ban, Crown, EyeOff, Radar, Shuffle, Sparkles, Swords, Target, X } from "lucide-react";
 import { useStaticData } from "../api.js";
+import { useElementRem, useFitCount } from "../hooks/useFitCount.js";
 import { DAMAGE_COLORS, ROLE_LABELS, pct, squareUrl } from "../assets.js";
 import {
   Bar, ChampPortrait, ChampionRow, Chip, Panel, Score100, SpellPips, ThreatBadge,
@@ -30,7 +31,7 @@ function DraftProgress({ allyCount, enemyCount, phase }) {
           );
         })}
       </div>
-      <span className="shrink-0 text-[11px] font-bold tracking-wide text-accent/80">{phaseLabel}</span>
+      <span className="shrink-0 text-xs font-bold tracking-wide text-accent/80">{phaseLabel}</span>
     </div>
   );
 }
@@ -38,8 +39,8 @@ function DraftProgress({ allyCount, enemyCount, phase }) {
 /* Tiny uppercase reason badge (e.g. ANTI-TANK, ENGAGE, MIXED DAMAGE). */
 function ReasonTag({ children }) {
   return (
-    <span className="shrink-0 rounded border border-white/12 bg-white/5 px-1 text-[9px]
-                     font-bold uppercase leading-[14px] tracking-wide text-white/55">
+    <span className="shrink-0 rounded border border-white/12 bg-white/5 px-1 text-3xs
+                     font-bold uppercase leading-[0.875rem] tracking-wide text-white/55">
       {children}
     </span>
   );
@@ -59,7 +60,7 @@ function MiniPickList({ label, tone, items, patch, isCounter }) {
   if (!items?.length) return null;
   return (
     <div className="mt-0.5 ml-2 rounded-md border border-white/[0.06] bg-white/[0.012] px-1.5 py-1">
-      <div className={`mb-0.5 text-[9px] font-bold tracking-[0.18em] ${MINI_LABEL[tone] || "text-white/60"}`}
+      <div className={`mb-0.5 text-3xs font-bold tracking-[0.18em] ${MINI_LABEL[tone] || "text-white/60"}`}
            title="Best picks from your pool for this matchup">
         {label} <span className="text-white/25">· YOUR POOL</span>
       </div>
@@ -70,10 +71,10 @@ function MiniPickList({ label, tone, items, patch, isCounter }) {
           return (
             <div key={it.name} title={miniTip(it, isCounter)} className="flex min-w-0 items-center gap-1.5">
               <ChampPortrait slug={it.slug} patch={patch} size="h-5 w-5" title={it.name} />
-              <span className="truncate text-[11px] text-white/75">{it.name}</span>
+              <span className="truncate text-xs text-white/75">{it.name}</span>
               {it.reasons?.[0] && <ReasonTag>{it.reasons[0]}</ReasonTag>}
               {edge != null && (
-                <span className={`ml-auto shrink-0 font-mono text-[10px] tabular-nums
+                <span className={`ml-auto shrink-0 font-mono text-2xs tabular-nums
                   ${isCounter && it.edge > 0 ? "text-good/70" : "text-white/35"}`}>{edge}</span>
               )}
             </div>
@@ -117,7 +118,7 @@ function ScoutStrip({ p, patch }) {
       <div className="mt-0.5 ml-2 flex items-center gap-1.5 rounded-md border border-white/[0.06]
                       bg-white/[0.012] px-1.5 py-0.5 opacity-60" title="Match history hidden / anonymized">
         <EyeOff className="h-3 w-3 shrink-0 text-white/35" />
-        <span className="truncate text-[10px] text-white/45">{p.name} · hidden</span>
+        <span className="truncate text-2xs text-white/45">{p.name} · hidden</span>
       </div>
     );
   }
@@ -128,10 +129,10 @@ function ScoutStrip({ p, patch }) {
   return (
     <div className="mt-0.5 ml-2 flex items-center gap-1 rounded-md border border-white/[0.06]
                     bg-white/[0.012] px-1.5 py-0.5" title={scoutTip(p)}>
-      <span className="max-w-[78px] shrink-0 truncate text-[10px] font-bold text-white/55">{p.name}</span>
+      <span className="max-w-[4.875rem] shrink-0 truncate text-2xs font-bold text-white/55">{p.name}</span>
       {tags.map((t) => <Chip key={t} tone={SCOUT_TAG_TONE[t] || "muted"}>{t}</Chip>)}
       {wr != null && (
-        <span className={`ml-auto shrink-0 font-mono text-[10px] tabular-nums
+        <span className={`ml-auto shrink-0 font-mono text-2xs tabular-nums
           ${f.win_rate >= 0.5 ? "text-good/70" : "text-enemy/70"}`}>
           {pct(wr)}{streak ? ` ${streak}` : ""}
         </span>
@@ -148,22 +149,22 @@ function ScoutStrip({ p, patch }) {
 function PlayerRow({ pick, patch, side, isMe }) {
   if (!pick) {
     return (
-      <div className="frost flex min-h-[44px] items-center gap-2 px-2.5 opacity-35">
+      <div className="frost flex min-h-[2.75rem] items-center gap-2 px-2.5 opacity-35">
         <div className="h-9 w-9 rounded border border-dashed border-white/15" />
-        <span className="text-[11px] tracking-widest text-white/30">AWAITING</span>
+        <span className="text-xs tracking-widest text-white/30">AWAITING</span>
       </div>
     );
   }
   const accent = isMe ? "accent" : side;
   return (
-    <div className={`frost ${isMe ? "frost-accent" : ""} flex min-h-[44px] items-center gap-2.5 px-2.5 py-1.5`}>
+    <div className={`frost ${isMe ? "frost-accent" : ""} flex min-h-[2.75rem] items-center gap-2.5 px-2.5 py-1.5`}>
       <ChampPortrait slug={pick.slug} patch={patch} size="h-9 w-9" accent={accent} title={pick.name} />
       <div className="min-w-0 flex-1 leading-tight">
         <div className="flex items-center gap-1">
-          <span className="truncate text-[13px] font-bold text-white/90">{pick.name || "…"}</span>
-          {isMe && <span className="text-[9px] font-bold tracking-widest text-accent">YOU</span>}
+          <span className="truncate text-base font-bold text-white/90">{pick.name || "…"}</span>
+          {isMe && <span className="text-3xs font-bold tracking-widest text-accent">YOU</span>}
         </div>
-        <div className="flex items-center gap-1 text-[10px] font-bold tracking-widest text-white/40">
+        <div className="flex items-center gap-1 text-2xs font-bold tracking-widest text-white/40">
           <span>{ROLE_LABELS[pick.role] || "—"}</span>
           {pick.damage_type && pick.damage_type !== "—" && (
             <span className={`rounded border px-0.5 ${DAMAGE_COLORS[pick.damage_type] || ""}`}>{pick.damage_type}</span>
@@ -176,10 +177,10 @@ function PlayerRow({ pick, patch, side, isMe }) {
         </div>
       )}
       {side !== "enemy" && pick.archetypes?.length > 0 && (
-        <div className="flex max-w-[92px] flex-wrap justify-end gap-0.5">
+        <div className="flex max-w-[5.75rem] flex-wrap justify-end gap-0.5">
           {pick.archetypes.slice(0, 2).map((a) => (
-            <span key={a} className="rounded border border-ally/30 bg-ally/10 px-1 text-[9px]
-                                     font-bold uppercase leading-[14px] tracking-wide text-ally/80">{a}</span>
+            <span key={a} className="rounded border border-ally/30 bg-ally/10 px-1 text-3xs
+                                     font-bold uppercase leading-[0.875rem] tracking-wide text-ally/80">{a}</span>
           ))}
         </div>
       )}
@@ -190,7 +191,7 @@ function PlayerRow({ pick, patch, side, isMe }) {
 
 /* A pick row plus its pool-derived Top-3 list (counters for enemies, synergies
    for allies) — only once the pick is locked and a list exists. */
-function PlayerCard({ pick, patch, side, isMe, scout }) {
+function PlayerCard({ pick, patch, side, isMe, scout, miniMax = 3, showScout = true }) {
   if (!pick) return <PlayerRow pick={null} patch={patch} side={side} />;
   const isEnemy = side === "enemy";
   const list = isEnemy ? pick.counters : pick.synergies;
@@ -198,13 +199,13 @@ function PlayerCard({ pick, patch, side, isMe, scout }) {
     <div className="flex flex-col">
       <PlayerRow pick={pick} patch={patch} side={side} isMe={isMe} />
       {/* Pre-game scout fingerprint at the player's own card (teammates + self). */}
-      {scout && <ScoutStrip p={scout} patch={patch} />}
-      {pick.locked && !isMe && (
+      {showScout && scout && <ScoutStrip p={scout} patch={patch} />}
+      {pick.locked && !isMe && miniMax > 0 && (
         <MiniPickList
           label={isEnemy ? "COUNTERS" : "SYNERGY"}
           tone={isEnemy ? "good" : "ally"}
           isCounter={isEnemy}
-          items={list}
+          items={list?.slice(0, miniMax)}
           patch={patch}
         />
       )}
@@ -212,8 +213,18 @@ function PlayerCard({ pick, patch, side, isMe, scout }) {
   );
 }
 
+/* Always exactly 5 slots, so instead of scrolling we adapt the per-card detail
+   (pool counter/synergy list length, scout strip) to the column height. */
 function TeamColumn({ title, icon, side, picks, patch, comp, scoutByRole }) {
   const slots = [...picks, ...Array(Math.max(0, 5 - picks.length)).fill(null)].slice(0, 5);
+  const [boxRef, boxRem] = useElementRem();
+  // Per-card vertical budget (5 fixed slots) → how much detail fits without
+  // scrolling. A full card is a player row (~3rem) + scout strip (~1.2rem) + a
+  // pool counter/synergy list (~2rem per item + ~1.4rem header). Thresholds are
+  // the measured full-detail heights, so the column clips nothing.
+  const perCard = boxRem / 5;
+  const miniMax = perCard >= 9.3 ? 3 : perCard >= 8.0 ? 2 : perCard >= 6.6 ? 1 : 0;
+  const showScout = perCard >= 4.6;
   return (
     <Panel title={title} icon={icon} accent={side} edge={side} className="gap-1.5">
       {comp && comp.archetype !== "unknown" && comp.archetype !== "balanced" && (
@@ -223,10 +234,10 @@ function TeamColumn({ title, icon, side, picks, patch, comp, scoutByRole }) {
           <div className="flex-1"><Bar value={comp.confidence} tone={side} /></div>
         </div>
       )}
-      <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5">
+      <div ref={boxRef} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden pr-0.5">
         {slots.map((p, i) => (
           <PlayerCard key={p ? `${side}-${p.champion_id}` : `${side}-e-${i}`}
-                      pick={p} patch={patch} side={side} isMe={p?.isMe}
+                      pick={p} patch={patch} side={side} isMe={p?.isMe} miniMax={miniMax} showScout={showScout}
                       scout={p ? scoutByRole?.[p.role] : null} />
         ))}
       </div>
@@ -255,7 +266,7 @@ function BanSlot({ slot, patch }) {
 
 function BanGroup({ label, tone, slots, patch, align = "start" }) {
   const lbl = (
-    <span className={`text-[10px] font-bold tracking-widest ${tone === "enemy" ? "text-enemy/70" : "text-ally/70"}`}>
+    <span className={`text-2xs font-bold tracking-widest ${tone === "enemy" ? "text-enemy/70" : "text-ally/70"}`}>
       {label}
     </span>
   );
@@ -287,7 +298,7 @@ function BansRow({ bans, patch }) {
 function DamageProfile({ label, tone, sum, warn }) {
   return (
     <div className="flex items-center gap-1">
-      <span className={`text-[10px] font-bold tracking-widest ${tone === "enemy" ? "text-enemy/70" : "text-ally/70"}`}>{label}</span>
+      <span className={`text-2xs font-bold tracking-widest ${tone === "enemy" ? "text-enemy/70" : "text-ally/70"}`}>{label}</span>
       <Chip tone="amber">AD {sum.physical_threats || 0}</Chip>
       <Chip tone="accent">AP {sum.magic_threats || 0}</Chip>
       {(sum.heavy_cc_count || 0) > 0 && <Chip tone="enemy">CC {sum.heavy_cc_count}</Chip>}
@@ -308,8 +319,8 @@ function TimingBanner({ timing }) {
     <div className={`flex items-center gap-2 rounded-md border px-2.5 py-1 ${skin}`}>
       <Target className="h-4 w-4 shrink-0" />
       <div className="min-w-0 leading-tight">
-        <div className="text-[12px] font-bold tracking-wide">{timing.headline}</div>
-        <div className="truncate text-[11px] opacity-80">{timing.detail}</div>
+        <div className="text-sm font-bold tracking-wide">{timing.headline}</div>
+        <div className="truncate text-xs opacity-80">{timing.detail}</div>
       </div>
     </div>
   );
@@ -332,16 +343,65 @@ function PickFace({ label, tone, pick, slugOf, patch, badge, badgeTone, foot }) 
                        accent={tone === "accent" ? "accent" : tone} title={pick.name} />
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-display text-[18px] font-extrabold tracking-wide text-white/95">{pick.name}</span>
+            <span className="truncate font-display text-lg font-extrabold tracking-wide text-white/95">{pick.name}</span>
             {badge && <Chip tone={badgeTone}>{badge}</Chip>}
           </div>
           <div className="mt-0.5 flex items-center gap-1.5" title={compBreakdown(pick.components)}>
             <Score100 value={pick.total} />
-            <span className="text-[10px] tracking-widest text-white/35">OVERALL</span>
+            <span className="text-2xs tracking-widest text-white/35">OVERALL</span>
           </div>
           {foot}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* AI reasoning can run long. The draft cockpit never scrolls, so the inline copy
+   is line-clamped and the full text opens in a small modal on "show more" (no
+   layout shift, no clipped content). */
+function ReasoningBlock({ text, lines = 3 }) {
+  const [open, setOpen] = useState(false);
+  const [truncated, setTruncated] = useState(false);
+  const pRef = useRef(null);
+  // Detect *actual* truncation (clamped height < full height) rather than guessing
+  // from character count — accurate across font scaling and column width, and
+  // re-checks on resize.
+  useLayoutEffect(() => {
+    const el = pRef.current;
+    if (!el) return;
+    const check = () => setTruncated(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, lines]);
+  if (!text) return null;
+  const clampCls = { 2: "line-clamp-2", 3: "line-clamp-3", 4: "line-clamp-4" }[lines] || "line-clamp-3";
+  return (
+    <div className="min-w-0">
+      <p ref={pRef} className={`t-body text-white/75 ${clampCls}`}>{text}</p>
+      {truncated && (
+        <button onClick={() => setOpen(true)}
+          className="mt-0.5 cursor-pointer text-2xs font-bold tracking-wide text-accent/80 hover:text-accent-bright">
+          show more
+        </button>
+      )}
+      {open && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-4" onClick={() => setOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()}
+               className="frost frost-accent relative flex max-w-lg flex-col gap-2 p-4">
+            <button onClick={() => setOpen(false)}
+                    className="absolute right-2 top-2 grid h-7 w-7 cursor-pointer place-items-center rounded-md border border-white/15 text-white/50 hover:border-accent/40 hover:text-accent-bright">
+              <X className="h-4 w-4" />
+            </button>
+            <div className="t-label text-accent/70 flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4" /> AI PICK · REASONING
+            </div>
+            <p className="t-body text-white/85">{text}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -360,8 +420,8 @@ function RecoCard({ reco, role, slugOf, patch }) {
             <Chip tone="muted">{reco.source}</Chip>
             {role && <Chip tone="ally">{ROLE_LABELS[role] || role}</Chip>}
           </div>
-          <div className="font-display text-[22px] font-extrabold tracking-wide text-accent-bright">{reco.pick}</div>
-          <p className="t-body text-white/75">{reco.reasoning || "Best fit for this draft."}</p>
+          <div className="font-display text-xl font-extrabold tracking-wide text-accent-bright">{reco.pick}</div>
+          <ReasoningBlock text={reco.reasoning || "Best fit for this draft."} lines={2} />
         </div>
       </div>
     );
@@ -373,7 +433,7 @@ function RecoCard({ reco, role, slugOf, patch }) {
           <div className="sweep absolute inset-0 rounded-full" />
           <Radar className="h-6 w-6 text-accent/70" />
         </div>
-        <span className="font-display text-[12px] tracking-[0.25em] text-accent/70">ANALYSING DRAFT…</span>
+        <span className="font-display text-sm tracking-[0.25em] text-accent/70">ANALYSING DRAFT…</span>
       </div>
     );
   }
@@ -399,40 +459,41 @@ function RecoCard({ reco, role, slugOf, patch }) {
         <div className="grid grid-cols-2 gap-3">
           <PickFace label="Optimal" tone="amber" pick={optimal} slugOf={slugOf} patch={patch}
                     badge="OFF-POOL" badgeTone="amber"
-                    foot={<div className="mt-0.5 text-[10px] tracking-wide text-amber/70">+{delta} over your pool</div>} />
+                    foot={<div className="mt-0.5 text-2xs tracking-wide text-amber/70">+{delta} over your pool</div>} />
           <div className="border-l border-white/8 pl-3">
             <PickFace label="From your pool" tone="ally" pick={poolPick} slugOf={slugOf} patch={patch}
                       badge="SAFE" badgeTone="ally"
-                      foot={<div className="mt-0.5 text-[10px] tracking-wide text-white/35">your best comfort pick</div>} />
+                      foot={<div className="mt-0.5 text-2xs tracking-wide text-white/35">your best comfort pick</div>} />
           </div>
         </div>
       )}
 
-      <p className="t-body text-white/75">
-        {optimal.reasoning || "Best synergy/counter fit for this draft."}
-      </p>
+      <ReasoningBlock text={optimal.reasoning || "Best synergy/counter fit for this draft."} lines={3} />
       {reco.alternatives?.length > 0 && (
-        <div className="text-[10px] tracking-wide text-white/35">alt: {reco.alternatives.join(" · ")}</div>
+        <div className="text-2xs tracking-wide text-white/35">alt: {reco.alternatives.join(" · ")}</div>
       )}
     </div>
   );
 }
 
 function RoleTop({ recs, patch }) {
-  const rows = (recs || []).slice(0, 6);
+  const rows = recs || [];
+  const [listRef, fit] = useFitCount({ rowRem: 2.9, gapRem: 0.125, min: 2, max: 6 });
   if (rows.length === 0) return null;
   return (
-    <Panel title="BEST FOR ROLE" icon={Crown} className="gap-0.5">
-      {rows.map((r, i) => {
-        const c = r.champion || {};
-        return (
-          <ChampionRow
-            key={c.id ?? c.name} rank={i + 1} slug={c.slug} patch={patch} name={c.name}
-            inPool={r.in_pool} title={r.reasoning || ""}
-            right={<Score100 value={r.score?.total} />}
-          />
-        );
-      })}
+    <Panel title="BEST FOR ROLE" icon={Crown} className="gap-0.5 min-h-0 flex-1">
+      <div ref={listRef} className="min-h-0 flex-1 space-y-0.5 overflow-hidden">
+        {rows.slice(0, fit).map((r, i) => {
+          const c = r.champion || {};
+          return (
+            <ChampionRow
+              key={c.id ?? c.name} rank={i + 1} slug={c.slug} patch={patch} name={c.name}
+              inPool={r.in_pool} title={r.reasoning || ""}
+              right={<Score100 value={r.score?.total} />}
+            />
+          );
+        })}
+      </div>
     </Panel>
   );
 }
@@ -446,8 +507,8 @@ function PoolScored({ scored, pick, slugOf, patch }) {
         <div key={s.name} title={(s.notes || []).join("  •  ")}
              className="flex items-center gap-2 rounded border border-white/8 bg-white/[0.015] px-1.5 py-0.5">
           <ChampPortrait slug={slugOf[s.name]} patch={patch} size="h-7 w-7" title={s.name} />
-          <span className="truncate text-[13px] text-white/80">{s.name}</span>
-          <span className="ml-auto font-mono text-[12px] font-bold tabular-nums text-white/45">
+          <span className="truncate text-base text-white/80">{s.name}</span>
+          <span className="ml-auto font-mono text-sm font-bold tabular-nums text-white/45">
             {s.score > 0 ? "+" : ""}{s.score}
           </span>
         </div>
@@ -485,7 +546,7 @@ export default function DraftCockpit({ state }) {
     return (
       <div className="frost flex h-full flex-col items-center justify-center gap-2">
         <Radar className="h-8 w-8 text-ally/70" />
-        <span className="font-display text-[13px] tracking-[0.3em] text-ally/70">AWAITING CHAMPION SELECT</span>
+        <span className="font-display text-base tracking-[0.3em] text-ally/70">AWAITING CHAMPION SELECT</span>
       </div>
     );
   }
@@ -513,7 +574,7 @@ export default function DraftCockpit({ state }) {
         <TeamColumn title="YOUR TEAM" icon={Sparkles} side="ally" picks={allyPicks}
                     patch={patch} comp={allyComp} scoutByRole={scoutByRole} />
 
-        <div className="scroll-thin flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
+        <div className="flex min-h-0 flex-col gap-2 overflow-hidden pr-0.5">
           <TimingBanner timing={intel?.counter_pick} />
           <RecoCard reco={reco} role={lobby.my_role} slugOf={slugOf} patch={patch} />
           <RoleTop recs={reco?.role_top} patch={patch} />
@@ -527,29 +588,29 @@ export default function DraftCockpit({ state }) {
       {/* bottom intel strip */}
       <div className="frost grid grid-cols-[1fr_0.65fr_1.75fr] items-center gap-3 px-3 py-1.5">
         <div className="flex items-center gap-2 overflow-hidden">
-          <span className="flex items-center gap-1 text-[11px] font-bold tracking-widest text-enemy/80"
+          <span className="flex items-center gap-1 text-xs font-bold tracking-widest text-enemy/80"
                 title="Suggested champions to ban (not actual bans)">
             <Ban className="h-4 w-4" /> TO BAN
           </span>
           {(intel?.ban_suggestions || []).slice(0, 3).length === 0
-            ? <span className="text-[12px] text-white/30">sync op.gg for ban data</span>
+            ? <span className="text-sm text-white/30">sync op.gg for ban data</span>
             : intel.ban_suggestions.slice(0, 3).map((b) => (
                 <span key={b.name} title={b.reason}
                       className="flex items-center gap-1 rounded border border-white/10 bg-white/[0.02] px-1 py-0.5">
                   <ChampPortrait slug={b.slug} patch={patch} size="h-6 w-6" title={b.name} />
-                  <span className="max-w-[80px] truncate text-[12px] text-white/75">{b.name}</span>
-                  {b.tier != null && <span className="text-[10px] text-white/40">T{b.tier}</span>}
+                  <span className="max-w-[5rem] truncate text-sm text-white/75">{b.name}</span>
+                  {b.tier != null && <span className="text-2xs text-white/40">T{b.tier}</span>}
                 </span>
               ))}
         </div>
         <div className="flex items-center gap-2 overflow-hidden">
-          <span className="flex items-center gap-1 text-[11px] font-bold tracking-widest text-white/45">
+          <span className="flex items-center gap-1 text-xs font-bold tracking-widest text-white/45">
             <Shuffle className="h-4 w-4" /> FLEX
           </span>
           {(intel?.flex_warnings || []).length === 0
-            ? <span className="text-[12px] text-white/30">none flagged</span>
+            ? <span className="text-sm text-white/30">none flagged</span>
             : intel.flex_warnings.slice(0, 3).map((f) => (
-                <span key={f.name} className="truncate text-[12px] text-white/70">
+                <span key={f.name} className="truncate text-sm text-white/70">
                   {f.name}<span className="text-white/35"> ({(f.roles || []).map((r) => ROLE_LABELS[r] || r).join("/")})</span>
                 </span>
               ))}

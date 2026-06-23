@@ -29,7 +29,7 @@ function Stat({ icon: Icon, ok, label, title }) {
     <div className="flex items-center gap-1.5" title={title}>
       <Icon className={`h-4 w-4 ${ok ? "text-accent" : "text-white/30"}`} />
       <Dot ok={ok} />
-      <span className="max-w-[120px] truncate text-[12px] tracking-wide text-white/55">{label}</span>
+      <span className="max-w-[7.5rem] truncate text-sm tracking-wide text-white/55">{label}</span>
     </div>
   );
 }
@@ -53,19 +53,19 @@ export default function StatusBar({ state, mode, act, api, demoActive }) {
     <header className="frost edge-accent flex items-center gap-3 px-3 py-1.5">
       <div className="flex items-center gap-2">
         <Zap className="h-4 w-4 text-accent" />
-        <span className="font-display text-[14px] font-bold tracking-[0.28em] text-white/90">SYLQON</span>
+        <span className="font-display text-md font-bold tracking-[0.28em] text-white/90">SYLQON</span>
         {version && (
           <button
             type="button"
             onClick={() => window.sylqonUpdater?.check?.()}
-            className="font-mono text-[10px] tracking-wide text-white/35 transition-colors hover:text-white/70"
+            className="font-mono text-2xs tracking-wide text-white/35 transition-colors hover:text-white/70"
             title="Installed app version — click to check for updates"
           >
             v{version}
           </button>
         )}
       </div>
-      <span className={`rounded border px-1.5 py-px font-display text-[11px] font-bold tracking-[0.2em] ${tag.tone}`}>
+      <span className={`rounded border px-1.5 py-px font-display text-xs font-bold tracking-[0.2em] ${tag.tone}`}>
         {tag.label}
       </span>
 
@@ -75,12 +75,12 @@ export default function StatusBar({ state, mode, act, api, demoActive }) {
             title="League client connection" />
       <Stat icon={Cpu} ok={ollama.available} label={ollama.processing ? "thinking…" : (ollama.model || "Ollama")}
             title="Ollama LLM" />
-      <span className="font-mono text-[12px] tracking-wide text-white/50">{patch}</span>
+      <span className="font-mono text-sm tracking-wide text-white/50">{patch}</span>
 
       <div className="ml-auto flex items-center gap-2">
         {syncing && (
           <div
-            className="flex items-center gap-1.5 rounded border border-accent/35 px-2 py-1 font-display text-[12px] font-bold tracking-[0.18em] text-accent/80"
+            className="flex items-center gap-1.5 rounded border border-accent/35 px-2 py-1 font-display text-sm font-bold tracking-[0.18em] text-accent/80"
             title={sync.detail || "Auto-syncing the champion universe from op.gg"}
           >
             <Loader2 className="h-4 w-4 animate-spin" />

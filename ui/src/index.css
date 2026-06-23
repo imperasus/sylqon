@@ -35,6 +35,23 @@
   --font-display: "Rajdhani", sans-serif;
   --font-tech: "Rajdhani", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
+
+  /* ---- fluid type scale ------------------------------------------------
+     Compact, dense companion scale. Every value is rem, so it rides the
+     fluid root font-size (see html.app-fluid-root) and scales with the
+     window on BOTH axes. The old ad-hoc text-[Npx] values map onto these:
+       8/8.5/9/9.5 → 3xs · 10/10.5 → 2xs · 11 → xs · 12 → sm
+       13 → base   · 14/15 → md    · 17/18/19 → lg · 20/22 → xl
+     At the 1280×800 reference size the root is 16px, so these render at the
+     exact same px as before — the tuned look is preserved, then scales. */
+  --text-3xs: 0.5625rem;  /*  9px @16 */
+  --text-2xs: 0.625rem;   /* 10px @16 */
+  --text-xs:  0.6875rem;  /* 11px @16 */
+  --text-sm:  0.75rem;    /* 12px @16 */
+  --text-base: 0.8125rem; /* 13px @16 */
+  --text-md:  0.9375rem;  /* 15px @16 */
+  --text-lg:  1.125rem;   /* 18px @16 */
+  --text-xl:  1.375rem;   /* 22px @16 */
 }
 
 html,
@@ -42,6 +59,19 @@ body,
 #root {
   height: 100%;
 }
+
+/* Fluid root font-size — the backbone of the responsive system. Every rem in
+   the app (Tailwind spacing, sizes, the --text-* scale) rides this, so the whole
+   cockpit scales to fit the window on BOTH axes with no scrollbars. min() picks
+   the tighter axis; the divisors encode the 1280×800 reference (1280/16=80,
+   800/16=50) so the root is exactly 16px there and the tuned look is unchanged.
+   Applied via a class (set in main.jsx) so the fixed-size /overlay widget, which
+   shares this stylesheet, keeps its own 16px base. */
+:root { font-size: 16px; }
+html.app-fluid-root {
+  font-size: clamp(11px, min(100vw / 80, 100svh / 50), 21px);
+}
+
 html,
 body {
   background:
@@ -55,10 +85,10 @@ body {
 
 /* ============================================================ typography scale
    Reusable text utilities so components stop hand-rolling text-[Npx]. */
-.t-h1 { font-size: 19px; line-height: 1.2; font-weight: 600; letter-spacing: 0.01em; color: #eef3fb; }
-.t-h2 { font-size: 15px; line-height: 1.25; font-weight: 600; color: #e3eaf5; }
-.t-body { font-size: 13px; line-height: 1.55; color: #d0d6e0; }
-.t-label { font-size: 11px; line-height: 1.3; font-weight: 700; letter-spacing: 0.14em;
+.t-h1 { font-size: 1.1875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.01em; color: #eef3fb; }
+.t-h2 { font-size: var(--text-md); line-height: 1.25; font-weight: 600; color: #e3eaf5; }
+.t-body { font-size: var(--text-base); line-height: 1.55; color: #d0d6e0; }
+.t-label { font-size: var(--text-xs); line-height: 1.3; font-weight: 700; letter-spacing: 0.14em;
            text-transform: uppercase; color: rgb(208 214 224 / 0.55); }
 .t-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 

@@ -5,6 +5,7 @@ import {
 import { useStaticData } from "../api.js";
 import { ROLE_LABELS, ROLE_ORDER, itemUrl, spellUrl, pct } from "../assets.js";
 import { ChampPortrait, Chip, EmptyState, Panel } from "./shared.jsx";
+import { useElementRem } from "../hooks/useFitCount.js";
 
 /* Per-role CS/min targets — a glanceable "keeping up?" gauge, not a hard rule.
    Mirrors livegame/state._CS_TARGETS (support farms by design → low bar). */
@@ -59,7 +60,7 @@ function Build({ p, patch }) {
       ))}
       {ks && (
         <span title={`${ks}${p.runes?.secondary ? ` · ${p.runes.secondary}` : ""}`}
-              className="ml-0.5 rounded px-1 text-[8.5px] font-bold leading-[15px]"
+              className="ml-0.5 rounded px-1 text-3xs font-bold leading-[0.9375rem]"
               style={{ color: tree, border: `1px solid ${tree}66`, background: `${tree}1f` }}>
           {KEYSTONE_ABBR[ks] || ks.slice(0, 5)}
         </span>
@@ -70,13 +71,15 @@ function Build({ p, patch }) {
           <img key={`i${i}`} src={itemUrl(patch, id)} alt="" title={`item ${id}`}
                className="h-4 w-4 rounded-sm border border-white/12 bg-black/30" draggable={false} />
         ))}
-        {items.length === 0 && <span className="text-[9px] text-white/25">no items yet</span>}
+        {items.length === 0 && <span className="text-3xs text-white/25">no items yet</span>}
       </div>
     </div>
   );
 }
 
-function PlayerCard({ p, patch, gameTime = 0 }) {
+/* detail: 2 = full (all rows) · 1 = drop the scout row · 0 = identity + stats only.
+   The column picks the level that lets all players fit without scrolling. */
+function PlayerCard({ p, patch, gameTime = 0, detail = 2 }) {
   const acc = p.account || {};
   const solo = acc.solo;
   const cc = p.current_champ || {};
@@ -115,7 +118,7 @@ function PlayerCard({ p, patch, gameTime = 0 }) {
     <div className={`frost relative flex flex-col gap-1 py-1.5 pr-2 pl-2.5
                      ${p.isSelf ? "frost-accent" : ""} ${p.is_dead ? "opacity-75" : ""}`}>
       {hasGroup && (
-        <span className="absolute inset-y-0 left-0 w-[3px] rounded-l-[10px]"
+        <span className="absolute inset-y-0 left-0 w-[0.1875rem] rounded-l-[0.625rem]"
               style={{ background: premadeColor(p.premade_group) }} />
       )}
 
@@ -125,27 +128,27 @@ function PlayerCard({ p, patch, gameTime = 0 }) {
           <div className={p.is_dead ? "grayscale" : ""}>
             <ChampPortrait slug={p.slug} patch={patch} size="h-8 w-8" accent={sideAccent} title={p.champion} />
           </div>
-          <span className="absolute -right-1.5 -bottom-1.5 grid h-4 min-w-[16px] place-items-center
-                           rounded-full border border-line bg-bg-2 px-0.5 text-[9px] font-bold text-white/85">
+          <span className="absolute -right-1.5 -bottom-1.5 grid h-4 min-w-[1rem] place-items-center
+                           rounded-full border border-line bg-bg-2 px-0.5 text-3xs font-bold text-white/85">
             {p.level || "?"}
           </span>
         </div>
         <div className="min-w-0 flex-1 leading-tight">
           <div className="flex items-center gap-1">
-            <span className="truncate text-[12px] font-bold text-white/90">{p.name}</span>
-            {p.isSelf && <span className="text-[8px] font-bold tracking-widest text-accent">YOU</span>}
+            <span className="truncate text-sm font-bold text-white/90">{p.name}</span>
+            {p.isSelf && <span className="text-3xs font-bold tracking-widest text-accent">YOU</span>}
             {solo?.hot_streak && <Flame className="h-3 w-3 text-bad" title="on a hot streak" />}
             {solo?.fresh_blood && (
-              <span className="rounded border border-ally/40 px-1 text-[8px] font-bold tracking-wide text-ally"
+              <span className="rounded border border-ally/40 px-1 text-3xs font-bold tracking-wide text-ally"
                     title="new to this rank — possible smurf / fresh account">SMURF?</span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 text-[9.5px] font-bold tracking-wide">
+          <div className="flex items-center gap-1.5 text-3xs font-bold tracking-wide">
             <span className="tracking-widest text-white/45">{ROLE_LABELS[p.role] || "—"}</span>
             {p.rank
               ? <span className="text-amber/85">{p.rank}</span>
               : <span className="text-white/30">Unranked</span>}
-            {acc.flex?.label && <span className="rounded border border-ally/30 px-1 text-[8.5px] text-ally/90"
+            {acc.flex?.label && <span className="rounded border border-ally/30 px-1 text-3xs text-ally/90"
                                       title="Ranked Flex">{acc.flex.label}</span>}
             {seasonWR && <span className="text-white/35">· {seasonWR}</span>}
           </div>
@@ -153,7 +156,7 @@ function PlayerCard({ p, patch, gameTime = 0 }) {
         {p.is_dead
           ? <Chip tone="bad"><Skull className="mr-0.5 inline h-2.5 w-2.5" />dead {Math.ceil(p.respawn_timer || 0)}s</Chip>
           : hasGroup && (
-            <span className="shrink-0 rounded px-1.5 py-px text-[9px] font-bold"
+            <span className="shrink-0 rounded px-1.5 py-px text-3xs font-bold"
                   title={partners.length ? `premade with ${partners.join(", ")}` : "premade"}
                   style={{ color: "#0c1020", background: premadeColor(p.premade_group) }}>
               {premadeLabel(partners.length + 1)} {premadeLetter(p.premade_group)}
@@ -162,7 +165,7 @@ function PlayerCard({ p, patch, gameTime = 0 }) {
       </div>
 
       {/* Row 2 — live K/D/A · CS · cs/m Δ · current champ games/WR/mastery */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/8 pt-1 font-mono text-[10.5px]">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/8 pt-1 font-mono text-2xs">
         <span className="font-bold text-white/80">{p.kills}/{p.deaths}/{p.assists}</span>
         <span className="text-white/35">{p.cs} CS</span>
         <span className={csTone} title={`CS/min (role target ${csTarget})`}>
@@ -179,10 +182,11 @@ function PlayerCard({ p, patch, gameTime = 0 }) {
       </div>
 
       {/* Row 3 — live build (spells · keystone · items) */}
-      <Build p={p} patch={patch} />
+      {detail >= 1 && <Build p={p} patch={patch} />}
 
       {/* Row 4 — recent form, playstyle, pool, history averages */}
-      <div className="flex flex-wrap items-center gap-1 text-[9.5px] text-white/45">
+      {detail >= 2 && (
+      <div className="flex flex-wrap items-center gap-1 text-3xs text-white/45">
         {formChip && (
           <Chip tone={formChip.tone}>
             {formChip.icon && <formChip.icon className="mr-0.5 inline h-2.5 w-2.5" />}{formChip.label}
@@ -203,6 +207,7 @@ function PlayerCard({ p, patch, gameTime = 0 }) {
           </span>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -220,12 +225,12 @@ function LaneLadder({ byRole, patch }) {
         const eTilt = (e?.recent_form?.streak || 0) <= -3;
         const edge = as >= 3 || eTilt ? "ally" : eHot ? "enemy" : "even";
         const edgeEl = edge === "ally"
-          ? <span className="text-[9px] font-bold text-good">◂ edge</span>
+          ? <span className="text-3xs font-bold text-good">◂ edge</span>
           : edge === "enemy"
-            ? <span className="text-[9px] font-bold text-enemy/80">risk ▸</span>
-            : <span className="text-[9px] text-white/30">even</span>;
+            ? <span className="text-3xs font-bold text-enemy/80">risk ▸</span>
+            : <span className="text-3xs text-white/30">even</span>;
         return (
-          <div key={role} className="flex items-center gap-2 rounded px-1 py-0.5 text-[10.5px] even:bg-white/[0.015]">
+          <div key={role} className="flex items-center gap-2 rounded px-1 py-0.5 text-2xs even:bg-white/[0.015]">
             <span className="w-6 shrink-0 font-bold tracking-widest text-white/40">{ROLE_LABELS[role]}</span>
             <span className="flex flex-1 items-center gap-1 truncate">
               {a && <ChampPortrait slug={a.slug} patch={patch} size="h-4 w-4" round title={a.champion} />}
@@ -276,12 +281,31 @@ function Callouts({ enemies, groups }) {
   return (
     <Panel title="THREATS" icon={Crosshair} accent="enemy" className="gap-1">
       {flags.slice(0, 4).map((f, i) => (
-        <div key={i} className="flex items-start gap-2 text-[11px] text-white/75">
+        <div key={i} className="flex items-start gap-2 text-xs text-white/75">
           <f.icon className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: f.color }} />
           <span>{f.text}</span>
         </div>
       ))}
     </Panel>
+  );
+}
+
+/* A team's player cards. Always shows every player; when the column is short it
+   drops per-card detail (scout row, then build row) instead of scrolling. */
+function PlayerColumn({ label, labelCls, players, patch, gameTime, keyPrefix }) {
+  const [boxRef, boxRem] = useElementRem();
+  // boxRem includes the ~1.7rem label header; the rest is split across the cards.
+  const perCard = players.length ? (boxRem - 1.7) / players.length : 0;
+  const detail = perCard >= 7.2 ? 2 : perCard >= 5.6 ? 1 : 0;
+  return (
+    <div ref={boxRef} className="flex min-h-0 flex-col gap-1.5 overflow-hidden pr-0.5">
+      <div className={`t-label flex items-center gap-1 ${labelCls}`}>
+        <Users className="h-3.5 w-3.5" /> {label}
+      </div>
+      {players.map((p) => (
+        <PlayerCard key={`${keyPrefix}-${p.name}`} p={p} patch={patch} gameTime={gameTime} detail={detail} />
+      ))}
+    </div>
   );
 }
 
@@ -343,26 +367,24 @@ export default function LiveBoard({ scout, live, patch }) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <div className="frost flex flex-wrap items-center gap-3 px-3 py-1.5">
-        <span className="flex items-center gap-1.5 text-[11px] font-bold tracking-widest text-accent/80">
+        <span className="flex items-center gap-1.5 text-xs font-bold tracking-widest text-accent/80">
           <Radar className="h-4 w-4" /> LIVE GAME
         </span>
-        <span className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-bad">
+        <span className="flex items-center gap-1.5 font-mono text-xs font-bold text-bad">
           <span className="h-2 w-2 rounded-full bg-bad pulse-soft" /> {mmss(live?.game_time)}
         </span>
         {premadeN > 0 && (
           <Chip tone="accent"><UsersRound className="mr-0.5 inline h-3 w-3" />{premadeN} premade{premadeN > 1 ? "s" : ""}</Chip>
         )}
-        <span className="ml-auto flex items-center gap-2 text-[10px] text-white/35">
+        <span className="ml-auto flex items-center gap-2 text-2xs text-white/35">
           <Chip tone="muted">scouted {scoutedN}/10</Chip>
           read-only · Live Client Data + Riot API
         </span>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_0.85fr_1fr] gap-2">
-        <div className="scroll-thin flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
-          <div className="t-label text-ally/70 flex items-center gap-1"><Users className="h-3.5 w-3.5" /> YOUR TEAM</div>
-          {ordered("ally").map((p) => <PlayerCard key={`a-${p.name}`} p={p} patch={patch} gameTime={live?.game_time} />)}
-        </div>
+        <PlayerColumn label="YOUR TEAM" labelCls="text-ally/70" players={ordered("ally")}
+                      patch={patch} gameTime={live?.game_time} keyPrefix="a" />
 
         <div className="scroll-thin flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
           <Callouts enemies={enemies} groups={groups} />
@@ -370,7 +392,7 @@ export default function LiveBoard({ scout, live, patch }) {
           {Object.keys(groups).length > 0 && (
             <Panel title="PREMADES" icon={UsersRound} accent="accent" className="gap-1">
               {Object.entries(groups).map(([gi, members]) => (
-                <div key={gi} className="flex items-center gap-2 text-[10.5px]">
+                <div key={gi} className="flex items-center gap-2 text-2xs">
                   <span className="h-2.5 w-2.5 rounded-sm" style={{ background: premadeColor(+gi) }} />
                   <span className="font-bold text-white/70">{premadeLetter(+gi)}</span>
                   <span className={members[0]?.side === "enemy" ? "text-enemy/80" : "text-ally/80"}>
@@ -378,17 +400,15 @@ export default function LiveBoard({ scout, live, patch }) {
                   </span>
                 </div>
               ))}
-              <span className="border-t border-white/8 pt-1 text-[9.5px] text-white/30">
+              <span className="border-t border-white/8 pt-1 text-3xs text-white/30">
                 Inferred from shared recent ranked + normal games.
               </span>
             </Panel>
           )}
         </div>
 
-        <div className="scroll-thin flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
-          <div className="t-label text-enemy/70 flex items-center gap-1"><Users className="h-3.5 w-3.5" /> ENEMY TEAM</div>
-          {ordered("enemy").map((p) => <PlayerCard key={`e-${p.name}`} p={p} patch={patch} gameTime={live?.game_time} />)}
-        </div>
+        <PlayerColumn label="ENEMY TEAM" labelCls="text-enemy/70" players={ordered("enemy")}
+                      patch={patch} gameTime={live?.game_time} keyPrefix="e" />
       </div>
     </div>
   );

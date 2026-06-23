@@ -17,6 +17,7 @@ import { startBackend, stopBackend } from "./backend";
 import { createTray, destroyTray, notifyTray } from "./tray";
 import { checkBackend } from "./health";
 import { setupAutoUpdates, attachUpdateBanner, checkForUpdatesManual } from "./updater";
+import { getSavedMainBounds, saveMainBounds } from "./store";
 
 // ---------------------------------------------------------------------------
 // Sylqon Desktop — main process
@@ -89,20 +90,19 @@ async function loadMainContent(win: BrowserWindow): Promise<void> {
 }
 
 function createMainWindow(): void {
+  // The dashboard is now fully responsive (fluid root scale + adaptive density),
+  // so the window is freely resizable. Default to the tuned 1280x800 canvas, but
+  // honor a saved size/position and clamp to a sensible minimum below which the
+  // dense views stop being comfortable.
+  const saved = getSavedMainBounds();
   mainWindow = new BrowserWindow({
-    // Fixed companion canvas: every dashboard view is tuned to 1280x800, so the
-    // window is locked to that size via equal min/max bounds (not resizable:false
-    // + useContentSize, which left the window black on launch on some Windows/GPU
-    // setups — a hidden window that never gets a resize pass never paints its
-    // first frame). Keeping the default paint path + an explicit backgroundColor
-    // is the safe way to pin the size.
-    width: 1280,
-    height: 800,
-    minWidth: 1280,
-    maxWidth: 1280,
-    minHeight: 800,
-    maxHeight: 800,
-    maximizable: false,
+    width: saved?.width ?? 1280,
+    height: saved?.height ?? 800,
+    ...(saved ? { x: saved.x, y: saved.y } : {}),
+    minWidth: 1024,
+    minHeight: 640,
+    resizable: true,
+    maximizable: true,
     backgroundColor: "#060a14", // matches the app bg; guarantees a painted surface
     show: false, // shown on ready-to-show to avoid a white flash
     frame: true, // normal OS frame (title bar + controls)
@@ -120,6 +120,15 @@ function createMainWindow(): void {
   });
 
   mainWindow.setMenuBarVisibility(false);
+
+  // Remember size/position across runs (debounced inside the store). Persist the
+  // normal (non-maximized) bounds so un-maximizing restores the prior size.
+  const persistBounds = () => {
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized()) return;
+    saveMainBounds(mainWindow.getNormalBounds());
+  };
+  mainWindow.on("resize", persistBounds);
+  mainWindow.on("move", persistBounds);
 
   // If the live dashboard fails to load (e.g. backend died mid-session), fall
   // back to the backend-down page. Ignore failures of the local file:// page

@@ -35,7 +35,7 @@ export function ChampPortrait({ slug, patch, size = "h-12 w-12", accent = "white
   if (!slug) {
     return (
       <div className={`${size} ${shape} shrink-0 border ${ring} grid place-items-center bg-bg-2 text-white/25`}>
-        <span className="text-[11px]">?</span>
+        <span className="text-xs">?</span>
       </div>
     );
   }
@@ -55,7 +55,7 @@ export function ThreatBadge({ threat }) {
   const hot = threat === "suppression" || threat === "heavy_cc";
   return (
     <span
-      className={`rounded border px-1 py-px text-[10px] font-bold tracking-wider uppercase
+      className={`rounded border px-1 py-px text-2xs font-bold tracking-wider uppercase
         ${hot
           ? "border-enemy/70 bg-enemy/15 text-enemy"
           : "border-enemy/35 bg-enemy/10 text-enemy/80"}`}
@@ -76,7 +76,7 @@ const TITLE_COLOR = {
 export function SectionTitle({ children, accent = "accent", icon: Icon, right }) {
   return (
     <div className="flex items-center gap-1.5">
-      <div className={`flex items-center gap-1.5 font-display text-[12px] font-bold tracking-[0.22em] ${TITLE_COLOR[accent] || TITLE_COLOR.white}`}>
+      <div className={`flex items-center gap-1.5 font-display text-sm font-bold tracking-[0.22em] ${TITLE_COLOR[accent] || TITLE_COLOR.white}`}>
         {Icon && <Icon className="h-4 w-4" />}
         {children}
       </div>
@@ -91,7 +91,7 @@ export function ScorePill({ score }) {
   const neutral = score === 0;
   return (
     <span
-      className={`rounded px-1 py-px font-mono text-[12px] font-bold tabular-nums
+      className={`rounded px-1 py-px font-mono text-sm font-bold tabular-nums
         ${neutral
           ? "bg-white/8 text-white/45"
           : positive
@@ -109,7 +109,7 @@ export function Score100({ value }) {
   const cls = v >= 75 ? "bg-good/15 text-good"
     : v >= 55 ? "bg-accent/15 text-accent-bright"
     : "bg-white/8 text-white/45";
-  return <span className={`rounded px-1 py-px font-mono text-[12px] font-bold tabular-nums ${cls}`}>{v}</span>;
+  return <span className={`rounded px-1 py-px font-mono text-sm font-bold tabular-nums ${cls}`}>{v}</span>;
 }
 
 /* Generic frost panel with an optional titled header. */
@@ -137,7 +137,7 @@ export function Chip({ tone = "muted", children, title }) {
   };
   return (
     <span title={title}
-          className={`rounded border px-1.5 py-px text-[11px] font-bold tracking-wider uppercase ${tones[tone] || tones.muted}`}>
+          className={`rounded border px-1.5 py-px text-xs font-bold tracking-wider uppercase ${tones[tone] || tones.muted}`}>
       {children}
     </span>
   );
@@ -157,8 +157,8 @@ export function EmptyState({ icon: Icon, label, hint }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-white/30">
       {Icon && <Icon className="h-7 w-7" />}
-      <span className="font-display text-[13px] tracking-[0.22em]">{label}</span>
-      {hint && <span className="max-w-[240px] text-center text-[13px] text-white/40">{hint}</span>}
+      <span className="font-display text-base tracking-[0.22em]">{label}</span>
+      {hint && <span className="max-w-[15rem] text-center text-base text-white/40">{hint}</span>}
     </div>
   );
 }
@@ -177,7 +177,7 @@ export function Button({ variant = "secondary", icon: Icon, children, className 
     <button
       disabled={disabled}
       className={`inline-flex items-center justify-center gap-1.5 rounded-md border px-2.5 py-1
-        text-[11px] font-bold tracking-widest uppercase transition-colors
+        text-xs font-bold tracking-widest uppercase transition-colors
         ${disabled ? "cursor-default opacity-50" : "cursor-pointer"}
         ${variants[variant] || variants.secondary} ${className}`}
       {...rest}
@@ -211,7 +211,7 @@ export function IconButton({ icon: Icon, title, active, tone = "accent", classNa
 /* Win / Loss pill. */
 export function WLPill({ win }) {
   return (
-    <span className={`grid h-5 w-5 place-items-center rounded text-[11px] font-extrabold
+    <span className={`grid h-5 w-5 place-items-center rounded text-xs font-extrabold
       ${win ? "bg-good/18 text-good" : "bg-bad/18 text-bad"}`}>
       {win ? "W" : "L"}
     </span>
@@ -225,8 +225,8 @@ export function StatBadge({ label, value, tone = "muted", tip }) {
   };
   return (
     <span title={tip} className="flex flex-col items-end leading-none">
-      <span className={`font-mono text-[12px] font-bold tabular-nums ${tones[tone] || tones.muted}`}>{value}</span>
-      <span className="text-[9px] font-bold tracking-widest text-white/35">{label}</span>
+      <span className={`font-mono text-sm font-bold tabular-nums ${tones[tone] || tones.muted}`}>{value}</span>
+      <span className="text-3xs font-bold tracking-widest text-white/35">{label}</span>
     </span>
   );
 }
@@ -243,15 +243,15 @@ export function ChampionRow({ slug, patch, name, sub, rank, right, accent = "whi
         flex items-center gap-2.5 rounded-md px-2 py-1.5 ${className}`}
     >
       {rank != null && (
-        <span className="w-4 shrink-0 text-center font-mono text-[11px] font-bold tabular-nums text-white/35">{rank}</span>
+        <span className="w-4 shrink-0 text-center font-mono text-xs font-bold tabular-nums text-white/35">{rank}</span>
       )}
       <ChampPortrait slug={slug} patch={patch} size="h-8 w-8" accent={accent} title={name} />
       <div className="min-w-0 flex-1 leading-tight">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-[13px] font-semibold text-white/90">{name}</span>
+          <span className="truncate text-base font-semibold text-white/90">{name}</span>
           {inPool && <Chip tone="accent">pool</Chip>}
         </div>
-        {sub && <div className="truncate text-[11px] text-white/40">{sub}</div>}
+        {sub && <div className="truncate text-xs text-white/40">{sub}</div>}
       </div>
       {right}
     </div>
@@ -269,7 +269,7 @@ export function Tabs({ items, active, onSelect, className = "" }) {
             key={it.key}
             onClick={() => onSelect?.(it.key)}
             className={`relative -mb-px flex items-center gap-1.5 rounded-t-md border-b-2 px-2.5 py-1.5
-              text-[12px] font-bold tracking-wide transition-colors
+              text-sm font-bold tracking-wide transition-colors
               ${on ? "border-accent bg-accent/10 text-accent-bright"
                    : "border-transparent text-white/45 hover:bg-white/5 hover:text-white/75"}`}
           >

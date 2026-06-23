@@ -15,6 +15,16 @@ export interface OverlayBounds {
 
 interface AppState {
   overlayBounds?: OverlayBounds;
+  mainBounds?: OverlayBounds;
+}
+
+/** True if a saved window's top-left still lands on a connected display
+ *  (guards against a monitor being unplugged since last run). */
+function boundsOnScreen(b: OverlayBounds): boolean {
+  return screen.getAllDisplays().some((d) => {
+    const a = d.workArea;
+    return b.x >= a.x && b.x < a.x + a.width && b.y >= a.y && b.y < a.y + a.height;
+  });
 }
 
 function statePath(): string {
@@ -49,17 +59,15 @@ function writeState(state: AppState): void {
 export function getSavedOverlayBounds(): OverlayBounds | null {
   const b = readState().overlayBounds;
   if (!b) return null;
-  const onScreen = screen.getAllDisplays().some((d) => {
-    const a = d.workArea;
-    // require the window's top-left to sit within some display's work area
-    return (
-      b.x >= a.x &&
-      b.x < a.x + a.width &&
-      b.y >= a.y &&
-      b.y < a.y + a.height
-    );
-  });
-  return onScreen ? b : null;
+  return boundsOnScreen(b) ? b : null;
+}
+
+/** Saved main-window bounds, but only if they still land on a connected display
+ *  (a smaller monitor since last run could otherwise open it off-screen). */
+export function getSavedMainBounds(): OverlayBounds | null {
+  const b = readState().mainBounds;
+  if (!b) return null;
+  return boundsOnScreen(b) ? b : null;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -70,6 +78,18 @@ export function saveOverlayBounds(bounds: OverlayBounds): void {
   saveTimer = setTimeout(() => {
     const state = readState();
     state.overlayBounds = bounds;
+    writeState(state);
+  }, 400);
+}
+
+let mainSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Persist main-window bounds, debounced (move/resize fire rapidly while dragging). */
+export function saveMainBounds(bounds: OverlayBounds): void {
+  if (mainSaveTimer) clearTimeout(mainSaveTimer);
+  mainSaveTimer = setTimeout(() => {
+    const state = readState();
+    state.mainBounds = bounds;
     writeState(state);
   }, 400);
 }

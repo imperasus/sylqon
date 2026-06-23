@@ -8,6 +8,12 @@ import "./index.css";
 // renders only the minimal in-game overlay; everything else is the dashboard.
 const isOverlay = window.location.pathname.startsWith("/overlay");
 
+// The dashboard rides a fluid root font-size (index.css) so the whole cockpit
+// scales to fit any window. The overlay is a fixed-size widget and must keep a
+// stable 16px base, so the class is added only for the dashboard. Set before
+// first paint to avoid a scale flash.
+if (!isOverlay) document.documentElement.classList.add("app-fluid-root");
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     {isOverlay ? <OverlayApp /> : <App />}

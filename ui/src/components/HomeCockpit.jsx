@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import {
-  Crown, History, Plus, Search, Sparkles, Star, TrendingUp, X,
+  ChevronLeft, ChevronRight, Crown, History, Plus, Search, Sparkles, Star, TrendingUp, X,
 } from "lucide-react";
 import {
   fetchChampionsByRole, fetchRecentMatches, useChampionStats, usePool, useScout, useStaticData,
 } from "../api.js";
+import { useFitCount, useMediaQuery } from "../hooks/useFitCount.js";
 import { pct, ROLE_LABELS, ROLE_ORDER, TIER_STYLE } from "../assets.js";
 import {
   Button, ChampPortrait, ChampionRow, Chip, EmptyState, IconButton, Panel, StatBadge, WLPill,
@@ -18,7 +19,7 @@ function RoleTabs({ role, onRole }) {
     <div className="flex gap-1">
       {ROLE_ORDER.map((r) => (
         <button key={r} onClick={() => onRole(r)}
-          className={`cursor-pointer rounded px-2.5 py-1 text-[12px] font-bold tracking-widest transition-colors
+          className={`cursor-pointer rounded px-2.5 py-1 text-sm font-bold tracking-widest transition-colors
             ${role === r ? "bg-accent/15 text-accent-bright" : "text-white/40 hover:bg-white/5 hover:text-white/70"}`}>
           {ROLE_LABELS[r]}
         </button>
@@ -34,14 +35,14 @@ function PoolCard({ name, slug, patch, stat, onRemove }) {
     <div className="group row relative flex items-center gap-2.5 rounded-md border border-white/8 bg-white/[0.015] px-2 py-1.5">
       <ChampPortrait slug={slug} patch={patch} size="h-9 w-9" accent="accent" title={name} round />
       <div className="min-w-0 flex-1 leading-tight">
-        <div className="truncate text-[13px] font-semibold text-accent-bright/90">{name}</div>
-        <div className="text-[11px] text-white/40">
+        <div className="truncate text-base font-semibold text-accent-bright/90">{name}</div>
+        <div className="text-xs text-white/40">
           {stat?.games >= 1 ? `${stat.games} game${stat.games === 1 ? "" : "s"}` : "no games yet"}
         </div>
       </div>
       {wr != null
         ? <StatBadge label="WR" value={pct(wr)} tone={wr >= 0.5 ? "good" : "warn"} tip="Your win rate on this champion" />
-        : <span className="text-[11px] text-white/20">—</span>}
+        : <span className="text-xs text-white/20">—</span>}
       <button onClick={() => onRemove(name)}
         className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-transparent text-white/25 opacity-0 transition-all hover:border-bad/50 hover:text-bad group-hover:opacity-100"
         title="Remove from pool">
@@ -71,15 +72,22 @@ function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
     ? champions.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) && !inPool.has(c.name)).slice(0, 6)
     : [];
   const top = matches[0];
+  // Pool grows with the column; show what fits (no scroll), flag the overflow.
+  const [listRef, fit] = useFitCount({ rowRem: 3.0, gapRem: 0.25, min: 1, max: current.length || 1 });
 
   return (
     <Panel title="YOUR POOL" icon={Star} right={<Chip tone="muted">{ROLE_LABELS[role]}</Chip>} className="gap-2.5 min-w-0">
-      <div className="scroll-thin -mr-1 flex max-h-44 min-h-[72px] flex-col gap-1 overflow-y-auto pr-1">
+      <div ref={listRef} className="-mr-1 flex min-h-0 flex-1 flex-col gap-1 overflow-hidden pr-1">
         {current.length === 0
-          ? <span className="px-1 text-[12px] text-white/30">No champions for {ROLE_LABELS[role]} — search below.</span>
-          : current.map((name) => (
+          ? <span className="px-1 text-sm text-white/30">No champions for {ROLE_LABELS[role]} — search below.</span>
+          : current.slice(0, fit).map((name) => (
               <PoolCard key={name} name={name} slug={slugOf[name]} patch={patch} stat={stats[name]} onRemove={remove} />
             ))}
+        {current.length > fit && (
+          <div className="pt-0.5 text-center text-2xs tracking-wide text-white/30">
+            +{current.length - fit} more in pool
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -87,14 +95,14 @@ function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
           <Search className="absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2 text-white/30" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search champion…"
             onKeyDown={(e) => { if (e.key === "Enter" && top) add(top.name); }}
-            className="w-full rounded-md border border-white/10 bg-black/30 py-1.5 pr-2 pl-7 text-[13px] text-white/80 outline-none placeholder:text-white/25 focus:border-accent/40" />
+            className="w-full rounded-md border border-white/10 bg-black/30 py-1.5 pr-2 pl-7 text-base text-white/80 outline-none placeholder:text-white/25 focus:border-accent/40" />
           {matches.length > 0 && (
             <div className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-accent/30 bg-bg-2/98 shadow-xl">
               {matches.map((c) => (
                 <button key={c.slug} onClick={() => add(c.name)}
                   className="flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left hover:bg-accent/10">
                   <ChampPortrait slug={c.slug} patch={patch} size="h-6 w-6" round />
-                  <span className="text-[13px] text-white/80">{c.name}</span>
+                  <span className="text-base text-white/80">{c.name}</span>
                   <Plus className="ml-auto h-4 w-4 text-accent/70" />
                 </button>
               ))}
@@ -114,8 +122,8 @@ function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
           <div className="mt-2 flex items-center gap-2.5 rounded-md border border-accent/25 bg-accent/[0.06] p-2">
             <ChampPortrait slug={scout.slug} patch={patch} size="h-10 w-10" accent="accent" round title={scout.pick} />
             <div className="min-w-0">
-              <div className="truncate font-display text-[14px] font-bold text-accent-bright">{scout.pick}</div>
-              <div className="line-clamp-2 text-[11px] leading-snug text-white/55">{scout.reason}</div>
+              <div className="truncate font-display text-md font-bold text-accent-bright">{scout.pick}</div>
+              <div className="line-clamp-2 text-xs leading-snug text-white/55">{scout.reason}</div>
             </div>
           </div>
         </div>
@@ -127,8 +135,10 @@ function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
 /* ----------------------------------------------------------------- meta */
 function MetaTable({ role, patch, pool, save, onOpen }) {
   const [rows, setRows] = useState([]);
+  const [page, setPage] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setPage(0);
     fetchChampionsByRole(role).then((r) => { if (!cancelled) setRows(r.champions || []); }).catch(() => {});
     return () => { cancelled = true; };
   }, [role]);
@@ -138,6 +148,21 @@ function MetaTable({ role, patch, pool, save, onOpen }) {
     if (inPool.has(name)) return;
     save({ ...pool, [role]: [...(pool[role] || []), name] });
   };
+
+  // Fit exactly the rows the panel height allows (no inner scroll); the rest is
+  // reachable by paging. The tier list is ranked, so paging through it reads
+  // naturally and the panel always stays full.
+  const capped = rows.slice(0, 40);
+  const [listRef, perCol] = useFitCount({ rowRem: 2.3, min: 4, max: 40 });
+  // On a wide/ultrawide window, fan the tier list into 2 columns so the extra
+  // width fills with twice as many champions instead of stretching each row.
+  const wide = useMediaQuery("(min-width: 1600px)");
+  const cols = wide ? 2 : 1;
+  const perPage = perCol * cols;
+  const pages = Math.max(1, Math.ceil(capped.length / perPage));
+  const curPage = Math.min(page, pages - 1);
+  const start = curPage * perPage;
+  const shown = capped.slice(start, start + perPage);
 
   return (
     <Panel title="PATCH META" icon={TrendingUp} accent="white"
@@ -155,23 +180,28 @@ function MetaTable({ role, patch, pool, save, onOpen }) {
             <span className="t-label text-center">Tier</span>
             <span className="t-label text-center" title="Add to pool / open"> </span>
           </div>
-          <div className="scroll-thin -mr-1 flex-1 overflow-y-auto pr-1">
-            {rows.slice(0, 40).map((c, i) => {
+          <div ref={listRef} className="-mr-1 min-h-0 flex-1 overflow-hidden pr-1"
+               style={cols > 1 ? {
+                 display: "grid", gridAutoFlow: "column", columnGap: "1.25rem",
+                 gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                 gridTemplateRows: `repeat(${perCol}, max-content)`,
+               } : undefined}>
+            {shown.map((c, i) => {
               const tier = TIER_STYLE[c.stats?.tier] || TIER_STYLE[3];
               const added = inPool.has(c.name);
               return (
                 <div key={c.id} onClick={() => onOpen(c)}
                   className={`row row-hover grid cursor-pointer grid-cols-[1.5rem_1fr_3.5rem_3.5rem_2.75rem_2rem] items-center gap-2 px-2 py-1 even:bg-white/[0.015] ${added ? "row-pool" : ""}`}>
-                  <span className="text-center font-mono text-[11px] tabular-nums text-white/35">{i + 1}</span>
+                  <span className="text-center font-mono text-xs tabular-nums text-white/35">{start + i + 1}</span>
                   <div className="flex min-w-0 items-center gap-2">
                     <ChampPortrait slug={c.slug} patch={patch} size="h-7 w-7" title={c.name} round />
-                    <span className="truncate text-[13px] font-semibold text-white/85">{c.name}</span>
+                    <span className="truncate text-base font-semibold text-white/85">{c.name}</span>
                     {added && <Chip tone="accent">pool</Chip>}
                   </div>
-                  <span className="text-right font-mono text-[12px] tabular-nums text-good">{c.stats?.win_rate != null ? `${c.stats.win_rate}%` : "—"}</span>
-                  <span className="text-right font-mono text-[12px] tabular-nums text-white/50">{c.stats?.pick_rate != null ? `${c.stats.pick_rate}%` : "—"}</span>
+                  <span className="text-right font-mono text-sm tabular-nums text-good">{c.stats?.win_rate != null ? `${c.stats.win_rate}%` : "—"}</span>
+                  <span className="text-right font-mono text-sm tabular-nums text-white/50">{c.stats?.pick_rate != null ? `${c.stats.pick_rate}%` : "—"}</span>
                   <span className="flex justify-center">
-                    <span className={`rounded border px-1 py-px text-[10px] font-bold ${tier.cls}`}>{tier.label}</span>
+                    <span className={`rounded border px-1 py-px text-2xs font-bold ${tier.cls}`}>{tier.label}</span>
                   </span>
                   <span className="flex justify-center">
                     <IconButton icon={added ? Star : Plus} active={added} onClick={(e) => addPool(c.name, e)}
@@ -181,6 +211,21 @@ function MetaTable({ role, patch, pool, save, onOpen }) {
               );
             })}
           </div>
+          {pages > 1 && (
+            <div className="mt-1 flex shrink-0 items-center justify-center gap-3 border-t border-white/8 pt-1.5">
+              <button onClick={() => setPage(Math.max(0, curPage - 1))} disabled={curPage === 0}
+                className="grid h-6 w-6 cursor-pointer place-items-center rounded border border-white/12 text-white/50 transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-default disabled:opacity-30">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="font-mono text-xs tabular-nums text-white/45">
+                {start + 1}–{start + shown.length} <span className="text-white/25">/ {capped.length}</span>
+              </span>
+              <button onClick={() => setPage(Math.min(pages - 1, curPage + 1))} disabled={curPage >= pages - 1}
+                className="grid h-6 w-6 cursor-pointer place-items-center rounded border border-white/12 text-white/50 transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-default disabled:opacity-30">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </Panel>
@@ -192,6 +237,7 @@ function MatchesPanel({ patch }) {
   const [matches, setMatches] = useState([]);
   const [matchesLoading, setMatchesLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [listRef, fit] = useFitCount({ rowRem: 2.9, gapRem: 0.125, min: 3, max: 10 });
   useEffect(() => {
     let cancelled = false;
     const load = () => fetchRecentMatches(10)
@@ -215,8 +261,8 @@ function MatchesPanel({ patch }) {
       ) : matches.length === 0 ? (
         <EmptyState icon={History} label="NO GAMES" hint="Recent Summoner's Rift games show here when the client is connected." />
       ) : (
-        <div className="scroll-thin -mr-1 flex-1 space-y-0.5 overflow-y-auto pr-1">
-          {matches.slice(0, 8).map((m) => {
+        <div ref={listRef} className="-mr-1 min-h-0 flex-1 space-y-0.5 overflow-hidden pr-1">
+          {matches.slice(0, fit).map((m) => {
             const win = m.result === "Win";
             const k = m.kda || {};
             return (
@@ -227,13 +273,18 @@ function MatchesPanel({ patch }) {
                 title="Open the AI post-game review"
                 right={
                   <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-[12px] tabular-nums text-white/60">{k.kills}/{k.deaths}/{k.assists}</span>
+                    <span className="font-mono text-sm tabular-nums text-white/60">{k.kills}/{k.deaths}/{k.assists}</span>
                     <WLPill win={win} />
                   </div>
                 }
               />
             );
           })}
+          {matches.length > fit && (
+            <div className="pt-0.5 text-center text-2xs tracking-wide text-white/30">
+              +{matches.length - fit} older game{matches.length - fit === 1 ? "" : "s"}
+            </div>
+          )}
         </div>
       )}
       <AnimatePresence>
@@ -259,7 +310,7 @@ export default function HomeCockpit({ state }) {
       <div className="frost flex items-center gap-3 px-3 py-1.5">
         <span className="t-label">Role</span>
         <RoleTabs role={role} onRole={setRole} />
-        <span className="ml-auto flex items-center gap-1.5 text-[11px] tracking-widest text-white/35">
+        <span className="ml-auto flex items-center gap-1.5 text-xs tracking-widest text-white/35">
           <Crown className="h-4 w-4 text-accent/60" /> {state?.cache?.builds ?? 0} BUILDS
         </span>
       </div>
