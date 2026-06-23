@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.4.0](https://github.com/imperasus/sylqon/compare/v1.3.6...v1.4.0) (2026-06-23)
+
+
+### Features
+
+* **rag:** semantic RAG over Data Dragon for builds, runes, kits and enemy scouting ([8feaf5c](https://github.com/imperasus/sylqon/commit/8feaf5c789e9bbd9c365d0faf1da0521e308e11a))
+
 ### [1.3.5](https://github.com/imperasus/sylqon/compare/v1.3.4...v1.3.5) (2026-06-22)
 
 
