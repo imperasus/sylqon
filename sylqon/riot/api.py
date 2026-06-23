@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
+from urllib.parse import quote
 
 import requests
 
@@ -72,6 +73,19 @@ def get_match_ids(puuid: str, count: int | None = None,
         params=params,
     )
     return result if isinstance(result, list) else []
+
+
+def get_account_by_riot_id(game_name: str, tag_line: str) -> dict | None:
+    """ACCOUNT-V1: resolve a Riot ID (gameName#tagLine) to {puuid, gameName,
+    tagLine}. Used to recover the encrypted PUUID when the LCU only hands back a
+    short internal id that SPECTATOR-V5 rejects. Mass-region endpoint."""
+    if not game_name or not tag_line:
+        return None
+    base = _MASS.format(region=config.RIOT_API_MASS_REGION)
+    return _get(
+        f"{base}/riot/account/v1/accounts/by-riot-id/"
+        f"{quote(game_name, safe='')}/{quote(tag_line, safe='')}"
+    )
 
 
 def get_match(match_id: str) -> dict | None:

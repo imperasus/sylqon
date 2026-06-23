@@ -234,6 +234,10 @@ class PipelineRunner:
         self._self_ranked: dict | None = None
         # Local player's PUUID — set on LCU connect; used for Spectator scouting.
         self._my_puuid: str = ""
+        # Riot ID (gameName, tagLine) from the LCU — lets us recover the encrypted
+        # PUUID via ACCOUNT-V1 when the LCU only gives a short internal id.
+        self._my_riot_id: tuple[str, str] = ("", "")
+        self._resolved_puuid: str = ""   # cached ACCOUNT-V1 result
         self._scout_lock = threading.Lock()
         # Auto post-game review: event-driven off the end-of-game stats block.
         self._last_reviewed_game: str | None = None
@@ -298,6 +302,8 @@ class PipelineRunner:
             summoner = self.client.current_summoner() or {}
             self._summoner_id = summoner.get("summonerId", 0)
             self._my_puuid = summoner.get("puuid", "")
+            self._my_riot_id = (summoner.get("gameName", "") or "",
+                                summoner.get("tagLine", "") or "")
             name = summoner.get("displayName") or summoner.get("gameName") or ""
             self.state.update("lcu", connected=True, summoner=name)
             threading.Thread(target=self._refresh_champion_stats,
@@ -673,12 +679,32 @@ class PipelineRunner:
     def _riot_self_puuid(self) -> str:
         """The PUUID for Riot API calls. The LCU's current-summoner puuid is
         normally the encrypted PUUID, but some clients hand back a short internal
-        UUID that SPECTATOR-V5 rejects with 400 — so fall back to the configured
-        RIOT_SELF_PUUID whenever the LCU value isn't a full encrypted PUUID."""
+        UUID that SPECTATOR-V5 rejects with 400. Resolution order:
+          1. the LCU value, if it's already a full encrypted PUUID (>= 70 chars);
+          2. the configured RIOT_SELF_PUUID override;
+          3. ACCOUNT-V1 lookup by the LCU Riot ID (cached) — so the scout works
+             out of the box with no manual config or .env in packaged builds."""
         lcu = self._my_puuid or ""
         if len(lcu) >= 70:
             return lcu
-        return config.RIOT_SELF_PUUID or lcu
+        if config.RIOT_SELF_PUUID:
+            return config.RIOT_SELF_PUUID
+        if self._resolved_puuid:
+            return self._resolved_puuid
+        game_name, tag_line = self._my_riot_id
+        if game_name and tag_line and config.RIOT_API_KEY:
+            try:
+                from sylqon.riot.api import get_account_by_riot_id
+                acct = get_account_by_riot_id(game_name, tag_line) or {}
+                pu = acct.get("puuid", "")
+                if len(pu) >= 70:
+                    self._resolved_puuid = pu
+                    log.info("Resolved encrypted PUUID via ACCOUNT-V1 for %s#%s",
+                             game_name, tag_line)
+                    return pu
+            except Exception:
+                log.warning("ACCOUNT-V1 PUUID resolution failed", exc_info=True)
+        return lcu
 
     def _stop_live_poller(self) -> None:
         """Tear the poller down on game end and clear the overlay state."""
@@ -695,6 +721,30 @@ class PipelineRunner:
         self._was_in_game = False
         self._schedule_mission_generation()
 
+    def _await_active_game(self, my_puuid: str, attempts: int = 18,
+                           interval: float = 20.0) -> dict | None:
+        """Poll SPECTATOR-V5 until the active game appears, then return it.
+
+        Riot's spectator endpoint lags the actual game start by ~1-2 minutes, so
+        the scout firing at poller start would otherwise get a 404 once and never
+        run. Retry with a fixed interval (interruptible via ``_live_stop`` so it
+        stops the instant the game ends) for up to ``attempts * interval`` seconds.
+        Returns the game dict, or ``None`` if it never appears / the game ended."""
+        from sylqon.riot.api import get_active_game_by_puuid
+        for i in range(attempts):
+            if self._live_stop.is_set():
+                return None
+            game = get_active_game_by_puuid(my_puuid)
+            if isinstance(game, dict):
+                if i:
+                    log.info("Live scout: spectator game available after ~%ds",
+                             int(i * interval))
+                return game
+            # interruptible sleep — returns immediately if the game ends
+            if self._live_stop.wait(interval):
+                return None
+        return None
+
     def _do_live_scout(self, my_puuid: str) -> None:
         """Fetch full fingerprints for all 10 players via Spectator + MATCH APIs,
         detect premade groups from shared matches, and resolve each player's
@@ -703,11 +753,10 @@ class PipelineRunner:
         try:
             from sylqon.riot import api as riot_api
             from sylqon.riot import scout as riot_scout
-            from sylqon.riot.api import get_active_game_by_puuid
 
-            game = get_active_game_by_puuid(my_puuid)
+            game = self._await_active_game(my_puuid)
             if not isinstance(game, dict):
-                log.info("Live scout: spectator game not found for local player")
+                log.info("Live scout: spectator game not found (gave up after retries)")
                 return
             participants = game.get("participants") or []
 
@@ -1231,7 +1280,11 @@ class PipelineRunner:
         """Who to ban for the player's role: the strongest meta champions in the
         lane, boosted when they hard-counter the player's pool, minus anything
         already picked or banned. Degrades to pure meta when counter data is thin."""
-        rows = self._meta_positions().get(ctx.my_role, [])
+        # meta_report.json is the primary source, but it is never written by the
+        # app (only shipped/seeded), so packaged builds lack it — fall back to the
+        # synced DB tier list (the same source as the Patch Meta panel) so ban
+        # suggestions appear whenever op.gg has been synced.
+        rows = self._meta_positions().get(ctx.my_role, []) or self._db_role_rows(ctx.my_role)
         if not rows:
             return []
         taken = ({e.name for e in ctx.enemies} | {a.name for a in ctx.allies}
@@ -1511,6 +1564,35 @@ class PipelineRunner:
         return dict(self._champ_stats)
 
     # ------------------------------------------------------- meta scout
+    def _db_role_rows(self, role: str) -> list[dict]:
+        """Role tier rows from the synced SQLite DB (same data the Patch Meta
+        panel uses), shaped like ``_meta_positions`` rows. Fallback for ban
+        suggestions when ``meta_report.json`` is absent. Best-effort: [] on any
+        error."""
+        from sylqon.db.session import get_session
+        from sylqon.db import queries
+        try:
+            session = get_session()
+        except Exception:
+            return []
+        try:
+            champs = queries.champions_for_role(session, role)
+            rows = [{
+                "champion": c.name,
+                "slug": c.slug,
+                "tier": ((c.op_gg_stats or {}).get(role) or {}).get("tier"),
+                "win_rate": ((c.op_gg_stats or {}).get(role) or {}).get("win_rate"),
+                "pick_rate": ((c.op_gg_stats or {}).get(role) or {}).get("pick_rate"),
+            } for c in champs]
+        except Exception:
+            log.debug("DB role-rows fallback failed for %s", role, exc_info=True)
+            return []
+        finally:
+            session.close()
+        rows.sort(key=lambda r: (r["tier"] if r["tier"] is not None else 9,
+                                 -(r["win_rate"] or 0)))
+        return rows
+
     def _meta_positions(self) -> dict[str, list[dict]]:
         try:
             raw = json.loads(config.META_REPORT_PATH.read_text(encoding="utf-8"))
