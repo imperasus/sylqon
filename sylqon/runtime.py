@@ -831,37 +831,61 @@ class PipelineRunner:
         """Merge Riot-scouted players into the scout state. Existing ally LCU
         fingerprints are kept (they're richer), but the Riot-only fields — rank,
         account summary, premade group, and current-champ stats — are overlaid
-        onto them so the live board has the full read for everyone."""
+        onto them so the live board has the full read for everyone.
+
+        Allies are matched to their existing LCU entry by puuid, falling back to
+        riot-name when the puuids disagree: champ select / current-summoner can
+        hand back a short internal id while SPECTATOR-V5 returns the encrypted
+        puuid, so a puuid-only merge would never collapse the two sources and the
+        board would show 5 + 10 = 15 cards instead of 10."""
         current = self.state.snapshot().get("scout") or {}
         existing: list[dict] = current.get("players") or []
         by_puuid: dict[str, dict] = {
             p.get("puuid", ""): p for p in existing if p.get("puuid")
         }
+
+        def _name_key(p: dict) -> str:
+            return (p.get("name") or "").strip().casefold()
+
+        by_name: dict[str, dict] = {
+            _name_key(p): p for p in existing if _name_key(p)
+        }
+
         merged: list[dict] = []
-        seen: set[str] = set()
+        seen_puuids: set[str] = set()   # spectator puuids re-added this pass
+        consumed: set[int] = set()      # id() of existing entries folded into a row
         for p in players:
             pu = p.get("puuid") or ""
-            seen.add(pu)
-            if pu and pu in by_puuid and p.get("side") == "ally":
-                # Keep the richer LCU fingerprint; overlay the Riot-only fields.
-                base = by_puuid[pu]
-                entry = {
+            if pu:
+                seen_puuids.add(pu)
+            base = by_puuid.get(pu)
+            if base is None and p.get("side") == "ally":
+                base = by_name.get(_name_key(p))  # puuid-format mismatch fallback
+            if base is not None and p.get("side") == "ally":
+                # Keep the richer LCU fingerprint; overlay the Riot-only fields and
+                # adopt the spectator puuid so premade lookups stay consistent.
+                consumed.add(id(base))
+                merged.append({
                     **base,
+                    "puuid": pu or base.get("puuid", ""),
                     "rank": base.get("rank") or p.get("rank", ""),
                     "account": p.get("account") or base.get("account"),
                     "current_champ": p.get("current_champ"),
                     "premade_group": p.get("premade_group"),
                     "premade_partners": p.get("premade_partners"),
                     "champion_id": p.get("champion_id", base.get("champion_id")),
-                }
-                merged.append(entry)
+                })
             else:
                 merged.append(p)
-        # Preserve any existing entry (e.g. hidden ally) not in spectator response.
+        # Preserve existing entries the spectator never covered — a hidden ally, or
+        # every ally when there's no Riot API key / it's a custom game (the LCU
+        # champ-select scout is then the only ally data we have).
         for p in existing:
-            pu = p.get("puuid") or ""
-            if pu not in seen:
-                merged.append(p)
+            if id(p) in consumed:
+                continue
+            if (p.get("puuid") or "") in seen_puuids:
+                continue  # spectator already re-added this player (e.g. an enemy)
+            merged.append(p)
         self.state.set("scout", {**current, "players": merged,
                                   "premade_groups": premade_groups,
                                   "ready": True, "at": time.time()})

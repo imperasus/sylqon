@@ -138,3 +138,87 @@ def test_db_role_rows_shapes_and_sorts(monkeypatch):
     rows = r._db_role_rows("bottom")
     assert [x["champion"] for x in rows] == ["Aatrox", "Garen"]  # tier 1 first
     assert rows[0]["win_rate"] == 52.0 and rows[0]["slug"] == "Aatrox"
+
+
+# ----------------------------------------------- live-scout merge dedup
+def _ally(name, puuid, games=12):
+    """An existing LCU champ-select ally entry (the richer fingerprint)."""
+    return {"name": name, "puuid": puuid, "side": "ally", "position": "top",
+            "is_self": False, "games_analyzed": games,
+            "champion_pool": [{"champion_id": 1}], "rank": ""}
+
+
+def _spec(name, puuid, side, champion_id=64):
+    """A spectator-scouted player entry as built by _do_live_scout."""
+    return {"name": name, "puuid": puuid, "side": side, "position": "top",
+            "games_analyzed": 5, "champion_id": champion_id,
+            "rank": "G2 · 50 LP", "account": {"rank": "G2 · 50 LP"},
+            "current_champ": {"games": 3}, "premade_group": None,
+            "premade_partners": None}
+
+
+_ENC = lambda i: f"ENC{'x' * 72}{i}"   # spectator-style encrypted puuid
+_ENE = lambda i: f"ENE{'x' * 72}{i}"
+
+
+def test_on_live_scout_dedups_allies_by_name_when_puuids_differ():
+    # The 15-instead-of-10 bug: champ select gives short ids, spectator gives
+    # encrypted puuids, so the puuid-only merge never collapsed the two sources.
+    r = _runner()
+    allies = [_ally(f"Ally{i}", f"short-{i}") for i in range(5)]
+    r.state.set("scout", {"players": allies, "ready": True, "at": 0})
+    spectator = ([_spec(f"Ally{i}", _ENC(i), "ally") for i in range(5)]
+                 + [_spec(f"Enemy{i}", _ENE(i), "enemy") for i in range(5)])
+
+    r._on_live_scout(spectator, premade_groups=0)
+    out = r.state.snapshot()["scout"]["players"]
+
+    assert len(out) == 10
+    a0 = next(p for p in out if p["name"] == "Ally0")
+    assert a0["games_analyzed"] == 12     # richer LCU fingerprint kept
+    assert a0["puuid"] == _ENC(0)         # spectator puuid adopted for premades
+    assert a0["rank"] == "G2 · 50 LP"     # Riot-only field overlaid
+    assert a0["current_champ"] == {"games": 3}
+
+
+def test_on_live_scout_dedups_allies_by_puuid_with_differing_name():
+    # When the puuids DO match, a differing spectator name must not split the row.
+    r = _runner()
+    allies = [_ally(f"Ally{i}", _ENC(i)) for i in range(5)]
+    r.state.set("scout", {"players": allies})
+    spectator = ([_spec(f"DiffName{i}", _ENC(i), "ally") for i in range(5)]
+                 + [_spec(f"Enemy{i}", _ENE(i), "enemy") for i in range(5)])
+
+    r._on_live_scout(spectator)
+    out = r.state.snapshot()["scout"]["players"]
+
+    assert len(out) == 10
+    a0 = next(p for p in out if p["puuid"] == _ENC(0))
+    assert a0["games_analyzed"] == 12     # matched by puuid, LCU value kept
+
+
+def test_on_live_scout_is_idempotent():
+    # A second spectator pass must not duplicate enemies (no stable LCU puuid).
+    r = _runner()
+    allies = [_ally(f"Ally{i}", f"short-{i}") for i in range(5)]
+    r.state.set("scout", {"players": allies})
+    spectator = ([_spec(f"Ally{i}", _ENC(i), "ally") for i in range(5)]
+                 + [_spec(f"Enemy{i}", _ENE(i), "enemy") for i in range(5)])
+
+    r._on_live_scout(spectator)
+    r._on_live_scout(spectator)
+    out = r.state.snapshot()["scout"]["players"]
+
+    assert len(out) == 10
+
+
+def test_on_live_scout_preserves_ally_spectator_never_covered():
+    # No Riot API key / custom game: spectator can't cover an ally, so the
+    # LCU-only entry must survive instead of vanishing from the board.
+    r = _runner()
+    r.state.set("scout", {"players": [_ally("Ghost", "short-ghost")]})
+
+    r._on_live_scout([_spec("Other", _ENC(0), "ally")])
+    out = r.state.snapshot()["scout"]["players"]
+
+    assert sorted(p["name"] for p in out) == ["Ghost", "Other"]
