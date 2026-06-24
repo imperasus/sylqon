@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.4.3](https://github.com/imperasus/sylqon/compare/v1.4.2...v1.4.3) (2026-06-24)
+
+
+### Bug Fixes
+
+* **live:** dedupe live-scout roster by name when puuids differ ([be5209a](https://github.com/imperasus/sylqon/commit/be5209a))
+
 ### [1.4.2](https://github.com/imperasus/sylqon/compare/v1.4.1...v1.4.2) (2026-06-24)
 
 
