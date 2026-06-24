@@ -229,6 +229,10 @@ release/
 
 # Databases (generated at runtime)
 *.db
+# SQLite WAL/SHM sidecar files (not matched by *.db)
+*.db-wal
+*.db-shm
+*.db-journal
 
 # Runtime cache & reports (regenerated)
 /cache/
