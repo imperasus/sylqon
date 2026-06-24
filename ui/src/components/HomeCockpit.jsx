@@ -171,14 +171,25 @@ function MetaTable({ role, patch, pool, save, onOpen }) {
         <EmptyState icon={TrendingUp} label="NO META DATA" hint="Hit SYNC to pull the tier list from op.gg." />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* sticky header */}
-          <div className="grid grid-cols-[1.5rem_1fr_3.5rem_3.5rem_2.75rem_2rem] items-center gap-2 border-b border-white/10 px-2 pb-1.5">
-            <span className="t-label text-center">#</span>
-            <span className="t-label">Champion</span>
-            <span className="t-label text-right" title="Win rate">WR</span>
-            <span className="t-label text-right" title="Pick rate">PR</span>
-            <span className="t-label text-center">Tier</span>
-            <span className="t-label text-center" title="Add to pool / open"> </span>
+          {/* sticky header — one labelled group per body column so the WR/PR/Tier
+              headers sit above BOTH columns on a wide (2-up) layout, not just the
+              right one. Mirrors the body grid (same gap + columnGap). */}
+          <div className="border-b border-white/10"
+               style={cols > 1 ? {
+                 display: "grid", columnGap: "1.25rem",
+                 gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+               } : undefined}>
+            {Array.from({ length: cols }).map((_, i) => (
+              <div key={i}
+                   className="grid grid-cols-[1.5rem_1fr_3.5rem_3.5rem_2.75rem_2rem] items-center gap-2 px-2 pb-1.5">
+                <span className="t-label text-center">#</span>
+                <span className="t-label">Champion</span>
+                <span className="t-label text-right" title="Win rate">WR</span>
+                <span className="t-label text-right" title="Pick rate">PR</span>
+                <span className="t-label text-center">Tier</span>
+                <span className="t-label text-center" title="Add to pool / open"> </span>
+              </div>
+            ))}
           </div>
           <div ref={listRef} className="-mr-1 min-h-0 flex-1 overflow-hidden pr-1"
                style={cols > 1 ? {

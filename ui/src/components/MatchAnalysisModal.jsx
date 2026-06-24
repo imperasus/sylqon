@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { AlertTriangle, Lightbulb, Loader2, ThumbsUp, X } from "lucide-react";
 import { fetchMatchAnalysis } from "../api.js";
@@ -42,7 +43,7 @@ export default function MatchAnalysisModal({ match, patch, onClose }) {
       </div>
     ) : null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-4" onClick={onClose}>
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
@@ -100,6 +101,7 @@ export default function MatchAnalysisModal({ match, patch, onClose }) {
           </div>
         )}
       </motion.div>
-    </div>
+    </div>,
+    document.body,
   );
 }
