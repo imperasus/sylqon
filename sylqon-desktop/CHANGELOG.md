@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.4.2](https://github.com/imperasus/sylqon/compare/v1.4.1...v1.4.2) (2026-06-24)
+
+
+### Bug Fixes
+
+* **ui:** align Patch Meta 2-up header and portal the match-review modal ([efcc6a3](https://github.com/imperasus/sylqon/commit/efcc6a369745df23a051e84ed1c4bf13eedb6b6e))
+
 ### [1.4.1](https://github.com/imperasus/sylqon/compare/v1.4.0...v1.4.1) (2026-06-23)
 
 
