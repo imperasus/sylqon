@@ -63,6 +63,7 @@ class MatchContext:
     enemy_picks_after_me: int = 0      # enemy pick actions still to come after ours
     ally_picks_after_me: int = 0       # ally pick actions still to come after ours
     is_last_pick: bool = False         # our pick is the last one in the draft order
+    my_ban_turn: bool = False          # our ban action is in progress (act on a ban now)
 
     def trigger_signature(self) -> str:
         """Signature of the *meaningful* draft state — the bits that should
@@ -183,6 +184,17 @@ def _is_my_turn(session: dict, cell_id: int) -> bool:
     for group in session.get("actions", []):
         for a in group:
             if (a.get("actorCellId") == cell_id and a.get("type") == "pick"
+                    and a.get("isInProgress") and not a.get("completed")):
+                return True
+    return False
+
+
+def _is_my_ban_turn(session: dict, cell_id: int) -> bool:
+    """True while our own ban action is the one in progress — the moment to act on
+    a ban suggestion. Mirrors :func:`_is_my_turn` for ``type == "ban"``."""
+    for group in session.get("actions", []):
+        for a in group:
+            if (a.get("actorCellId") == cell_id and a.get("type") == "ban"
                     and a.get("isInProgress") and not a.get("completed")):
                 return True
     return False
@@ -355,6 +367,7 @@ def read_match_context(client: LCUClient, catalog: Catalog,
                                       me.get("assignedPosition", "")) or "middle"
     all_locked = _all_players_locked(session)
     my_turn = _is_my_turn(session, cell_id)
+    my_ban_turn = _is_my_ban_turn(session, cell_id)
     bans = _banned_champions(session)
     ban_slots = parse_bans(session, catalog)
     enemy_after, ally_after, is_last = _pick_timing(session, cell_id)
@@ -378,4 +391,5 @@ def read_match_context(client: LCUClient, catalog: Catalog,
         enemy_picks_after_me=enemy_after,
         ally_picks_after_me=ally_after,
         is_last_pick=is_last,
+        my_ban_turn=my_ban_turn,
     )

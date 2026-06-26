@@ -518,6 +518,27 @@ function PoolScored({ scored, pick, slugOf, patch }) {
   );
 }
 
+/* Elevated ban recommendation, shown only while it's the player's ban turn. It
+   surfaces the existing #1 ban_suggestions entry at the decisive moment; the
+   passive bottom "TO BAN" strip still lists all three. */
+function BanBanner({ suggestion, patch }) {
+  if (!suggestion) return null;
+  return (
+    <div className="flex items-center gap-2.5 rounded-md border border-enemy/45 bg-enemy/10 px-3 py-2">
+      <Ban className="h-4 w-4 shrink-0 text-enemy" />
+      <ChampPortrait slug={suggestion.slug} patch={patch} size="h-10 w-10" accent="enemy" title={suggestion.name} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="t-label text-enemy/80">BAN NOW</span>
+          <span className="truncate font-display text-md font-bold text-white/90">{suggestion.name}</span>
+          {suggestion.tier != null && <span className="text-2xs text-white/40">T{suggestion.tier}</span>}
+        </div>
+        {suggestion.reason && <div className="truncate text-xs text-white/55">{suggestion.reason}</div>}
+      </div>
+    </div>
+  );
+}
+
 export default function DraftCockpit({ state }) {
   const { champions } = useStaticData();
   const lobby = state?.lobby;
@@ -576,6 +597,7 @@ export default function DraftCockpit({ state }) {
                     patch={patch} comp={allyComp} scoutByRole={scoutByRole} />
 
         <div className="flex min-h-0 flex-col gap-2 overflow-hidden pr-0.5">
+          <BanBanner suggestion={intel?.ban_now ? intel?.ban_suggestions?.[0] : null} patch={patch} />
           <TimingBanner timing={intel?.counter_pick} />
           <DraftScorecard balance={intel?.balance} />
           <RecoCard reco={reco} role={lobby.my_role} slugOf={slugOf} patch={patch} />

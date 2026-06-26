@@ -1274,6 +1274,7 @@ class PipelineRunner:
                 ally_comp, enemy_comp,
                 self._ally_summary(ctx), ctx.team_threat_summary()),
             "counter_pick": draft_intel.counter_pick_advice(ctx),
+            "ban_now": ctx.my_ban_turn,
             "flex_warnings": self._flex_warnings(ctx),
             "ban_suggestions": self._ban_suggestions(ctx),
             "bans": [self.catalog.champion_name(cid) for cid in ctx.bans

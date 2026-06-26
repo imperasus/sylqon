@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sylqon.analysis import draft_intel
 from sylqon.lcu.lobby import (
-    ChampPick, MatchContext, _banned_champions, _pick_timing,
+    ChampPick, MatchContext, _banned_champions, _is_my_ban_turn, _pick_timing,
     display_signature, parse_bans,
 )
 
@@ -181,6 +181,30 @@ def test_parse_bans_empty_when_no_bans():
 
 
 # -- display signature must react to bans (real-time gate) -------------------
+def test_is_my_ban_turn():
+    cell = 0
+
+    def session(actions):
+        return {"actions": [actions]}
+
+    # Our ban action is in progress → it's our ban turn.
+    assert _is_my_ban_turn(session([
+        {"type": "ban", "actorCellId": cell, "isInProgress": True, "completed": False},
+    ]), cell) is True
+    # A completed ban for us is no longer our turn.
+    assert _is_my_ban_turn(session([
+        {"type": "ban", "actorCellId": cell, "isInProgress": False, "completed": True},
+    ]), cell) is False
+    # An in-progress PICK for us is the pick turn, not a ban turn.
+    assert _is_my_ban_turn(session([
+        {"type": "pick", "actorCellId": cell, "isInProgress": True, "completed": False},
+    ]), cell) is False
+    # Another cell banning is not our turn.
+    assert _is_my_ban_turn(session([
+        {"type": "ban", "actorCellId": 5, "isInProgress": True, "completed": False},
+    ]), cell) is False
+
+
 def test_display_signature_moves_when_ban_completes():
     base = {
         "localPlayerCellId": 0,
