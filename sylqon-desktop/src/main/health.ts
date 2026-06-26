@@ -31,3 +31,48 @@ export function checkBackend(url: string, timeoutMs = 2500): Promise<boolean> {
     }
   });
 }
+
+/**
+ * GET `url` and parse the JSON body. Resolves `null` on any error (unreachable,
+ * non-2xx, timeout, bad JSON) so callers can simply skip when the backend isn't
+ * ready. Read-only; same http/https + timeout shape as `checkBackend`.
+ */
+export function fetchJson<T = any>(url: string, timeoutMs = 2500): Promise<T | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (v: T | null) => {
+      if (!settled) {
+        settled = true;
+        resolve(v);
+      }
+    };
+    try {
+      const lib = url.startsWith("https") ? https : http;
+      const req = lib.get(url, (res) => {
+        if (!res.statusCode || res.statusCode >= 400) {
+          res.resume();
+          return done(null);
+        }
+        let body = "";
+        res.setEncoding("utf-8");
+        res.on("data", (chunk) => {
+          body += chunk;
+        });
+        res.on("end", () => {
+          try {
+            done(JSON.parse(body) as T);
+          } catch {
+            done(null);
+          }
+        });
+      });
+      req.setTimeout(timeoutMs, () => {
+        req.destroy();
+        done(null);
+      });
+      req.on("error", () => done(null));
+    } catch {
+      done(null);
+    }
+  });
+}

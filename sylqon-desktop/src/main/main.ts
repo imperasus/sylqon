@@ -4,10 +4,12 @@ import {
   getBaseUrl,
   getClickThroughHotkey,
   getDashboardUrl,
+  getOverlayAutoDefault,
   getToggleHotkey,
 } from "./config";
 import { resolveAppIcon } from "./icon";
 import {
+  applyGameActive,
   createOverlayWindow,
   destroyOverlay,
   toggleClickThrough,
@@ -15,7 +17,7 @@ import {
 } from "./overlay";
 import { startBackend, stopBackend } from "./backend";
 import { createTray, destroyTray, notifyTray } from "./tray";
-import { checkBackend } from "./health";
+import { checkBackend, fetchJson } from "./health";
 import { setupAutoUpdates, attachUpdateBanner, checkForUpdatesManual } from "./updater";
 import { getSavedMainBounds, saveMainBounds } from "./store";
 
@@ -37,8 +39,12 @@ import { getSavedMainBounds, saveMainBounds } from "./store";
 
 let mainWindow: BrowserWindow | null = null;
 let healthPoll: ReturnType<typeof setInterval> | null = null;
+let overlayAutoPoll: ReturnType<typeof setInterval> | null = null;
 let isQuitting = false; // true only once the user really wants to exit
 let trayBalloonShown = false;
+
+// How often to poll the backend game state for auto show/hide of the overlay.
+const OVERLAY_POLL_MS = 2500;
 
 const STATIC_PAGE = (name: string) =>
   path.join(app.getAppPath(), "static", name);
@@ -218,6 +224,33 @@ function registerHotkeys(): void {
   }
 }
 
+/**
+ * Auto show/hide the overlay by polling the backend game state. Shows it when a
+ * game becomes active, hides it when the game ends; the F10 hotkey still works as
+ * a manual override (overlay.applyGameActive only acts on edges). Disabled via
+ * SYLQON_OVERLAY_AUTO=0 / `autoOverlay: false`.
+ */
+function startOverlayAutoToggle(): void {
+  if (!getOverlayAutoDefault()) {
+    console.log("[sylqon-desktop] overlay auto show/hide disabled (manual F10 only)");
+    return;
+  }
+  const stateUrl = getBaseUrl() + "/api/state";
+  overlayAutoPoll = setInterval(async () => {
+    const data = await fetchJson<{ overlay?: { active?: boolean }; live?: { active?: boolean } }>(stateUrl);
+    if (!data) return; // backend not ready / unreachable → leave state unchanged
+    applyGameActive(!!(data.overlay?.active || data.live?.active));
+  }, OVERLAY_POLL_MS);
+  console.log("[sylqon-desktop] overlay auto show/hide enabled");
+}
+
+function stopOverlayAutoToggle(): void {
+  if (overlayAutoPoll) {
+    clearInterval(overlayAutoPoll);
+    overlayAutoPoll = null;
+  }
+}
+
 // --- IPC from the backend-down page (only source of these messages) ---------
 ipcMain.on("sylqon:retry", () => {
   if (mainWindow && !mainWindow.isDestroyed()) loadMainContent(mainWindow);
@@ -247,6 +280,8 @@ if (!app.requestSingleInstanceLock()) {
     // Create the overlay up front (hidden) so the first hotkey press is instant.
     createOverlayWindow();
     registerHotkeys();
+    // Auto show/hide the overlay as games start/end (F10 still overrides).
+    startOverlayAutoToggle();
     createTray({ showMainWindow, checkForUpdates: checkForUpdatesManual, quit: quitApp });
 
     // Check for updates silently and surface an in-app banner if one is found
@@ -264,6 +299,7 @@ app.on("before-quit", () => {
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
   stopHealthPoll();
+  stopOverlayAutoToggle();
   destroyOverlay();
   destroyTray();
   stopBackend();

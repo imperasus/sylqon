@@ -99,23 +99,52 @@ export function createOverlayWindow(): BrowserWindow {
   return overlayWindow;
 }
 
-/** Show the overlay if hidden, hide it if shown. Never steals focus on show. */
-export function toggleOverlay(): void {
+/** Show the overlay without stealing focus (creates it if needed). */
+function showOverlay(): void {
   if (!overlayWindow || overlayWindow.isDestroyed()) {
     createOverlayWindow();
   }
   const win = overlayWindow!;
-
-  if (win.isVisible()) {
-    win.hide();
-    return;
-  }
-
+  if (win.isVisible()) return;
   placeOverlay(win);
   applyClickThrough(win); // re-assert in case it changed while hidden
   // showInactive: appear WITHOUT stealing focus from the game.
   win.showInactive();
   win.setAlwaysOnTop(true, "screen-saver");
+}
+
+/** Hide the overlay if it is currently shown. */
+function hideOverlay(): void {
+  if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+    overlayWindow.hide();
+  }
+}
+
+/** Show the overlay if hidden, hide it if shown. Never steals focus on show. */
+export function toggleOverlay(): void {
+  if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+    hideOverlay();
+  } else {
+    showOverlay();
+  }
+}
+
+// Last game-active state seen by the auto-toggle, so we only act on edges (and a
+// manual F10 toggle between edges is respected).
+let lastGameActive: boolean | null = null;
+
+/**
+ * Auto show/hide the overlay from the backend game state. Edge-triggered: the
+ * overlay pops up when a game becomes active and hides when it ends, but we do
+ * NOT re-assert every poll — so if the user manually hid it with F10 mid-game it
+ * stays hidden until the next game. Riot-safe: this only flips a normal window's
+ * visibility based on a value the backend already publishes.
+ */
+export function applyGameActive(active: boolean): void {
+  if (active === lastGameActive) return;
+  lastGameActive = active;
+  if (active) showOverlay();
+  else hideOverlay();
 }
 
 /** Toggle whether clicks pass through the overlay to the window below. */

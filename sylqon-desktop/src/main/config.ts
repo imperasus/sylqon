@@ -25,6 +25,7 @@ interface FileConfig {
   toggleHotkey?: string;
   clickThroughHotkey?: string;
   clickThrough?: boolean;
+  autoOverlay?: boolean;
 }
 
 /**
@@ -129,4 +130,18 @@ export function getClickThroughDefault(): boolean {
   const fileVal = getFileConfig().clickThrough;
   if (typeof fileVal === "boolean") return fileVal;
   return false;
+}
+
+/**
+ * Whether the overlay auto shows when a game starts and hides when it ends
+ * (the manual F10 toggle still works as an override). Default true. Env:
+ * SYLQON_OVERLAY_AUTO ("0"/"false" to disable), file: autoOverlay.
+ */
+export function getOverlayAutoDefault(): boolean {
+  const raw = process.env.SYLQON_OVERLAY_AUTO?.trim().toLowerCase();
+  if (raw === "1" || raw === "true" || raw === "yes") return true;
+  if (raw === "0" || raw === "false" || raw === "no") return false;
+  const fileVal = getFileConfig().autoOverlay;
+  if (typeof fileVal === "boolean") return fileVal;
+  return true;
 }
