@@ -8,8 +8,8 @@ import { DAMAGE_COLORS, ROLE_LABELS, TIER_STYLE, itemUrl, spellUrl } from "../as
 import { useBuildVariants } from "../hooks/useBuildVariants.js";
 import { useElementRem } from "../hooks/useFitCount.js";
 import {
-  ChampPortrait, Chip, EmptyState, Panel, Score100, ScorePill, SectionTitle,
-  Tabs, ThreatBadge,
+  ChampPortrait, Chip, DraftScorecard, EmptyState, Panel, Score100, ScorePill,
+  SectionTitle, Tabs, ThreatBadge,
 } from "./shared.jsx";
 
 const EMPTY_DIFF = { added: [], removed: [] };
@@ -552,9 +552,10 @@ export default function PostlockCockpit({ state, api }) {
           <ItemsPanel build={activeBuild} patch={patch} enemySummary={enemySummary} dense={itemsDense} />
         </div>
 
-        {/* Right — runes + team-wide stats / enemy comp. */}
+        {/* Right — runes + draft win% + team-wide stats / enemy comp. */}
         <div className="flex min-h-0 flex-col gap-2.5 overflow-hidden pr-0.5">
           <RunesPanel build={activeBuild} />
+          <DraftScorecard balance={intel?.balance} />
           <TeamStats lobby={lobby} intel={intel} />
         </div>
       </div>

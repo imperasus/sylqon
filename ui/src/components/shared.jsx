@@ -1,3 +1,4 @@
+import { Gauge } from "lucide-react";
 import { squareUrl, spellUrl, THREAT_LABELS } from "../assets.js";
 
 /* Summoner-spell icons with hover tooltip = description. */
@@ -150,6 +151,56 @@ export function Bar({ value = 0, tone = "accent" }) {
     <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
       <div className={`h-full ${bg}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
     </div>
+  );
+}
+
+const SCORE_TONE = {
+  good: { text: "text-good", bg: "bg-good" },
+  bad: { text: "text-bad", bg: "bg-bad" },
+  amber: { text: "text-amber", bg: "bg-amber" },
+};
+
+/* Estimated draft win% — head-to-head composition balance read.
+   balance: { win_pct, label, tone, confidence, drivers:[{text, sign}] }.
+   Below ~40% confidence (sparse draft) it shows a READING… state instead of a
+   misleadingly precise number. Reused by the live draft and post-lock views. */
+export function DraftScorecard({ balance }) {
+  if (!balance) return null;
+  const win = Math.max(0, Math.min(100, balance.win_pct ?? 50));
+  const reading = (balance.confidence ?? 0) < 40;
+  const t = SCORE_TONE[balance.tone] || SCORE_TONE.amber;
+  const lo = Math.min(50, win), hi = Math.max(50, win);
+  return (
+    <Panel title="DRAFT WIN %" icon={Gauge} accent="accent"
+           right={reading
+             ? <span className="text-2xs font-bold tracking-widest text-white/35">READING…</span>
+             : <Chip tone={balance.tone}>{balance.label}</Chip>}>
+      <div className="flex items-center gap-3">
+        <div className="flex shrink-0 flex-col items-center leading-none"
+             title="Deterministic estimate from comp archetypes, damage balance, frontline and lane matchup — not a trained model.">
+          <span className={`font-display text-3xl font-extrabold tabular-nums ${reading ? "text-white/30" : t.text}`}>
+            {win}<span className="text-lg">%</span>
+          </span>
+          <span className="mt-0.5 text-3xs font-bold tracking-[0.2em] text-white/35">EST.</span>
+        </div>
+        <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/8">
+          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/25" />
+          {!reading && (
+            <div className={`absolute inset-y-0 ${t.bg}`}
+                 style={{ left: `${lo}%`, width: `${hi - lo}%` }} />
+          )}
+        </div>
+      </div>
+      {!reading && balance.drivers?.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {balance.drivers.map((d) => (
+            <Chip key={d.text} tone={d.sign > 0 ? "good" : "bad"}>
+              {d.sign > 0 ? "+" : "−"} {d.text}
+            </Chip>
+          ))}
+        </div>
+      )}
+    </Panel>
   );
 }
 

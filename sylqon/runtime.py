@@ -1265,9 +1265,14 @@ class PipelineRunner:
                        "damage_type": _damage_type(info),
                        "threats": _threats(ctx.my_champion)}
         ally_picks = list(ctx.allies) + ([my_pick] if my_pick else [])
+        enemy_comp = draft_intel.classify_comp(ctx.enemies)
+        ally_comp = draft_intel.classify_comp(ally_picks)
         return {
-            "enemy_comp": draft_intel.classify_comp(ctx.enemies),
-            "ally_comp": draft_intel.classify_comp(ally_picks),
+            "enemy_comp": enemy_comp,
+            "ally_comp": ally_comp,
+            "balance": draft_intel.draft_balance(
+                ally_comp, enemy_comp,
+                self._ally_summary(ctx), ctx.team_threat_summary()),
             "counter_pick": draft_intel.counter_pick_advice(ctx),
             "flex_warnings": self._flex_warnings(ctx),
             "ban_suggestions": self._ban_suggestions(ctx),

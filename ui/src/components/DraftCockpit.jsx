@@ -4,7 +4,8 @@ import { useStaticData } from "../api.js";
 import { useElementRem, useFitCount } from "../hooks/useFitCount.js";
 import { DAMAGE_COLORS, ROLE_LABELS, pct, squareUrl } from "../assets.js";
 import {
-  Bar, ChampPortrait, ChampionRow, Chip, Panel, Score100, SpellPips, ThreatBadge,
+  Bar, ChampPortrait, ChampionRow, Chip, DraftScorecard, Panel, Score100,
+  SpellPips, ThreatBadge,
 } from "./shared.jsx";
 
 /* Segmented progress: one cell per draft slot, lit as picks lock in. */
@@ -576,6 +577,7 @@ export default function DraftCockpit({ state }) {
 
         <div className="flex min-h-0 flex-col gap-2 overflow-hidden pr-0.5">
           <TimingBanner timing={intel?.counter_pick} />
+          <DraftScorecard balance={intel?.balance} />
           <RecoCard reco={reco} role={lobby.my_role} slugOf={slugOf} patch={patch} />
           <RoleTop recs={reco?.role_top} patch={patch} />
           <PoolScored scored={reco?.scored} pick={reco?.pick} slugOf={slugOf} patch={patch} />
