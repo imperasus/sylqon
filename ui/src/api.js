@@ -189,6 +189,12 @@ export async function fetchRecentMatches(limit = 10) {
 export async function fetchMatchAnalysis(id) {
   return (await fetch(`/api/matches/${id}/analysis`)).json();
 }
+export async function fetchMacroCoach() {
+  return (await fetch(`/api/coach`)).json();
+}
+export async function refreshMacroCoach() {
+  return (await fetch(`/api/coach/refresh`, { method: "POST" })).json();
+}
 export async function fetchProBuilds(champion, role = "") {
   const q = new URLSearchParams({ champion, ...(role ? { role } : {}) });
   return (await fetch(`/api/pro-builds?${q}`)).json();

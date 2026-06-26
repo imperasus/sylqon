@@ -226,3 +226,17 @@ class MatchAnalysis(Base):
     generated_at = Column(DateTime, default=datetime.utcnow)
 
     match = relationship("MatchHistory", back_populates="analysis")
+
+
+class MacroCoachReport(Base):
+    """Cached account-level coaching synthesis (the AI Macro Coach "top 3").
+    Regenerated when ``based_on_game_id`` no longer matches the newest stored
+    game (i.e. fresh games have been played). The deterministic scorecard is
+    computed live each request; only the LLM prose is cached here."""
+    __tablename__ = "macro_coach_reports"
+
+    id = Column(Integer, primary_key=True)
+    based_on_game_id = Column(String)   # newest game_id at generation time
+    narrative = Column(String)
+    priorities = Column(JSON)           # [{title, detail}]
+    generated_at = Column(DateTime, default=datetime.utcnow)

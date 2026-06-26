@@ -13,6 +13,7 @@ import {
 } from "./shared.jsx";
 import ChampionDetailModal from "./ChampionDetailModal.jsx";
 import MatchAnalysisModal from "./MatchAnalysisModal.jsx";
+import MacroCoach from "./MacroCoach.jsx";
 
 function RoleTabs({ role, onRole }) {
   return (
@@ -325,6 +326,8 @@ export default function HomeCockpit({ state }) {
           <Crown className="h-4 w-4 text-accent/60" /> {state?.cache?.builds ?? 0} BUILDS
         </span>
       </div>
+
+      <MacroCoach />
 
       <div className="grid min-h-0 flex-1 grid-cols-[1.1fr_2fr_1.1fr] gap-4">
         <PoolPanel role={role} pool={pool} champions={champions} patch={patch} stats={stats} scout={scout} save={save} />

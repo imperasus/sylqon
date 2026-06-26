@@ -358,6 +358,64 @@ def post_game() -> dict:
     return runner.state.snapshot().get("post_game") or {"active": False}
 
 
+def _coach_payload(force: bool = False) -> dict:
+    """Shared logic for GET /api/coach and POST /api/coach/refresh: sync recent
+    games, compute the deterministic scorecard, and attach the cached (or freshly
+    generated) LLM 'top 3'. The scorecard is always returned; the priorities
+    degrade gracefully when Ollama is offline."""
+    from sylqon.analysis.macro_coach import build_scorecard
+    from sylqon.ai.macro_coach_prompt import MacroCoachAnalyzer
+    from sylqon.db.schema import MacroCoachReport
+
+    session = get_session()
+    try:
+        if runner.client is not None and runner.client.is_alive():
+            try:
+                match_store.sync_recent_matches(session, runner.client, 20)
+                session.commit()
+            except Exception:
+                logging.getLogger(__name__).warning("coach match sync failed", exc_info=True)
+                session.rollback()
+        rows = queries.recent_matches(session, 20)
+        matches = [match_store.serialize_match(session, m) for m in rows]
+        scorecard = build_scorecard(matches)
+        latest_gid = matches[0]["game_id"] if matches else ""
+
+        narrative, priorities, available = "", [], False
+        cached = (session.query(MacroCoachReport)
+                  .order_by(MacroCoachReport.id.desc()).first())
+        if (not force and cached is not None
+                and cached.based_on_game_id == latest_gid):
+            narrative, priorities, available = (cached.narrative or "",
+                                                cached.priorities or [], True)
+        elif not scorecard["insufficient"]:
+            result = MacroCoachAnalyzer(runner.engine).analyze(scorecard)
+            if result is not None:
+                narrative, priorities, available = (result["narrative"],
+                                                    result["priorities"], True)
+                session.add(MacroCoachReport(based_on_game_id=latest_gid,
+                            narrative=narrative, priorities=priorities))
+                session.commit()
+        return {"scorecard": scorecard, "narrative": narrative,
+                "priorities": priorities, "priorities_available": available,
+                "patch": runner.catalog.patch}
+    finally:
+        session.close()
+
+
+@app.get("/api/coach")
+def coach() -> dict:
+    """Account-level AI Macro Coach: a role-aware performance scorecard over the
+    last ~20 games plus the cached LLM 'top 3 things to improve'."""
+    return _coach_payload(force=False)
+
+
+@app.post("/api/coach/refresh")
+def coach_refresh() -> dict:
+    """Force-regenerate the macro-coach priorities (ignores the cache)."""
+    return _coach_payload(force=True)
+
+
 @app.get("/api/champions")
 def list_champions() -> dict:
     """All champions (name/slug/tags) for the pool editor's picker."""
