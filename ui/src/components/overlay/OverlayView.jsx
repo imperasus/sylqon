@@ -13,11 +13,15 @@ const CS_TONE = { ahead: "text-good", behind: "text-bad", "on-track": "text-whit
 
 /* Compact live readout: CS-vs-target, level diff, KDA — all from the read-only
    Live Client Data snapshot the coach already polls. */
+const SPIKE_TONE = { ahead: "text-good", behind: "text-bad", even: "text-white/70" };
+
 function Benchmark({ game }) {
   const b = game.cs_benchmark || {};
   const ld = game.level_diff || 0;
+  const spike = game.item_spike || {};
+  const hasSpike = !!spike.status;
   return (
-    <div className="grid grid-cols-3 gap-1.5 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 text-xs backdrop-blur-sm">
+    <div className={`grid ${hasSpike ? "grid-cols-4" : "grid-cols-3"} gap-1.5 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 text-xs backdrop-blur-sm`}>
       <div className="flex flex-col">
         <span className="text-3xs tracking-widest text-white/35">CS/MIN</span>
         <span className={CS_TONE[b.status] || "text-white/70"}>
@@ -35,6 +39,33 @@ function Benchmark({ game }) {
         <span className="text-3xs tracking-widest text-white/35">KDA</span>
         <span className="font-mono text-white/80">{game.kills ?? 0}/{game.deaths ?? 0}/{game.assists ?? 0}</span>
       </div>
+      {hasSpike && (
+        <div className="flex flex-col" title="Completed items vs your lane opponent">
+          <span className="text-3xs tracking-widest text-white/35">ITEMS</span>
+          <span className={`font-mono ${SPIKE_TONE[spike.status] || "text-white/70"}`}>
+            {spike.mine}<span className="text-white/30">/{spike.opponent}</span>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const SOUL = {
+  ally_soul_point: { text: "SOUL POINT — secure the next dragon", cls: "border-good/45 bg-good/10 text-good" },
+  enemy_soul_point: { text: "ENEMY SOUL POINT — contest the next dragon", cls: "border-bad/45 bg-bad/10 text-bad" },
+  ally_soul: { text: "DRAGON SOUL secured", cls: "border-good/45 bg-good/10 text-good" },
+  enemy_soul: { text: "ENEMY HAS SOUL — play around Elder", cls: "border-bad/45 bg-bad/10 text-bad" },
+};
+
+/* A prominent one-line warning at the decisive dragon-soul moment. */
+function SoulBanner({ soul }) {
+  const s = SOUL[soul?.status];
+  if (!s) return null;
+  return (
+    <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-2xs font-bold tracking-wide backdrop-blur-sm ${s.cls}`}>
+      <Flame className="h-3.5 w-3.5 shrink-0" />
+      <span>{s.text}</span>
     </div>
   );
 }
@@ -87,6 +118,7 @@ export default function OverlayView() {
         </div>
       ) : (
         <div className="flex flex-col gap-2">
+          {inGame && <SoulBanner soul={game.soul} />}
           {inGame && <Benchmark game={game} />}
           {inGame && <Objectives timers={game.objective_timers} />}
           {missions.map((m) => <MissionCard key={m.id} mission={m} />)}

@@ -169,6 +169,7 @@ class MissionEngine:
                 "ward_score": live.ward_score, "champion": live.champion,
                 "level": live.level, "cs_benchmark": live.cs_benchmark,
                 "level_diff": live.level_diff, "objective_timers": live.objective_timers,
+                "soul": live.soul, "item_spike": live.item_spike,
             },
         }
 

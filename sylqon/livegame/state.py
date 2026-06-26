@@ -40,6 +40,8 @@ class LiveGameState:
     cs_benchmark: dict = field(default_factory=dict) # {target, delta, status}
     level_diff: int = 0                              # my level − enemy avg level
     objective_timers: dict = field(default_factory=dict)  # {dragon, baron} secs to next
+    soul: dict = field(default_factory=dict)         # {status, ally, enemy} dragon-soul read
+    item_spike: dict = field(default_factory=dict)   # {mine, opponent, status} vs lane opp
 
     @classmethod
     def none(cls) -> "LiveGameState":
@@ -155,6 +157,20 @@ def _item_ids(p: dict) -> list[int]:
     return out
 
 
+# A completed legendary/mythic costs ~2500-3400g; boots (~1100) and components
+# (≤1300) fall below this. The Live Client item carries its gold ``price``, so we
+# count "finished power-spike items" with no item DB lookup.
+LEGENDARY_PRICE = 2000
+
+
+def _completed_count(p: dict) -> int:
+    """Number of completed (legendary-priced, non-consumable) items a player holds,
+    from the on-screen Live Client ``items`` — a DB-free power-spike proxy."""
+    items = p.get("items") or []
+    return sum(1 for it in items
+               if not it.get("consumable") and int(it.get("price") or 0) >= LEGENDARY_PRICE)
+
+
 def _rune_name(node: dict, table: dict) -> str:
     """Resolve a rune/style node to its canonical English name by id (locale-
     independent), falling back to the localized displayName if the id is unknown."""
@@ -198,6 +214,7 @@ def _parse_roster(all_players: list[dict], my_team: str) -> list[dict]:
             "is_dead": bool(p.get("isDead")),
             "respawn_timer": float(p.get("respawnTimer") or 0.0),
             "items": _item_ids(p),
+            "completed_items": _completed_count(p),
             "spells": _spell_names(p),
             "runes": _runes(p),
         })
@@ -250,6 +267,46 @@ def _objective_timers(events: list[dict], game_time: float) -> dict:
     next_baron = (max(baron) + 360.0) if baron else 1200.0
     return {"dragon": max(0, round(next_dragon - game_time)),
             "baron": max(0, round(next_baron - game_time))}
+
+
+def _dragon_soul(objectives: dict) -> dict:
+    """Read the dragon-soul race from the drake counts (already on-screen). A team
+    on 3 drakes is at its *soul point* — the next dragon grants the soul; ≥4 means
+    the soul is taken (dragons then become Elder). Status is "" when neither team
+    is close, so the overlay only nags at the decisive moment."""
+    d = (objectives or {}).get("dragons") or {}
+    ally, enemy = int(d.get("ally") or 0), int(d.get("enemy") or 0)
+    if ally >= 4:
+        status = "ally_soul"
+    elif enemy >= 4:
+        status = "enemy_soul"
+    elif ally >= 3:
+        status = "ally_soul_point"
+    elif enemy >= 3:
+        status = "enemy_soul_point"
+    else:
+        status = ""
+    return {"status": status, "ally": ally, "enemy": enemy}
+
+
+def _item_spike(roster: list[dict], my_role: str) -> dict:
+    """Completed-item lead over the same-role enemy laner (a power-spike read).
+    Empty when there is no resolvable lane opponent or neither side has finished an
+    item yet (nothing useful to show in the early game)."""
+    if not my_role:
+        return {}
+    mine = next((p for p in roster
+                 if p.get("side") == "ally" and p.get("role") == my_role), None)
+    opp = next((p for p in roster
+                if p.get("side") == "enemy" and p.get("role") == my_role), None)
+    if mine is None or opp is None:
+        return {}
+    m, o = int(mine.get("completed_items") or 0), int(opp.get("completed_items") or 0)
+    if m == 0 and o == 0:
+        return {}
+    diff = m - o
+    status = "ahead" if diff >= 1 else "behind" if diff <= -1 else "even"
+    return {"mine": m, "opponent": o, "status": status}
 
 
 def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
@@ -309,4 +366,6 @@ def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
         cs_benchmark=_cs_benchmark(role, cs_per_min),
         level_diff=_level_diff(roster, my_level),
         objective_timers=_objective_timers(light_events, game_time),
+        soul=_dragon_soul(objectives),
+        item_spike=_item_spike(roster, role),
     )

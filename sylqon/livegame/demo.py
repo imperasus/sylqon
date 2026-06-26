@@ -12,7 +12,9 @@ match history without a running game.
 from __future__ import annotations
 
 from sylqon.data import static
-from sylqon.livegame.state import LiveGameState, _infer_roles
+from sylqon.livegame.state import (
+    LiveGameState, _dragon_soul, _infer_roles, _item_spike,
+)
 
 SPEED = 10.0         # in-game seconds per real second (fast-forward for testing)
 CS_PER_MIN = 14.0    # high enough that the farm missions complete in-window
@@ -32,7 +34,20 @@ def fake_live_state(elapsed_seconds: float, role: str = "bottom") -> LiveGameSta
     takedowns = int(gt // TAKEDOWN_EVERY)              # scripted takedowns
     kills = takedowns // 2
     assists = takedowns - kills
-    dragons_ally = 1 if gt >= DRAGON_AT else 0
+    # Drakes climb to the soul point (3) so the overlay's soul warning lights up.
+    dragons_ally = min(3, int(gt // DRAGON_AT))
+    objectives = {"dragons": {"ally": dragons_ally, "enemy": 0},
+                  "heralds": {"ally": 0, "enemy": 0},
+                  "barons": {"ally": 0, "enemy": 0},
+                  "towers": {"ally": 0, "enemy": 0}}
+    # Minimal 2-player roster (me + same-role enemy laner) with a growing item lead,
+    # so the item-spike read has data to show.
+    mine_items = int(minutes // 5)
+    opp_items = int(minutes // 7)
+    roster = [
+        {"side": "ally", "role": role, "completed_items": mine_items},
+        {"side": "enemy", "role": role, "completed_items": opp_items},
+    ]
     return LiveGameState(
         active=True,
         game_time=round(gt, 1),
@@ -48,12 +63,12 @@ def fake_live_state(elapsed_seconds: float, role: str = "bottom") -> LiveGameSta
         team="ORDER",
         is_dead=False,
         respawn_timer=0.0,
-        objectives={"dragons": {"ally": dragons_ally, "enemy": 0},
-                    "heralds": {"ally": 0, "enemy": 0},
-                    "barons": {"ally": 0, "enemy": 0},
-                    "towers": {"ally": 0, "enemy": 0}},
+        objectives=objectives,
         death_times=[],
         events=[],
+        roster=roster,
+        soul=_dragon_soul(objectives),
+        item_spike=_item_spike(roster, role),
     )
 
 

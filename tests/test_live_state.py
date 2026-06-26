@@ -165,6 +165,68 @@ def test_runes_fall_back_to_displayname_for_unknown_id():
     assert r["keystone"] == "Brand New Rune"
 
 
+# ----------------------------------------------- C-delta: soul + power-spike
+def test_dragon_soul_thresholds():
+    from sylqon.livegame.state import _dragon_soul
+    assert _dragon_soul({"dragons": {"ally": 3, "enemy": 1}})["status"] == "ally_soul_point"
+    assert _dragon_soul({"dragons": {"ally": 1, "enemy": 3}})["status"] == "enemy_soul_point"
+    assert _dragon_soul({"dragons": {"ally": 4, "enemy": 2}})["status"] == "ally_soul"
+    assert _dragon_soul({"dragons": {"ally": 2, "enemy": 4}})["status"] == "enemy_soul"
+    assert _dragon_soul({"dragons": {"ally": 2, "enemy": 1}})["status"] == ""
+    assert _dragon_soul({})["status"] == ""
+
+
+def test_completed_count_excludes_boots_components_consumables():
+    from sylqon.livegame.state import _completed_count
+    p = {"items": [
+        {"itemID": 3031, "price": 3400},                    # legendary -> counts
+        {"itemID": 6672, "price": 3000},                    # legendary -> counts
+        {"itemID": 3006, "price": 1100},                    # boots -> below threshold
+        {"itemID": 1038, "price": 1300},                    # component -> below
+        {"itemID": 2055, "price": 75, "consumable": True},  # control ward -> excluded
+    ]}
+    assert _completed_count(p) == 2
+
+
+def test_item_spike_needs_opponent_and_items():
+    from sylqon.livegame.state import _item_spike
+    only_me = [{"side": "ally", "role": "bottom", "completed_items": 2}]
+    assert _item_spike(only_me, "bottom") == {}            # no lane opponent
+    zeros = [{"side": "ally", "role": "bottom", "completed_items": 0},
+             {"side": "enemy", "role": "bottom", "completed_items": 0}]
+    assert _item_spike(zeros, "bottom") == {}              # nothing finished yet
+    behind = [{"side": "ally", "role": "bottom", "completed_items": 1},
+              {"side": "enemy", "role": "bottom", "completed_items": 2}]
+    assert _item_spike(behind, "bottom") == {"mine": 1, "opponent": 2, "status": "behind"}
+
+
+ITEM_SPIKE_SAMPLE = {
+    "gameData": {"gameTime": 1200.0},
+    "activePlayer": {"riotIdGameName": "Me", "level": 11},
+    "allPlayers": [
+        {"riotIdGameName": "Me", "championName": "Jinx", "team": "ORDER",
+         "position": "BOTTOM", "level": 11, "scores": {"creepScore": 200},
+         "items": [{"itemID": 3031, "price": 3400, "slot": 0},
+                   {"itemID": 3094, "price": 2600, "slot": 1},
+                   {"itemID": 3006, "price": 1100, "slot": 2}]},
+        {"riotIdGameName": "Enemy", "championName": "Caitlyn", "team": "CHAOS",
+         "position": "BOTTOM", "scores": {},
+         "items": [{"itemID": 6672, "price": 3100, "slot": 0},
+                   {"itemID": 1038, "price": 1300, "slot": 1}]},
+    ],
+    "events": {"Events": []},
+}
+
+
+def test_item_spike_and_soul_via_parse_live_state():
+    s = parse_live_state(ITEM_SPIKE_SAMPLE)
+    # 2 finished items (boots excluded) vs the enemy bottom's 1 → ahead.
+    assert s.item_spike == {"mine": 2, "opponent": 1, "status": "ahead"}
+    assert s.roster[0]["completed_items"] == 2
+    # No drakes in this sample → no soul nag.
+    assert s.soul["status"] == ""
+
+
 if __name__ == "__main__":
     import pytest
 

@@ -25,10 +25,14 @@ def test_fake_state_progresses_without_deaths():
 
 
 def test_fake_objective_after_threshold():
-    early = fake_live_state(5, "jungle")     # game_time 30 < 90
-    later = fake_live_state(30, "jungle")    # game_time 180 >= 90
+    early = fake_live_state(5, "jungle")     # gt 50 < DRAGON_AT (60) → no drake
+    later = fake_live_state(30, "jungle")    # gt 300 → drakes ramp to the soul point
     assert early.objectives["dragons"]["ally"] == 0
-    assert later.objectives["dragons"]["ally"] == 1
+    assert later.objectives["dragons"]["ally"] == 3
+    # ramped to 3 drakes → the overlay's dragon-soul warning lights up.
+    assert later.soul["status"] == "ally_soul_point"
+    # and the demo roster gives the item-spike read something to show.
+    assert later.item_spike.get("status") in {"ahead", "behind", "even"}
 
 
 def test_engine_completes_missions_via_demo():
