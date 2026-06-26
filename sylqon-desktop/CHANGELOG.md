@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.1](https://github.com/imperasus/sylqon/compare/v1.5.0...v1.5.1) (2026-06-26)
+
+
+### Features
+
+* **draft:** elevate the ban suggestion during the ban turn ([37c9386](https://github.com/imperasus/sylqon/commit/37c93865b6a422e3349acb453577977086e4ac04)), closes [#1](https://github.com/imperasus/sylqon/issues/1)
+
 ## [1.5.0](https://github.com/imperasus/sylqon/compare/v1.4.3...v1.5.0) (2026-06-26)
 
 
