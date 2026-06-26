@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.5.0](https://github.com/imperasus/sylqon/compare/v1.4.3...v1.5.0) (2026-06-26)
+
+
+### Features
+
+* **coach:** add account-level AI macro coach ([03cd553](https://github.com/imperasus/sylqon/commit/03cd553dbf424ab46f77fa5936d8648441bb049e))
+* **draft:** add estimated draft win% scorecard ([468ecd3](https://github.com/imperasus/sylqon/commit/468ecd30de8def00bad2e6c7e670f5a2da55e032))
+* **overlay:** add dragon-soul and power-spike tactical signals ([c409d37](https://github.com/imperasus/sylqon/commit/c409d371a05be1b3decf41fc0bf7646e07d5591e))
+* **overlay:** auto show/hide the overlay on game state ([80f2141](https://github.com/imperasus/sylqon/commit/80f21413dbfa0ec3f74152878d07bf2cf9d357d5))
+
 ### [1.4.3](https://github.com/imperasus/sylqon/compare/v1.4.2...v1.4.3) (2026-06-24)
 
 
