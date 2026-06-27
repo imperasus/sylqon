@@ -13,31 +13,42 @@ import json
 
 from sylqon.data import static
 from sylqon.data.catalog import Catalog
+# Re-exported so existing imports (`from sylqon.ai.prompts import
+# rune_pool_for_champion`) keep working while the implementation now lives in
+# the seed-driven rune_pool module.
+from sylqon.data.rune_pool import rune_pool_for_champion  # noqa: F401
 from sylqon.lcu.lobby import MatchContext
 
 
 def threat_directives(threat: dict) -> list[str]:
     """Champ-select-time itemization doctrine derived from the enemy comp.
-    Tag names in [brackets] match the labels annotated onto pool items."""
+    Tag names in [brackets] match the labels annotated onto pool items.
+
+    These directives are also enforced in code (``loadout._enforce_counter_items``):
+    a missing mandated tag is swapped into the final build from the situational
+    pool, in this same priority order — so the wording here mirrors the
+    guarantee rather than merely suggesting it."""
     d = []
     if threat.get("heavy_healing"):
-        d.append("Heavy enemy healing: pick EXACTLY one [Anti-heal] item.")
+        d.append("Heavy enemy healing: at least one [Anti-heal] item is mandatory "
+                 "(enforced) — an early component already cuts the healing.")
     tanks = threat.get("tanks", 0)
     if tanks >= 2:
-        d.append(f"{tanks} tanks on enemy team: pick a [% Pen] item and order it "
+        d.append(f"{tanks} tanks on enemy team: a [% Pen] item is mandatory; order it "
                  "FIRST among situational picks — penetration must arrive by the "
                  "3rd-4th purchase, before resists stack out of reach.")
     elif tanks == 1:
         d.append("1 tank: a [% Pen] or [%HP Damage] item is a strong later pick.")
     if threat.get("suppression"):
-        d.append("Suppression on enemy team: an [Anti-CC] item (QSS/Mercurial) "
-                 "is near-mandatory for a carry.")
+        d.append("Suppression on enemy team: an [Anti-CC] item (QSS/Mercurial, or "
+                 "Mercury's Treads) is mandatory (enforced) for a carry.")
     elif threat.get("heavy_cc_count", 0) >= 3:
-        d.append("3+ heavy-CC enemies: prefer [Anti-CC] / tenacity options.")
+        d.append("3+ heavy-CC enemies: an [Anti-CC] / tenacity option is mandatory "
+                 "(enforced).")
     if threat.get("burst_ad") or threat.get("burst_ap"):
-        d.append("Assassin/burst threat: include one [Survival] item and order it "
-                 "mid-build (2nd situational pick), not last — you must outlive "
-                 "the one-shot window before damage matters.")
+        d.append("Assassin/burst threat: one [Survival] item is mandatory (enforced); "
+                 "order it mid-build (2nd situational pick), not last — you must "
+                 "outlive the one-shot window before damage matters.")
     if threat.get("physical_threats", 0) >= 4:
         d.append("4+ physical threats: prefer [Armor] when choosing between "
                  "defensive options.")
@@ -53,8 +64,15 @@ def threat_directives(threat: dict) -> list[str]:
 def rune_directives(threat: dict) -> list[str]:
     """Champ-select-time rune fine-tuning doctrine. The base page is kept; only
     the flexible defensive picks (defense stat shard, secondary defensive runes)
-    are nudged toward the resist the enemy comp actually deals."""
-    d = []
+    are nudged toward the resist the enemy comp actually deals.
+
+    Enforced in code (``loadout._apply_runes``): the keystone and primary core
+    runes are taken from the meta op.gg page and only swapped under a genuinely
+    strong threat AND when the swap stays inside the champion's rune pool — the
+    AI may only retune the flexible defensive / utility slots and the defense
+    stat shard (``loadout._apply_shards``)."""
+    d = ["Keep the meta op.gg keystone + primary core; only the flexible "
+         "defensive/utility runes and the defense stat shard are adjustable."]
     ap, ad = threat.get("magic_threats", 0), threat.get("physical_threats", 0)
     if ap >= 3 and ap > ad:
         d.append("Enemy is AP-heavy: lean the defense shard / flexible secondary "
@@ -67,7 +85,7 @@ def rune_directives(threat: dict) -> list[str]:
     if threat.get("heavy_healing"):
         d.append("Heavy enemy healing: Grievous Wounds comes from items — do NOT "
                  "spend runes on it; keep the damage/utility runes.")
-    if not d:
+    if len(d) == 1:
         d.append("No defensive skew: keep the cached/base rune page verbatim.")
     return d
 
@@ -77,19 +95,6 @@ def _tag_label(item: dict) -> str:
     if not tags:
         return ""
     return " [" + "/".join(static.COUNTER_TAG_INFO[t][0] for t in tags) + "]"
-
-
-def rune_pool_for_champion(champion: str) -> dict | None:
-    """Return the curated rune pool for a champion, or None if not in the dict.
-
-    When None is returned, compile_prompt falls back to the current global
-    rune pool behavior (unchanged).
-
-    Returns a dict with keys:
-        keystone_options, primary_minor_flex,
-        secondary_style_options, secondary_minor_options
-    """
-    return static.CHAMPION_RUNE_ARCHETYPES.get(champion)
 
 
 def compile_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) -> str:

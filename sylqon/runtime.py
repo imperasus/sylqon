@@ -24,7 +24,7 @@ from sylqon.ai.pick_prompt import (
 from sylqon.analysis import build_archetype, draft_intel
 from sylqon.analysis.scoring import ChampionScorer
 from sylqon.cache.store import MetaCache
-from sylqon.data import static
+from sylqon.data import rune_pool, static
 from sylqon.data.catalog import Catalog
 from sylqon.lcu import scout as scout_mod
 from sylqon.lcu.client import LCUClient
@@ -1957,6 +1957,12 @@ class PipelineRunner:
                                           ctx.my_role)
             log.info("Candidate build for %s %s from %s", ctx.my_champion, ctx.my_role, source)
 
+            # Fold the live champion-specific rune page into the seed-derived rune
+            # pool so its meta keystone/runes are always legal for this champion
+            # (generic role-default fallbacks aren't champion-specific — skip them).
+            if not source.startswith("seed-role") and source != "seed-any":
+                rune_pool.register_build(ctx.my_champion, candidate)
+
             base = loadout_mod.from_candidate(candidate, ctx, source)
             self.last_standard = loadout_mod.from_candidate(candidate, ctx, source)
             ai_result = None
@@ -1982,9 +1988,10 @@ class PipelineRunner:
 
             if config.OPEN_BUILD_MODE:
                 final = loadout_mod.apply_ai_open_decision(
-                    base, ai_result, ctx, self.catalog)
+                    base, ai_result, ctx, self.catalog, candidate)
             else:
-                final = loadout_mod.apply_ai_decision(base, ai_result, ctx, self.catalog)
+                final = loadout_mod.apply_ai_decision(
+                    base, ai_result, ctx, self.catalog, candidate)
             final.name = final.name or "Recommended"
             self.last_candidate, self.last_loadout = candidate, final
             self.last_variants = [final]  # primary only until alternatives generate

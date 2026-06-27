@@ -405,6 +405,57 @@ SPLIT_PUSH_CHAMPS = {
     "Illaoi", "Riven", "Aatrox", "Renekton", "Yone", "Jayce",
 }
 
+# --- Champion / item damage typing (counter-item eligibility) -----------------
+# The damage profile a champion actually BUILDS for ("ad" / "ap" / "mixed").
+# Used to keep counter-item enforcement type-correct: never slot an AP item on a
+# pure-AD carry (e.g. Lord Dominik's on Syndra) or an AD item on an AP mage
+# (e.g. Morellonomicon on Zed). "mixed" is the permissive fallback — the right
+# call for true hybrids, tanks and supports, whose relevant counter items are
+# universal anyway. Champions absent here fall back to "mixed".
+CHAMPION_DAMAGE_TYPE: dict[str, str] = {
+    # --- AD: marksmen ---
+    "Jinx": "ad", "Caitlyn": "ad", "Kai'Sa": "ad", "Jhin": "ad", "Ezreal": "ad",
+    "Ashe": "ad", "Miss Fortune": "ad", "Smolder": "ad", "Kog'Maw": "ad",
+    "Lucian": "ad", "Tristana": "ad", "Samira": "ad", "Xayah": "ad", "Draven": "ad",
+    "Sivir": "ad", "Vayne": "ad", "Aphelios": "ad", "Zeri": "ad", "Nilah": "ad",
+    "Varus": "ad", "Twitch": "ad", "Quinn": "ad", "Kalista": "ad",
+    # --- AD: assassins ---
+    "Zed": "ad", "Talon": "ad", "Qiyana": "ad", "Rengar": "ad", "Kha'Zix": "ad",
+    "Naafiri": "ad", "Pyke": "ad", "Nocturne": "ad", "Kayn": "ad",
+    # --- AD: fighters / bruisers ---
+    "Darius": "ad", "Garen": "ad", "Aatrox": "ad", "Renekton": "ad", "Riven": "ad",
+    "Camille": "ad", "Fiora": "ad", "Sett": "ad", "Tryndamere": "ad", "Yasuo": "ad",
+    "Yone": "ad", "Olaf": "ad", "Trundle": "ad", "Nasus": "ad", "Gnar": "ad",
+    "Wukong": "ad", "Pantheon": "ad", "Jayce": "ad", "Gangplank": "ad",
+    "Irelia": "ad", "Urgot": "ad", "Illaoi": "ad", "Kled": "ad", "K'Sante": "ad",
+    # --- AD: junglers ---
+    "Vi": "ad", "Lee Sin": "ad", "Graves": "ad", "Master Yi": "ad", "Hecarim": "ad",
+    "Xin Zhao": "ad", "Kindred": "ad", "Viego": "ad", "Briar": "ad",
+    # --- AP: mages / assassins ---
+    "Hwei": "ap", "Brand": "ap", "Syndra": "ap", "LeBlanc": "ap", "Ahri": "ap",
+    "Annie": "ap", "Veigar": "ap", "Fizz": "ap", "Akali": "ap", "Evelynn": "ap",
+    "Lissandra": "ap", "Zoe": "ap", "Diana": "ap", "Vex": "ap", "Aurora": "ap",
+    "Xerath": "ap", "Vel'Koz": "ap", "Ziggs": "ap", "Lux": "ap", "Orianna": "ap",
+    "Viktor": "ap", "Cassiopeia": "ap", "Karthus": "ap", "Anivia": "ap",
+    "Swain": "ap", "Vladimir": "ap", "Ryze": "ap", "Taliyah": "ap", "Neeko": "ap",
+    "Zyra": "ap", "Seraphine": "ap", "Heimerdinger": "ap", "Malzahar": "ap",
+    "Morgana": "ap", "Elise": "ap", "Fiddlesticks": "ap", "Lillia": "ap",
+    "Ekko": "ap", "Katarina": "ap", "Kassadin": "ap", "Aurelion Sol": "ap",
+    "Mordekaiser": "ap", "Amumu": "ap", "Galio": "ap", "Maokai": "ap",
+    "Nidalee": "ap", "Rumble": "ap", "Singed": "ap", "Sylas": "ap",
+    # --- AP: enchanters / supports ---
+    "Soraka": "ap", "Nami": "ap", "Sona": "ap", "Lulu": "ap", "Janna": "ap",
+    "Yuumi": "ap", "Karma": "ap", "Renata Glasc": "ap",
+    # --- mixed: hybrids / tanks / utility (their counter items are universal) ---
+    "Jax": "mixed", "Kayle": "mixed", "Teemo": "mixed", "Warwick": "mixed",
+    "Skarner": "mixed", "Cho'Gath": "mixed", "Malphite": "mixed", "Volibear": "mixed",
+    "Udyr": "mixed", "Thresh": "mixed", "Nautilus": "mixed", "Leona": "mixed",
+    "Alistar": "mixed", "Braum": "mixed", "Rell": "mixed", "Rakan": "mixed",
+    "Blitzcrank": "mixed", "Sejuani": "mixed", "Zac": "mixed", "Ornn": "mixed",
+    "Sion": "mixed", "Shen": "mixed", "Tahm Kench": "mixed", "Rammus": "mixed",
+    "Poppy": "mixed", "Dr. Mundo": "mixed",
+}
+
 ROLE_ALIASES = {
     "top": "top", "jungle": "jungle", "middle": "middle", "mid": "middle",
     "bottom": "bottom", "adc": "bottom", "bot": "bottom",
@@ -522,6 +573,89 @@ COUNTER_TAG_INFO: dict[str, tuple[str, str]] = {
     "anti_shield": ("Anti-shield", "vs shield stacking"),
     "mobility":    ("Mobility", "extra MS for kiting / positioning"),
     "damage":      ("Damage / Greed", "when ahead or no dominant threat"),
+}
+
+# Item damage-class restriction, keyed by Data Dragon item NAME:
+#   "ad_only"   — scales with / itemises AD (lethality, armor pen, crit, AD on-hit)
+#   "ap_only"   — scales with / itemises AP (ability power)
+#   "universal" — resists / HP / tenacity / revive / cleanse — damage-agnostic
+# Consumed by ``loadout._item_eligible_for_champion`` to gate counter items (and
+# AI item picks) against the champion's CHAMPION_DAMAGE_TYPE. Items absent here
+# fall back to "universal" (permissive) so a missing entry never over-restricts.
+ITEM_CLASS_RESTRICTION: dict[str, str] = {
+    # --- AD-only (lethality / armor pen / crit / AD on-hit) ---
+    "Mortal Reminder": "ad_only",
+    "Chempunk Chainsword": "ad_only",
+    "Lord Dominik's Regards": "ad_only",
+    "Serylda's Grudge": "ad_only",
+    "Black Cleaver": "ad_only",
+    "Terminus": "ad_only",
+    "Blade of The Ruined King": "ad_only",
+    "Sundered Sky": "ad_only",
+    "Maw of Malmortius": "ad_only",
+    "Edge of Night": "ad_only",
+    "Death's Dance": "ad_only",
+    "Immortal Shieldbow": "ad_only",
+    "Mercurial Scimitar": "ad_only",
+    "Serpent's Fang": "ad_only",
+    "Phantom Dancer": "ad_only",
+    "Rapidfire Cannon": "ad_only",
+    "Opportunity": "ad_only",
+    "Spear of Shojin": "ad_only",
+    "Infinity Edge": "ad_only",
+    "Kraken Slayer": "ad_only",
+    "Bloodthirster": "ad_only",
+    "Essence Reaver": "ad_only",
+    "The Collector": "ad_only",
+    "Runaan's Hurricane": "ad_only",
+    "Ravenous Hydra": "ad_only",
+    "Trinity Force": "ad_only",
+    "Stridebreaker": "ad_only",
+    "Experimental Hexplate": "ad_only",
+    "Youmuu's Ghostblade": "ad_only",
+    "Eclipse": "ad_only",
+    "Hubris": "ad_only",
+    "Voltaic Cyclosword": "ad_only",
+    # --- AP-only (ability power scaling) ---
+    "Morellonomicon": "ap_only",
+    "Void Staff": "ap_only",
+    "Cryptbloom": "ap_only",
+    "Liandry's Torment": "ap_only",
+    "Zhonya's Hourglass": "ap_only",
+    "Banshee's Veil": "ap_only",
+    "Mikael's Blessing": "ap_only",
+    "Cosmic Drive": "ap_only",
+    "Rabadon's Deathcap": "ap_only",
+    "Luden's Companion": "ap_only",
+    "Shadowflame": "ap_only",
+    "Blackfire Torch": "ap_only",
+    "Rylai's Crystal Scepter": "ap_only",
+    "Lich Bane": "ap_only",
+    "Nashor's Tooth": "ap_only",
+    "Riftmaker": "ap_only",
+    "Horizon Focus": "ap_only",
+    "Malignance": "ap_only",
+    "Stormsurge": "ap_only",
+    "Mejai's Soulstealer": "ap_only",
+    # --- universal (resists / HP / tenacity / revive / cleanse) ---
+    "Thornmail": "universal",
+    "Guardian Angel": "universal",
+    "Sterak's Gage": "universal",
+    "Quicksilver Sash": "universal",
+    "Mercury's Treads": "universal",
+    "Plated Steelcaps": "universal",
+    "Wit's End": "universal",
+    "Jak'Sho, The Protean": "universal",
+    "Spirit Visage": "universal",
+    "Force of Nature": "universal",
+    "Dead Man's Plate": "universal",
+    "Randuin's Omen": "universal",
+    "Frozen Heart": "universal",
+    "Guinsoo's Rageblade": "universal",
+    "Iceborn Gauntlet": "universal",
+    "Kaenic Rookern": "universal",
+    "Unending Despair": "universal",
+    "Hollow Radiance": "universal",
 }
 
 OPEN_BUILD_EXCLUDED_DDRAGON_TAGS: frozenset[str] = frozenset({

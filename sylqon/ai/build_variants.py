@@ -113,7 +113,7 @@ def generate_variants(ctx: MatchContext, candidate: dict, catalog: Catalog,
         if not isinstance(v, dict):
             continue
         base = loadout_mod.from_candidate(candidate, ctx, "opgg")
-        variant = loadout_mod.apply_ai_decision(base, v, ctx, catalog)
+        variant = loadout_mod.apply_ai_decision(base, v, ctx, catalog, candidate)
         sig = _signature(variant)
         if sig in seen:
             continue  # AI produced nothing meaningfully different; drop it

@@ -103,6 +103,246 @@ def _rune_ids(keystone: str, primary: list[str], secondary: list[str]) -> list[i
     return ids
 
 
+def _safe_threat(ctx: MatchContext) -> dict:
+    """Threat summary as a plain dict, tolerant of stub/mocked contexts.
+
+    The threat-aware item/rune/shard logic runs even when ``ai`` is missing, so
+    a bare test double whose ``team_threat_summary()`` returns a non-dict must
+    degrade to "no threat" rather than raise or read truthy mock values."""
+    try:
+        summary = ctx.team_threat_summary()
+    except Exception:  # pragma: no cover - defensive
+        return {}
+    return summary if isinstance(summary, dict) else {}
+
+
+def _strong_threat(threat: dict) -> bool:
+    """A genuinely strong enemy threat that can justify deviating the keystone
+    from the meta op.gg page (assassins/burst, chain CC, suppression)."""
+    return bool(
+        threat.get("burst_ad")
+        or threat.get("burst_ap")
+        or threat.get("suppression")
+        or threat.get("heavy_cc_count", 0) >= 3
+    )
+
+
+# --- Counter-item enforcement -------------------------------------------------
+# Threat condition -> the counter tag(s) that MUST appear somewhere in the final
+# build, in priority order. ``urgent`` items are inserted at the front of the
+# situational block (they win fights early); the rest go at the back. This is the
+# code-level mirror of ``prompts.threat_directives``.
+
+def _item_eligible_for_champion(item_name: str, champion: str) -> bool:
+    """Whether an item's damage class fits the champion's damage profile.
+
+    Keeps counter-item enforcement (and AI item picks) type-correct: an AP-only
+    item never lands on a pure-AD champion and vice-versa. Unknown champion →
+    "mixed" and unknown item → "universal" — both permissive, so we degrade to
+    the old behaviour rather than over-restricting."""
+    champ_type = static.CHAMPION_DAMAGE_TYPE.get(champion, "mixed")
+    if champ_type == "mixed":
+        return True  # hybrids/tanks/supports: any class is fine
+    item_class = static.ITEM_CLASS_RESTRICTION.get(item_name, "universal")
+    if item_class == "ad_only":
+        return champ_type == "ad"
+    if item_class == "ap_only":
+        return champ_type == "ap"
+    return True  # universal (or unknown label) → always eligible
+
+
+def _counter_requirements(threat: dict) -> list[tuple[set[str], bool]]:
+    reqs: list[tuple[set[str], bool]] = []
+    if threat.get("heavy_healing"):
+        reqs.append(({"anti_heal"}, True))
+    if threat.get("tanks", 0) >= 2:
+        # %Pen or %HP shred must arrive early vs a stacked frontline.
+        reqs.append(({"percent_pen", "tank_shred"}, True))
+    if threat.get("suppression") or threat.get("heavy_cc_count", 0) >= 3:
+        reqs.append(({"anti_cc"}, True))
+    if threat.get("burst_ad") or threat.get("burst_ap"):
+        reqs.append(({"anti_burst"}, True))
+    if threat.get("physical_threats", 0) >= 4:
+        reqs.append(({"armor"}, False))
+    if threat.get("magic_threats", 0) >= 3:
+        reqs.append(({"mr"}, False))
+    return reqs
+
+
+def _least_important_slot(situ: list[dict], required_union: set[str],
+                          protected_front: int) -> int | None:
+    """Index of the situational slot safest to drop: the last (greediest) pick
+    that does NOT itself carry a still-required counter tag, scanning right→left
+    and never touching the urgent counters already inserted at the front. Returns
+    None when every remaining slot is load-bearing (so we never trade away one
+    mandated tag for another)."""
+    for idx in range(len(situ) - 1, protected_front - 1, -1):
+        tags = static.ITEM_COUNTER_TAGS.get(situ[idx].get("id", 0), ())
+        if not (set(tags) & required_union):
+            return idx
+    return None
+
+
+def _enforce_counter_items(base: Loadout, items: list[dict], build: dict,
+                           ctx: MatchContext, catalog: Catalog) -> list[dict]:
+    """Code-level guarantee that threat-mandated counter items are present.
+
+    For every counter tag the enemy comp demands but the current build misses,
+    swap the least-important (greedy/damage) situational slot for a pool item
+    carrying that tag — urgent tags (anti-heal / %pen / anti-CC / survival) move
+    to the front of the situational block, defensive preferences to the back.
+
+    Boots (slot 0) and core slots are never touched — defensive boots are
+    ``_select_boots``' job. Returns ``items`` unchanged whenever no threat
+    mandates a swap, the build has no editable situational structure, or the
+    pool can't satisfy a tag — so the result is never illegal or shorter."""
+    threat = _safe_threat(ctx)
+    reqs = _counter_requirements(threat)
+    if not reqs:
+        return items
+
+    pool = (build.get("situational_pool") if isinstance(build, dict) else None) \
+        or base.situational_pool
+    if not pool or not base.core_items:
+        return items  # legacy flat build: no boots+core+situational structure
+
+    n_fixed = 1 + len(base.core_items)  # boots + core stay put
+    if n_fixed >= len(items):
+        return items  # no situational slots to adjust
+
+    head = list(items[:n_fixed])
+    situ = list(items[n_fixed:])
+
+    def tags_of(item_id: int | None) -> set[str]:
+        return set(static.ITEM_COUNTER_TAGS.get(item_id or 0, ()))
+
+    # Pool items keyed by id, filtered to the champion's damage class (resolving
+    # via catalog only if a pool entry lacks an id). This is what prevents an AP
+    # item being enforced onto an AD champion (or vice-versa).
+    champion = getattr(ctx, "my_champion", "") or ""
+    pool_by_id: dict[int, dict] = {}
+    for it in pool:
+        name = it.get("name", "")
+        iid = it.get("id")
+        if iid is None and catalog is not None:
+            iid = catalog.item_id(name)
+        if iid is None:
+            continue
+        if not _item_eligible_for_champion(name, champion):
+            log.debug("Counter item %s not eligible for %s (%s); skipping pool entry",
+                      name, champion, static.CHAMPION_DAMAGE_TYPE.get(champion, "mixed"))
+            continue
+        pool_by_id.setdefault(iid, {"id": iid, "name": name})
+
+    required_union: set[str] = set().union(*(tags for tags, _ in reqs))
+    urgent_front = 0  # how many urgent counters we've pinned to the front so far
+
+    for accepted, urgent in reqs:
+        if any(tags_of(it.get("id")) & accepted for it in head + situ):
+            continue  # already covered (boots/core count too)
+        in_build = {it.get("id") for it in head} | {s.get("id") for s in situ}
+        replacement = next(
+            (it for iid, it in pool_by_id.items()
+             if iid not in in_build and tags_of(iid) & accepted),
+            None,
+        )
+        if replacement is None:
+            continue  # pool can't cover this tag — leave the build as-is
+        drop = _least_important_slot(situ, required_union, urgent_front)
+        if drop is None:
+            continue  # every slot is load-bearing; don't break existing cover
+        situ.pop(drop)
+        if urgent:
+            situ.insert(urgent_front, replacement)
+            urgent_front = min(urgent_front + 1, len(situ))
+        else:
+            situ.append(replacement)
+
+    result = head + situ
+    if len(result) != len(items):  # pragma: no cover - defensive invariant
+        log.debug("Counter enforcement changed item count; keeping original build")
+        return items
+    if [i.get("id") for i in result] != [i.get("id") for i in items]:
+        log.info("Counter items enforced for matchup: %s",
+                 [i.get("name") for i in result[n_fixed:]])
+    return result
+
+
+# --- Threat-aware stat shards -------------------------------------------------
+
+def _clamp_shard(value: str, row: list[str], fallback: str) -> str:
+    """Keep a shard name inside its legal row, preferring the op.gg fallback."""
+    if value in row:
+        return value
+    if fallback in row:
+        return fallback
+    return row[0]
+
+
+def _acceptable_defense_shards(threat: dict) -> set[str]:
+    """Defense-row shards that are *not worse* than the computed default for this
+    comp. The AI's defense pick is only honoured when it lands in this set,
+    otherwise the threat-aware computed shard wins (e.g. never let pure Health
+    Scaling replace Tenacity into chain-CC / suppression)."""
+    ap = threat.get("magic_threats", 0)
+    ad = threat.get("physical_threats", 0)
+    heavy_cc = threat.get("heavy_cc_count", 0) >= 3 or bool(threat.get("suppression"))
+    ap_heavy = ap >= 3 and ap > ad
+    ad_heavy = ad >= 4 and ad >= ap
+    if heavy_cc:
+        return {"Tenacity and Slow Resist"}
+    if ap_heavy:
+        return {"Health Scaling", "Tenacity and Slow Resist"}
+    if ad_heavy:
+        return {"Health", "Tenacity and Slow Resist", "Health Scaling"}
+    return set(static.SHARD_ROW_DEFENSE)
+
+
+def _compute_default_shards(threat: dict, base_shards: list[str]) -> list[str]:
+    """Threat-aware meta-default shard trio (offense / flex / defense).
+
+    Offense stays on the op.gg pick; the flex and (mainly) defense rows adapt to
+    the enemy AD/AP balance and CC load. Always returns a valid, in-row trio, so
+    it is a safe default even when the AI gives no shards at all."""
+    off, flex, dfn = base_shards[0], base_shards[1], base_shards[2]
+    ap = threat.get("magic_threats", 0)
+    ad = threat.get("physical_threats", 0)
+    heavy_cc = threat.get("heavy_cc_count", 0) >= 3 or bool(threat.get("suppression"))
+    ap_heavy = ap >= 3 and ap > ad
+    ad_heavy = ad >= 4 and ad >= ap
+
+    if ap_heavy:                       # decisively magic damage → extra HP scaling
+        flex = "Health Scaling"
+    if heavy_cc:                       # chain CC / suppression → tenacity over raw HP
+        dfn = "Tenacity and Slow Resist"
+    elif ap_heavy:
+        dfn = "Health Scaling"
+    elif ad_heavy:                     # burst AD wants tenacity to survive the combo
+        dfn = "Tenacity and Slow Resist" if threat.get("burst_ad") else "Health"
+    # balanced comp → keep the op.gg defense shard.
+
+    return [
+        _clamp_shard(off, static.SHARD_ROW_OFFENSE, base_shards[0]),
+        _clamp_shard(flex, static.SHARD_ROW_FLEX, base_shards[1]),
+        _clamp_shard(dfn, static.SHARD_ROW_DEFENSE, base_shards[2]),
+    ]
+
+
+def _base_shard_names(out: Loadout, candidate_build: dict | None) -> list[str]:
+    """The op.gg/meta default shard names (offense/flex/defense). Prefers the
+    candidate build's ``stat_shards`` and falls back to the page already on the
+    loadout (set by :func:`from_candidate`), then the global default."""
+    if isinstance(candidate_build, dict):
+        shards = candidate_build.get("stat_shards")
+        if (isinstance(shards, list) and len(shards) == 3
+                and all(isinstance(s, str) for s in shards)):
+            return list(shards)
+    names = [static.SHARD_BY_ID.get(i) for i in (out.shard_ids or [])]
+    if len(names) == 3 and all(names):
+        return names  # type: ignore[return-value]
+    return list(static.DEFAULT_SHARDS)
+
+
 def _valid_rune_block(
     keystone: str,
     primary: list[str],
@@ -196,10 +436,27 @@ def deterministic_spells(build: dict, ctx: MatchContext,
     elif (threats["burst_ap"] or threats["burst_ad"]) and role == "middle" \
             and "Barrier" in allowed1:
         spell1 = "Barrier"
+    elif _enemy_poke_count(ctx) >= 2 and role == "middle" and "Barrier" in allowed1:
+        # Heavy poke comp chunks a mid carry before the fight — Barrier survives
+        # the harass (only when op.gg actually runs it on the champion).
+        spell1 = "Barrier"
     else:
         spell1 = base1 if base1 in static.ALLOWED_SPELL1 else \
             static.DEFAULT_SPELL1_BY_ROLE.get(role, "Heal")
     return spell1, spell2
+
+
+def _enemy_poke_count(ctx: MatchContext) -> int:
+    """How many enemies are flagged as poke threats. Tolerant of stub contexts
+    (a non-iterable ``enemies`` degrades to 0)."""
+    try:
+        return sum(
+            1 for e in ctx.enemies
+            if "poke" in (e.get("threats", []) if isinstance(e, dict)
+                          else getattr(e, "threats", []))
+        )
+    except TypeError:  # pragma: no cover - mocked ctx without a real enemy list
+        return 0
 
 
 def from_candidate(build: dict, ctx: MatchContext, source: str) -> Loadout:
@@ -244,19 +501,25 @@ def from_candidate(build: dict, ctx: MatchContext, source: str) -> Loadout:
 
 
 def apply_ai_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
-                      catalog: Catalog) -> Loadout:
+                      catalog: Catalog, candidate: dict | None = None) -> Loadout:
     """Merge the AI's selections onto the candidate build, field by field,
-    keeping the deterministic base wherever the AI output is invalid."""
-    if not isinstance(ai, dict):
-        log.info("No usable AI output; using %s build verbatim", base.source)
-        return base
+    keeping the deterministic base wherever the AI output is invalid.
 
+    ``candidate`` is the cached/seed build dict ``base`` was compiled from. It is
+    optional (everything degrades to ``base``'s own fields when omitted) and lets
+    the threat-aware shard logic and counter-item enforcement read the original
+    op.gg pool / shards directly.
+    """
     out = base
+    has_ai = isinstance(ai, dict)
+    ai_dict: dict = ai if has_ai else {}
+    if not has_ai:
+        log.info("No usable AI output; using %s build verbatim", base.source)
 
     # --- Pool format: core_items + situational_items -------------------------
     has_pool = bool(base.situational_pool and base.core_items and base.boots is not None)
 
-    if has_pool and ("core_items" in ai or "situational_items" in ai):
+    if has_ai and has_pool and ("core_items" in ai_dict or "situational_items" in ai_dict):
         pool_names = {item["name"] for item in base.situational_pool}
         default_core_names = [item["name"] for item in base.core_items]
         # Expected situational slots: total items minus boots(1) minus core items
@@ -273,16 +536,18 @@ def apply_ai_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
                 n in pool_names for n in ai_core_names if n not in default_core_names
             )
             all_exist = all(catalog.item_id(n) is not None for n in ai_core_names)
-            if swaps <= 1 and swapped_in_pool and all_exist:
+            eligible = all(_item_eligible_for_champion(n, ctx.my_champion)
+                           for n in ai_core_names)
+            if swaps <= 1 and swapped_in_pool and all_exist and eligible:
                 core_valid = True
                 final_core_names = ai_core_names
             else:
                 log.debug(
-                    "AI core_items rejected (swaps=%d, pool_ok=%s, exist=%s)",
-                    swaps, swapped_in_pool, all_exist,
+                    "AI core_items rejected (swaps=%d, pool_ok=%s, exist=%s, eligible=%s)",
+                    swaps, swapped_in_pool, all_exist, eligible,
                 )
 
-        # Validate situational_items: exact count, all from pool, no dups with boots/core
+        # Validate situational_items: exact count, all from pool, no dups, type-eligible
         ai_situ = ai.get("situational_items", [])
         situ_valid = False
         if isinstance(ai_situ, list) and len(ai_situ) == situational_count:
@@ -293,12 +558,14 @@ def apply_ai_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
             )
             all_in_pool = all(n in pool_names for n in ai_situ_names)
             all_exist = all(catalog.item_id(n) is not None for n in ai_situ_names)
-            if no_dup and all_in_pool and all_exist:
+            eligible = all(_item_eligible_for_champion(n, ctx.my_champion)
+                           for n in ai_situ_names)
+            if no_dup and all_in_pool and all_exist and eligible:
                 situ_valid = True
             else:
                 log.debug(
-                    "AI situational_items rejected (no_dup=%s, pool_ok=%s, exist=%s)",
-                    no_dup, all_in_pool, all_exist,
+                    "AI situational_items rejected (no_dup=%s, pool_ok=%s, exist=%s, eligible=%s)",
+                    no_dup, all_in_pool, all_exist, eligible,
                 )
 
         if situ_valid:
@@ -317,34 +584,83 @@ def apply_ai_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
     from sylqon.ai.prompts import rune_pool_for_champion
     champion_rune_pool = rune_pool_for_champion(ctx.my_champion)
 
-    _apply_runes(out, ai, rune_pool=champion_rune_pool)
-    _apply_shards(out, ai)
-    _apply_spells(out, ai, ctx)
+    _apply_runes(out, ai_dict, ctx, rune_pool=champion_rune_pool)
+    _apply_shards(out, ai_dict, ctx, candidate)
+    _apply_spells(out, ai_dict, ctx)
 
-    out.reasoning = str(ai.get("reasoning", ""))[:300]
-    out.source = f"{base.source}+ollama"
+    # Code-level counter-item guarantee. Runs even without AI so threat coverage
+    # holds when Ollama is unavailable; a no-op when no threat mandates a swap.
+    enforced = _enforce_counter_items(base, out.items, candidate or {}, ctx, catalog)
+    if enforced and len(enforced) == len(out.items):
+        out.items = enforced
+
+    if has_ai:
+        out.reasoning = str(ai_dict.get("reasoning", ""))[:300]
+        out.source = f"{base.source}+ollama"
     return out
 
 
-def _apply_runes(out: Loadout, ai: dict, rune_pool: dict | None = None) -> None:
+def _apply_runes(out: Loadout, ai: dict, ctx: MatchContext,
+                 rune_pool: dict | None = None) -> None:
+    """Apply the AI's rune block only as a pool-constrained filter over the
+    candidate (meta op.gg) page.
+
+    Without a champion pool the legacy permissive behaviour holds (any globally
+    valid block is accepted). With a pool we keep the meta keystone + primary
+    core unless a strong threat justifies a pool-legal keystone swap, and reject
+    any primary rune outside the champion's flexible pool — so the AI can only
+    retune the flexible defensive / utility slots. Any rejection falls back to
+    the candidate page deterministically."""
     ks = ai.get("keystone", "")
     prim = ai.get("primary_runes", [])
     sec = ai.get("secondary_runes", [])
     sec_style = ai.get("secondary_style", "")
-    if _valid_rune_block(ks, prim, sec, sec_style, rune_pool=rune_pool):
-        out.primary_style_id = static.RUNE_STYLES[static.KEYSTONE_STYLE[ks]]
-        out.secondary_style_id = static.RUNE_STYLES[sec_style]
-        out.rune_perk_ids = _rune_ids(ks, prim, sec)
-    else:
+    if not _valid_rune_block(ks, prim, sec, sec_style, rune_pool=rune_pool):
         log.debug("AI rune block rejected; keeping candidate runes")
+        return
+
+    if rune_pool is not None:
+        # Candidate keystone currently on the loadout = the meta fallback.
+        cand_ks = static.RUNE_BY_ID.get(out.rune_perk_ids[0]) if out.rune_perk_ids else None
+        if ks != cand_ks and not (
+            _strong_threat(_safe_threat(ctx)) and ks in rune_pool["keystone_options"]
+        ):
+            log.debug("Keystone swap %s->%s not threat-justified; keeping meta page",
+                      cand_ks, ks)
+            return
+        if not all(r in rune_pool["primary_minor_flex"] for r in prim):
+            log.debug("AI primary runes outside champion flex pool; keeping meta page")
+            return
+
+    out.primary_style_id = static.RUNE_STYLES[static.KEYSTONE_STYLE[ks]]
+    out.secondary_style_id = static.RUNE_STYLES[sec_style]
+    out.rune_perk_ids = _rune_ids(ks, prim, sec)
 
 
-def _apply_shards(out: Loadout, ai: dict) -> None:
-    shards = ai.get("stat_shards", [])
+def _apply_shards(out: Loadout, ai: dict, ctx: MatchContext,
+                  candidate_build: dict | None = None) -> None:
+    """Threat-aware, meta-anchored stat shards.
+
+    The op.gg shards are the base; the defense (and, vs decisive AP, the flex)
+    row is overridden deterministically from the enemy AD/AP balance and CC load.
+    This computed trio is ALWAYS written, so a missing/garbage AI shard output
+    still yields a matchup-aware page. A valid AI page may keep its offense/flex
+    picks, but its defense pick is only honoured when it is no worse than the
+    computed shard for this comp (never undo CC/AP/AD cover)."""
+    threat = _safe_threat(ctx)
+    base_shards = _base_shard_names(out, candidate_build)
+    computed = _compute_default_shards(threat, base_shards)
+    final = list(computed)
+
+    shards = ai.get("stat_shards", []) if isinstance(ai, dict) else []
     rows = [static.SHARD_ROW_OFFENSE, static.SHARD_ROW_FLEX, static.SHARD_ROW_DEFENSE]
     if (isinstance(shards, list) and len(shards) == 3
             and all(s in rows[i] for i, s in enumerate(shards))):
-        out.shard_ids = [static.STAT_SHARDS[s] for s in shards]
+        final[0], final[1] = shards[0], shards[1]          # trust within-row offense/flex
+        if shards[2] in _acceptable_defense_shards(threat):
+            final[2] = shards[2]                            # honour a threat-consistent defense
+
+    out.shard_ids = [static.STAT_SHARDS[s] for s in final]
 
 
 def _apply_spells(out: Loadout, ai: dict, ctx: MatchContext) -> None:
@@ -357,7 +673,7 @@ def _apply_spells(out: Loadout, ai: dict, ctx: MatchContext) -> None:
 
 
 def apply_ai_open_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
-                           catalog: Catalog) -> Loadout:
+                           catalog: Catalog, candidate: dict | None = None) -> Loadout:
     """Like apply_ai_decision but for OpenBuild mode.
 
     Differences from the standard path:
@@ -366,15 +682,15 @@ def apply_ai_open_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
     - Situational items only need to exist in catalog (no pool membership check).
     - Source suffix is +ollama-open.
     """
-    if not isinstance(ai, dict):
-        log.info("No usable AI output; using %s build verbatim", base.source)
-        return base
-
     out = base
+    has_ai = isinstance(ai, dict)
+    ai_dict: dict = ai if has_ai else {}
+    if not has_ai:
+        log.info("No usable AI output; using %s build verbatim", base.source)
 
     has_pool = bool(base.core_items) and base.boots is not None
 
-    if has_pool and ("core_items" in ai or "situational_items" in ai):
+    if has_ai and has_pool and ("core_items" in ai_dict or "situational_items" in ai_dict):
         default_core_names = [item["name"] for item in base.core_items]
         situational_count = len(base.items) - 1 - len(base.core_items)
 
@@ -384,12 +700,14 @@ def apply_ai_open_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
             ai_core_names = [str(n) for n in ai_core]
             swaps = sum(1 for n in ai_core_names if n not in default_core_names)
             all_exist = all(catalog.item_id(n) is not None for n in ai_core_names)
-            if swaps <= 1 and all_exist:
+            eligible = all(_item_eligible_for_champion(n, ctx.my_champion)
+                           for n in ai_core_names)
+            if swaps <= 1 and all_exist and eligible:
                 final_core_names = ai_core_names
             else:
                 log.debug(
-                    "AI core_items rejected (swaps=%d, exist=%s)",
-                    swaps, all_exist,
+                    "AI core_items rejected (swaps=%d, exist=%s, eligible=%s)",
+                    swaps, all_exist, eligible,
                 )
 
         ai_situ = ai.get("situational_items", [])
@@ -401,12 +719,14 @@ def apply_ai_open_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
                 set(ai_situ_names) & occupied
             )
             all_exist = all(catalog.item_id(n) is not None for n in ai_situ_names)
-            if no_dup and all_exist:
+            eligible = all(_item_eligible_for_champion(n, ctx.my_champion)
+                           for n in ai_situ_names)
+            if no_dup and all_exist and eligible:
                 situ_valid = True
             else:
                 log.debug(
-                    "AI situational_items rejected (no_dup=%s, exist=%s)",
-                    no_dup, all_exist,
+                    "AI situational_items rejected (no_dup=%s, exist=%s, eligible=%s)",
+                    no_dup, all_exist, eligible,
                 )
 
         if situ_valid:
@@ -425,10 +745,16 @@ def apply_ai_open_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
     from sylqon.ai.prompts import rune_pool_for_champion
     champion_rune_pool = rune_pool_for_champion(ctx.my_champion)
 
-    _apply_runes(out, ai, rune_pool=champion_rune_pool)
-    _apply_shards(out, ai)
-    _apply_spells(out, ai, ctx)
+    _apply_runes(out, ai_dict, ctx, rune_pool=champion_rune_pool)
+    _apply_shards(out, ai_dict, ctx, candidate)
+    _apply_spells(out, ai_dict, ctx)
 
-    out.reasoning = str(ai.get("reasoning", ""))[:300]
-    out.source = f"{base.source}+ollama-open"
+    # Code-level counter-item guarantee (same as the standard path).
+    enforced = _enforce_counter_items(base, out.items, candidate or {}, ctx, catalog)
+    if enforced and len(enforced) == len(out.items):
+        out.items = enforced
+
+    if has_ai:
+        out.reasoning = str(ai_dict.get("reasoning", ""))[:300]
+        out.source = f"{base.source}+ollama-open"
     return out
