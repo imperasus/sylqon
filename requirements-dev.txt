@@ -1,0 +1,13 @@
+# Development / test dependencies for the offline suite (`python -m pytest tests/ -q`).
+# Installs the full runtime stack plus the test runner and the libraries that the
+# optional, flag-gated RAG modules import at module load time — the RAG test files
+# import sylqon/rag/*_retrieve.py, which `import numpy`, so the suite needs it even
+# though the RAG feature flags default OFF (see tests/conftest.py).
+
+-r requirements.txt
+
+pytest>=8.0
+
+# Imported by sylqon/rag/{item,rune,kit}_retrieve.py. Not in the base runtime
+# requirements because the RAG paths are off by default and lazily imported.
+numpy>=1.26

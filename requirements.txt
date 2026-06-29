@@ -2,3 +2,14 @@ requests>=2.31
 urllib3>=2.0
 websocket-client>=1.7
 SQLAlchemy>=2.0
+
+# Web server stack — the dashboard + JSON API in sylqon/server.py. Required to
+# run `python -m sylqon.server` / `python -m sylqon.main`. (Versions mirror the
+# pins verified in sylqon-desktop/backend/requirements-build.txt.)
+fastapi>=0.115
+uvicorn[standard]>=0.34
+pydantic>=2.8
+
+# Optional dev convenience: load a project-root .env. config.py degrades
+# gracefully (ImportError is swallowed) if this isn't installed.
+python-dotenv>=1.0
