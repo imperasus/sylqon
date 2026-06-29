@@ -109,6 +109,43 @@ class MetaCache:
             self._save()
         log.info("Cached build for %s %s (source=%s)", champion, role, source)
 
+    def bulk_put_builds(self, items: list[tuple], patch: str,
+                        skip_existing: bool = False) -> int:
+        """Write many builds at once with a single ``_save()`` — used by the full
+        sync (and the startup DB backfill) to pre-warm the live cache for every
+        champion without the O(n²) disk churn of calling :meth:`put_build` per
+        entry.
+
+        ``items``: ``[(champion, role, build, raw_payload), ...]``. Entries are
+        tagged ``source="opgg"`` so :meth:`reconvert_opgg_builds` can refresh them
+        after a later LCU catalog supplement. With ``skip_existing`` the write
+        only *adds* missing keys — it never overwrites an already-cached build
+        (e.g. a fresher live champ-select fetch). Returns the number written."""
+        if not items:
+            return 0
+        now = time.time()
+        written = 0
+        with self._lock:
+            for champion, role, build, raw_payload in items:
+                key = build_key(champion, role)
+                if skip_existing and key in self._data["builds"]:
+                    continue
+                entry: dict = {
+                    "updated_at": now,
+                    "source": "opgg",
+                    "patch": patch,
+                    "build": build,
+                }
+                if raw_payload is not None:
+                    entry["raw_payload"] = raw_payload
+                self._data["builds"][key] = entry
+                written += 1
+            if written:
+                self._data["patch"] = patch
+                self._save()
+        log.info("Bulk-cached %d build(s)", written)
+        return written
+
     # -- post-supplement re-conversion ---------------------------------------
     def reconvert_opgg_builds(self, catalog) -> int:
         """Re-convert all OP.GG-sourced builds that have a stored raw_payload.

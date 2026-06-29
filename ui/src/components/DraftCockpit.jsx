@@ -56,14 +56,14 @@ function miniTip(it, isCounter) {
   return bits.join("\n");
 }
 
-/* Top-3 counters/synergies from the player's pool, beneath a locked card. */
+/* Top-3 counters/synergies across the whole role roster, beneath a locked card. */
 function MiniPickList({ label, tone, items, patch, isCounter }) {
   if (!items?.length) return null;
   return (
     <div className="mt-0.5 ml-2 rounded-md border border-white/[0.06] bg-white/[0.012] px-1.5 py-1">
       <div className={`mb-0.5 text-3xs font-bold tracking-[0.18em] ${MINI_LABEL[tone] || "text-white/60"}`}
-           title="Best picks from your pool for this matchup">
-        {label} <span className="text-white/25">· YOUR POOL</span>
+           title="Best picks across the whole roster for this matchup">
+        {label} <span className="text-white/25">· OVERALL</span>
       </div>
       <div className="flex flex-col gap-0.5">
         {items.map((it) => {
@@ -190,7 +190,7 @@ function PlayerRow({ pick, patch, side, isMe }) {
   );
 }
 
-/* A pick row plus its pool-derived Top-3 list (counters for enemies, synergies
+/* A pick row plus its roster-wide Top-3 list (counters for enemies, synergies
    for allies) — only once the pick is locked and a list exists. */
 function PlayerCard({ pick, patch, side, isMe, scout, miniMax = 3, showScout = true }) {
   if (!pick) return <PlayerRow pick={null} patch={patch} side={side} />;

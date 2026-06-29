@@ -52,6 +52,49 @@ def test_refresh_targets_uses_per_entry_patch(store):
     assert ("Ahri", "middle") in store.refresh_targets("14.13.1")
 
 
+def test_bulk_put_builds(store):
+    """Full-sync pre-warm path: many builds in one save, raw_payload optional,
+    counted by stats() and persisted to disk."""
+    items = [
+        ("Ahri", "middle", {"items": [1, 2, 3, 4]}, {"shaped": "payload"}),
+        ("Jinx", "bottom", {"items": [5, 6, 7, 8]}, None),
+    ]
+    n = store.bulk_put_builds(items, "14.12.1")
+
+    assert n == 2
+    assert store.stats()["builds"] == 2
+    # Tagged source="opgg" + patch-fresh -> a "cache" hit, not stale.
+    assert store.get_build("Ahri", "middle", "14.12.1")[1] == "cache"
+    # raw_payload kept when given (so reconvert can refresh after a catalog
+    # supplement), absent when None.
+    assert store._data["builds"]["Ahri|middle"]["raw_payload"] == {"shaped": "payload"}
+    assert "raw_payload" not in store._data["builds"]["Jinx|bottom"]
+    # Persisted: a fresh cache on the same (monkeypatched) path reads them back.
+    assert MetaCache().stats()["builds"] == 2
+
+
+def test_bulk_put_builds_empty_is_noop(store):
+    assert store.bulk_put_builds([], "14.12.1") == 0
+    assert store.stats()["builds"] == 0
+
+
+def test_bulk_put_builds_skip_existing_preserves_fresher_entries(store):
+    """The startup DB backfill only fills gaps — it must never clobber an already
+    cached (e.g. fresher live-fetched) build."""
+    live = {"items": [9, 9, 9, 9]}
+    store.put_build("Ahri", "middle", live, "opgg", "14.12.1")
+
+    added = store.bulk_put_builds(
+        [("Ahri", "middle", {"items": [1, 1, 1, 1]}, None),   # already present -> skipped
+         ("Jinx", "bottom", {"items": [2, 2, 2, 2]}, None)],  # missing -> added
+        "14.12.1", skip_existing=True)
+
+    assert added == 1
+    assert store.stats()["builds"] == 2
+    assert store.get_build("Ahri", "middle")[0] == live  # untouched
+    assert store.get_build("Jinx", "bottom")[0] == {"items": [2, 2, 2, 2]}
+
+
 def test_synced_patch_roundtrip(store):
     assert store.get_synced_patch() == ""
     store.set_synced_patch("14.12")

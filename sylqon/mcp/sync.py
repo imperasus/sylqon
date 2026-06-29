@@ -94,7 +94,7 @@ class SynergiesPayload:
 # Automated full sync (direct op.gg HTTP — no MCP/Node needed)
 # ---------------------------------------------------------------------------
 def run_full_sync(region: str | None = None, sleep: float = 0.12,
-                  progress=None) -> dict:
+                  progress=None, store=None, catalog=None) -> dict:
     """Populate the DB for EVERY champion in EVERY role it plays: roles + meta
     tiers/win/pick, counters, synergies and builds.
 
@@ -103,6 +103,13 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
     keep-alive session) while DB writes stay single-threaded. Runs unattended;
     idempotent — safe to re-run each patch. ``progress(done, total)`` is called
     periodically.
+
+    When a ``store`` (:class:`~sylqon.cache.store.MetaCache`) is passed, every
+    converted build is also mirrored into the live injection cache in one batched
+    write at the end — so the "X BUILDS" badge reflects the whole universe and any
+    champion is instantly injectable in draft (no live op.gg fetch). Pass the
+    runtime ``catalog`` too so the cache builds carry the same patch as the rest
+    of the app (no patch drift); when omitted a fresh ``Catalog`` is built.
     """
     from sylqon import config
     from sylqon.cache.opgg import opgg_to_build
@@ -113,10 +120,13 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
     from sylqon.mcp import ingest, opgg_http
 
     init_db()
-    catalog = Catalog()
+    if catalog is None:
+        catalog = Catalog()
     catalog.refresh_if_stale()
     session = get_session()
-    counts = {"champions": 0, "builds": 0, "counters": 0, "synergies": 0, "skipped": 0}
+    cache_writes: list[tuple] = []  # (champion, role, build, raw_payload) for the live cache
+    counts = {"champions": 0, "builds": 0, "counters": 0, "synergies": 0,
+              "cached": 0, "skipped": 0}
     try:
         # Self-bootstrap: ensure a Champion row exists per Data Dragon champion so
         # the sync can populate roles/stats/builds even on a fresh DB.
@@ -182,6 +192,9 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
                         if build and ingest.mirror_build(session, champ.name, role, build,
                                                          "opgg-sync", catalog.patch):
                             counts["builds"] += 1
+                            # Mirror into the live injection cache too (batched
+                            # write below) so every champion is instantly buildable.
+                            cache_writes.append((champ.name, role, build, payload))
                     for c in counters:
                         other = rows.get(c["champion_id"])
                         if other is None:
@@ -206,6 +219,10 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
                     if progress:
                         progress(done, total)
         session.commit()
+        # Pre-warm the live injection cache in one batched save (avoids the O(n²)
+        # disk churn of a per-build put_build during the loop).
+        if store is not None and cache_writes:
+            counts["cached"] = store.bulk_put_builds(cache_writes, catalog.patch)
     finally:
         session.close()
     log.info("Full sync complete: %s", counts)

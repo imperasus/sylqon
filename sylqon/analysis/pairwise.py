@@ -1,8 +1,10 @@
 """Per-pair counter / synergy ranking for the live champ-select board.
 
 Given a single revealed pick — an enemy to counter, or an ally to synergise
-with — and the player's role pool, rank the pool champions for that one matchup.
-Two deterministic signals are blended:
+with — and a set of candidate champions, rank those candidates for that one
+matchup. The caller supplies the candidates (the live board passes the whole role
+roster, so the suggestion is the best answer overall, not just from the player's
+pool). Two deterministic signals are blended:
 
   * a **tag heuristic floor** — reuses the engage / frontline / enchanter /
     threat / damage predicates from the champion recommender (``ai.pick_prompt``)

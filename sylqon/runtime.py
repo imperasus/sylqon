@@ -245,6 +245,39 @@ class PipelineRunner:
         self._last_role_top: list[dict] = []        # universal role top-N for live draft
         logging.getLogger("sylqon").addHandler(StateLogHandler(self.state))
         self._bootstrap_if_empty()
+        self._prewarm_cache_from_db()
+
+    def _prewarm_cache_from_db(self) -> None:
+        """Network-free: mirror the already-synced DB build universe into the live
+        injection cache so every champion is instantly buildable and the "X BUILDS"
+        badge reflects the full set — without waiting for the next patch's auto
+        full-sync. Only current-patch builds are added (so none are mislabelled as
+        fresh), and existing cache entries (e.g. fresher live fetches) are kept.
+        Best-effort: never breaks startup."""
+        patch = self.catalog.patch
+        if not patch:
+            return  # catalog not loaded yet; the auto full-sync will pre-warm later
+        try:
+            from sylqon.db.schema import Champion, ChampionBuild
+            from sylqon.db.session import get_session
+            session = get_session()
+            try:
+                rows = (session.query(ChampionBuild, Champion.name)
+                        .join(Champion, ChampionBuild.champion_id == Champion.id)
+                        .filter(ChampionBuild.patch == patch)
+                        .all())
+            finally:
+                session.close()
+        except Exception:
+            log.debug("DB cache pre-warm skipped", exc_info=True)
+            return
+        items = [(name, b.role, b.build_json, None)
+                 for b, name in rows if b.build_json]
+        if not items:
+            return
+        added = self.store.bulk_put_builds(items, patch, skip_existing=True)
+        if added:
+            log.info("Pre-warmed %d build(s) into the live cache from the DB universe", added)
 
     def _bootstrap_if_empty(self) -> None:
         """On fresh installs (no cached builds), fetch the catalog from Data
@@ -1195,14 +1228,21 @@ class PipelineRunner:
 
     def _pick_intel(self, ctx: MatchContext) -> tuple[dict, dict]:
         """Per-locked-pick Top-3 lists: counters for each revealed enemy and
-        synergies for each locked ally, drawn from the player's role pool. Tag
-        heuristic floor + optional op.gg DB booster (same pool the recommender
-        uses, minus anything already taken or banned). Returns
-        ``({enemy_id: [...]}, {ally_id: [...]})``; best-effort, never raises."""
+        synergies for each locked ally, ranked across the WHOLE role roster (every
+        champion that plays the lane), not just the player's pool. Tag heuristic
+        floor + optional op.gg DB booster, minus anything already taken or banned.
+        Returns ``({enemy_id: [...]}, {ally_id: [...]})``; best-effort, never
+        raises."""
+        session = None
+        try:
+            from sylqon.db.session import get_session
+            session = get_session()
+        except Exception:
+            session = None
         try:
             from sylqon.ai.pick_prompt import build_candidates
             from sylqon.analysis import pairwise
-            pool = self.store.champions_for_role(ctx.my_role)
+            pool = self._role_universe(ctx.my_role, session)
             candidates = build_candidates(ctx, pool, self.catalog)
             excluded = ({ctx.my_champion}
                         | {self.catalog.champion_name(cid) for cid in ctx.bans})
@@ -1211,17 +1251,6 @@ class PipelineRunner:
                 c["slug"] = (self.catalog.champion_by_name(c["name"]) or {}).get("id", "")
             if not candidates:
                 return {}, {}
-        except Exception:
-            log.debug("pick-intel candidate build failed", exc_info=True)
-            return {}, {}
-
-        session = None
-        try:
-            from sylqon.db.session import get_session
-            session = get_session()
-        except Exception:
-            session = None
-        try:
             counters = {
                 e.champion_id: pairwise.rank_counters_for_enemy(
                     e, candidates, session=session, role=ctx.my_role)
@@ -1232,13 +1261,28 @@ class PipelineRunner:
                     a, candidates, session=session, role=ctx.my_role)
                 for a in ctx.allies if a.locked
             }
+            return counters, synergies
         except Exception:
-            log.debug("pick-intel ranking failed", exc_info=True)
-            counters, synergies = {}, {}
+            log.debug("pick-intel failed", exc_info=True)
+            return {}, {}
         finally:
             if session is not None:
                 session.close()
-        return counters, synergies
+
+    def _role_universe(self, role: str, session) -> list[str]:
+        """Every champion that plays ``role`` (op.gg lane-meta) for overall
+        counter/synergy ranking — independent of the player's curated pool. Falls
+        back to the buildable set when the DB roster isn't available yet (no sync
+        / no session)."""
+        if session is not None:
+            try:
+                from sylqon.db import queries
+                names = [c.name for c in queries.champions_for_role(session, role)]
+                if names:
+                    return names
+            except Exception:
+                log.debug("role-universe DB lookup failed", exc_info=True)
+        return self.store.buildable_for_role(role)
 
     def _ally_summary(self, ctx: MatchContext) -> dict:
         """Damage / threat profile of the player's own team (allies + the local
@@ -2180,7 +2224,8 @@ class PipelineRunner:
                                   detail=f"{done}/{total} champion-roles synced")
 
             try:
-                result = run_full_sync(progress=progress)
+                result = run_full_sync(progress=progress, store=self.store,
+                                       catalog=self.catalog)
                 # Mark the patch we just synced so the auto-sync won't re-run
                 # until the next patch lands.
                 if not result.get("error"):
@@ -2189,7 +2234,8 @@ class PipelineRunner:
                 self._refresh_system_status()
                 self.state.update("sync", running=False, at=time.time(),
                                   detail=("sync complete: "
-                                          f"{result.get('builds', 0)} builds, "
+                                          f"{result.get('builds', 0)} builds "
+                                          f"({result.get('cached', 0)} cached), "
                                           f"{result.get('counters', 0)} counters, "
                                           f"{result.get('synergies', 0)} synergies"),
                                   last_result=result)
