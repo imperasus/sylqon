@@ -222,3 +222,80 @@ def test_on_live_scout_preserves_ally_spectator_never_covered():
     out = r.state.snapshot()["scout"]["players"]
 
     assert sorted(p["name"] for p in out) == ["Ghost", "Other"]
+
+
+# ------------------------------------------ two-phase streaming (1+2)
+def test_patch_scout_players_applies_deep_and_preserves_lcu_ally():
+    # A deep_pending Riot-only card takes the full fingerprint overlay; a
+    # richer LCU ally (no deep_pending) keeps its pool — only Riot-only fields.
+    r = _runner()
+    r.state.set("scout", {"players": [
+        {"puuid": "E", "side": "enemy", "deep_pending": True,
+         "games_analyzed": 0, "champion_pool": [], "current_champ": {}},
+        {"puuid": "A", "side": "ally", "games_analyzed": 12,   # LCU-rich
+         "champion_pool": [{"champion_id": 1}], "current_champ": {}},
+        {"puuid": "Z", "side": "enemy", "deep_pending": True,  # untouched
+         "games_analyzed": 0},
+    ], "ready": True, "at": 0})
+
+    r._patch_scout_players({
+        "E": {"deep_pending": False, "games_analyzed": 7,
+              "champion_pool": [{"champion_id": 64}], "current_champ": {"games": 5}},
+        "A": {"deep_pending": False, "games_analyzed": 30,
+              "champion_pool": [{"champion_id": 99}], "current_champ": {"games": 9}},
+    }, premade_groups=2)
+    out = {p["puuid"]: p for p in r.state.snapshot()["scout"]["players"]}
+
+    assert out["E"]["games_analyzed"] == 7                 # full fingerprint applied
+    assert out["E"]["champion_pool"] == [{"champion_id": 64}]
+    assert out["E"]["deep_pending"] is False
+    assert out["A"]["games_analyzed"] == 12                # LCU pool preserved
+    assert out["A"]["champion_pool"] == [{"champion_id": 1}]
+    assert out["A"]["current_champ"] == {"games": 9}       # Riot-only field overlaid
+    assert out["Z"]["deep_pending"] is True                # not in patches → untouched
+    assert r.state.snapshot()["scout"]["premade_groups"] == 2
+
+
+def test_do_live_scout_shows_all_ten_before_deep_stats(monkeypatch):
+    # The whole point of 1+2: a full 10-card push happens (Phase A) *before* any
+    # match-history fingerprint resolves, then deep stats stream in (Phase B).
+    import sylqon.riot.scout as riot_scout
+    import sylqon.riot.api as riot_api
+    from sylqon.lcu.scout import PlayerFingerprint
+
+    r = _runner()
+    monkeypatch.setattr(r, "_name_slug", lambda e: None)
+    parts = [{"puuid": f"P{i}", "championId": 10 + i,
+              "teamId": 100 if i < 5 else 200,
+              "riotId": f"Name{i}#TAG", "teamPosition": "TOP"} for i in range(10)]
+    monkeypatch.setattr(r, "_await_active_game", lambda pu: {"participants": parts})
+    monkeypatch.setattr(riot_scout, "scout_account",
+                        lambda pu: ({"rank": "G2 · 50 LP", "mastery": []}, []))
+    monkeypatch.setattr(riot_scout, "scout_history",
+                        lambda pu, mastery=None: (
+                            PlayerFingerprint(games_analyzed=8,
+                                              champion_pool=[{"champion_id": 64}]),
+                            {"g1": {pu: 100}}))
+    monkeypatch.setattr(riot_api, "get_mastery_by_champion", lambda pu, cid: None)
+    monkeypatch.setattr(riot_scout, "detect_premades", lambda puuids, cm: [])
+
+    scout_pushes: list = []
+    orig_set = r.state.set
+    monkeypatch.setattr(r.state, "set", lambda sec, val: (
+        scout_pushes.append(val) if sec == "scout" else None, orig_set(sec, val))[-1])
+
+    r._do_live_scout("P0")
+
+    # Phase A: the first scout push already has all 10 cards, none with deep stats.
+    phase_a = scout_pushes[0]
+    assert len(phase_a["players"]) == 10
+    assert all(p["deep_pending"] for p in phase_a["players"])
+    assert all(p["games_analyzed"] == 0 for p in phase_a["players"])
+    # Streaming: 1 (Phase A) + 10 (per-player) + 1 (premade) pushes.
+    assert len(scout_pushes) == 12
+
+    final = {p["puuid"]: p for p in r.state.snapshot()["scout"]["players"]}
+    assert len(final) == 10
+    assert all(p["games_analyzed"] == 8 for p in final.values())
+    assert all(p["deep_pending"] is False for p in final.values())
+    assert final["P2"]["side"] == "ally" and final["P7"]["side"] == "enemy"

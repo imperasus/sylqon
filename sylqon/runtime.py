@@ -7,6 +7,7 @@ dashboard. main.py (headless CLI) and server.py (dashboard) both run this.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import logging
 import threading
@@ -779,10 +780,19 @@ class PipelineRunner:
         return None
 
     def _do_live_scout(self, my_puuid: str) -> None:
-        """Fetch full fingerprints for all 10 players via Spectator + MATCH APIs,
-        detect premade groups from shared matches, and resolve each player's
-        games/WR + mastery on the champion they're on now. Runs on a daemon
-        thread — updates scout state when complete."""
+        """Scout all 10 players via Spectator + MATCH APIs in two phases so the
+        board fills in fast:
+
+          Phase A (cheap, ~1-2s): rank + mastery + current-champ for everyone, in
+            parallel. All 10 cards are pushed at once — the user sees the full
+            roster immediately, with the deep stats still pending.
+          Phase B (slow): the match-history fingerprint per player. Each player's
+            deep read is streamed into its card the moment it resolves, rather
+            than waiting for the slowest of the ten.
+
+        Premade detection needs every player's shared games, so it runs as a
+        final overlay once all of Phase B has completed. Runs on a daemon
+        thread; never raises."""
         try:
             from sylqon.riot import api as riot_api
             from sylqon.riot import scout as riot_scout
@@ -800,29 +810,28 @@ class PipelineRunner:
             if not puuids:
                 return
 
-            log.info("Live scout: scouting %d players via Riot API", len(puuids))
-            scouted = riot_scout.scout_all(puuids)
+            # ---- Phase A: rank + mastery for all 10, in parallel. -------------
+            log.info("Live scout: phase 1 (rank/mastery) for %d players", len(puuids))
+            accounts: dict[str, tuple[dict, list | None]] = {}
+            with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=min(10, len(puuids))) as ex:
+                futs = {ex.submit(riot_scout.scout_account, pu): pu for pu in puuids}
+                for fut in concurrent.futures.as_completed(futs):
+                    pu = futs[fut]
+                    try:
+                        accounts[pu] = fut.result()
+                    except Exception:
+                        log.debug("scout_account failed for %s…", pu[:8], exc_info=True)
+                        accounts[pu] = ({}, None)
 
-            # Premade groups, cross-referenced from everyone's shared recent games.
-            comatches = {pu: c for pu, (_, _, c) in scouted.items()}
-            groups = riot_scout.detect_premades(set(puuids), comatches)
-            group_of = {pu: i for i, g in enumerate(groups) for pu in g}
-
-            players: list[dict] = []
+            # Build a thin card per player (no fingerprint yet) and show all 10.
+            cards: dict[str, dict] = {}
             for p in participants:
                 pu = p.get("puuid", "")
-                fp, account, _ = scouted.get(pu, (None, {}, {}))
-                entry: dict = (fp.to_dict() if fp and fp.games_analyzed > 0
-                               else {"games_analyzed": 0})
-                # Resolve champion_pool/comfort IDs → display name + slug.
-                for pool_entry in entry.get("champion_pool", []):
-                    self._name_slug(pool_entry)
-                if entry.get("comfort"):
-                    self._name_slug(entry["comfort"])
-
+                account, _ = accounts.get(pu, ({}, None))
                 cid = p.get("championId")
                 cc = riot_scout.current_champ_stats(
-                    fp, (account or {}).get("mastery"), cid)
+                    None, (account or {}).get("mastery"), cid)
                 # Fall back to a direct mastery lookup when the current champ is
                 # outside the player's top-5 mastery (best-effort, never fatal).
                 if cc.get("mastery_points") is None and cid:
@@ -835,30 +844,122 @@ class PipelineRunner:
                         log.debug("by-champion mastery lookup failed", exc_info=True)
 
                 name = (p.get("riotId") or "").split("#")[0] or p.get("summonerName", "")
-                entry["name"] = name
-                entry["puuid"] = pu
-                entry["champion_id"] = cid
-                entry["rank"] = (account or {}).get("rank", "")
-                entry["account"] = account or {}
-                entry["current_champ"] = cc
-                entry["premade_group"] = group_of.get(pu)
-                entry["side"] = "ally" if p.get("teamId") == my_team_id else "enemy"
-                entry["position"] = (p.get("teamPosition") or "").lower()
-                players.append(entry)
+                cards[pu] = {
+                    "games_analyzed": 0,
+                    "deep_pending": True,   # match-history fingerprint still loading
+                    "name": name,
+                    "puuid": pu,
+                    "champion_id": cid,
+                    "rank": (account or {}).get("rank", ""),
+                    "account": account or {},
+                    "current_champ": cc,
+                    "premade_group": None,
+                    "side": "ally" if p.get("teamId") == my_team_id else "enemy",
+                    "position": (p.get("teamPosition") or "").lower(),
+                }
 
-            # Resolve premade partner names now that every entry has a name.
-            name_by_pu = {p["puuid"]: p.get("name", "") for p in players}
-            for entry in players:
-                g = entry.get("premade_group")
+            self._on_live_scout(list(cards.values()), premade_groups=0)
+
+            # ---- Phase B: match-history fingerprint, streamed in per player. --
+            log.info("Live scout: phase 2 (match history) for %d players", len(puuids))
+            mastery_by_pu = {pu: acc[1] for pu, acc in accounts.items()}
+            comatches: dict[str, dict] = {}
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+                futs = {ex.submit(riot_scout.scout_history, pu,
+                                  mastery_by_pu.get(pu)): pu for pu in puuids}
+                for fut in concurrent.futures.as_completed(futs):
+                    pu = futs[fut]
+                    try:
+                        fp, cm = fut.result()
+                    except Exception:
+                        log.debug("scout_history failed for %s…", pu[:8], exc_info=True)
+                        fp, cm = None, {}
+                    comatches[pu] = cm or {}
+
+                    card = cards.get(pu)
+                    if card is None:
+                        continue
+                    patch: dict = {"deep_pending": False}
+                    if fp and fp.games_analyzed > 0:
+                        deep = fp.to_dict()
+                        for pool_entry in deep.get("champion_pool", []):
+                            self._name_slug(pool_entry)
+                        if deep.get("comfort"):
+                            self._name_slug(deep["comfort"])
+                        # Now that we have recent games, refine current-champ —
+                        # but keep the Phase-A mastery fallback if history can't.
+                        prev_cc = card.get("current_champ") or {}
+                        cc = riot_scout.current_champ_stats(
+                            fp, (card.get("account") or {}).get("mastery"),
+                            card.get("champion_id"))
+                        if cc.get("mastery_points") is None:
+                            cc["mastery_points"] = prev_cc.get("mastery_points")
+                            cc["mastery_level"] = prev_cc.get("mastery_level")
+                        patch.update(deep)
+                        patch["current_champ"] = cc
+                    # Stream just this player's deep read onto the board. (The
+                    # local `card` is read-only here — Phase A appended its dict
+                    # by reference into published state, so mutating it would let
+                    # a polling reader see a half-applied update.)
+                    self._patch_scout_players({pu: patch})
+
+            # ---- Final overlay: premade groups from everyone's shared games. --
+            groups = riot_scout.detect_premades(set(puuids), comatches)
+            group_of = {pu: i for i, g in enumerate(groups) for pu in g}
+            name_by_pu = {pu: c.get("name", "") for pu, c in cards.items()}
+            premade_patches: dict[str, dict] = {}
+            for pu in cards:
+                g = group_of.get(pu)
+                patch = {"premade_group": g}
                 if g is not None:
-                    entry["premade_partners"] = [
+                    patch["premade_partners"] = [
                         name_by_pu[x] for x in groups[g]
-                        if x != entry["puuid"] and name_by_pu.get(x)
+                        if x != pu and name_by_pu.get(x)
                     ]
-
-            self._on_live_scout(players, premade_groups=len(groups))
+                premade_patches[pu] = patch
+            self._patch_scout_players(premade_patches, premade_groups=len(groups))
         except Exception:
             log.exception("_do_live_scout failed")
+
+    # Riot-only fields that may be overlaid onto an ally's richer LCU fingerprint
+    # without clobbering it (mirrors the overlay set in `_on_live_scout`).
+    _SCOUT_OVERLAY_FIELDS = (
+        "current_champ", "premade_group", "premade_partners",
+        "rank", "account", "champion_id",
+    )
+
+    def _patch_scout_players(self, patches: dict[str, dict],
+                             premade_groups: int | None = None) -> None:
+        """Overlay per-player ``patches`` (keyed by puuid) onto the live scout
+        board without re-running the LCU reconciliation in `_on_live_scout`.
+
+        Used to *stream* Phase-B deep stats and premade groups onto the cards the
+        Phase-A push already placed. A card still awaiting its match-history
+        fingerprint carries ``deep_pending`` — those take the full patch. Cards
+        without it are ally fingerprints sourced from the (richer) LCU champ-select
+        scout, so only the Riot-only fields are overlaid; their champion pool is
+        preserved. Entries not present in ``patches`` pass through untouched."""
+        current = self.state.snapshot().get("scout") or {}
+        players: list[dict] = current.get("players") or []
+        merged: list[dict] = []
+        for p in players:
+            patch = patches.get(p.get("puuid", ""))
+            if not patch:
+                merged.append(p)
+                continue
+            new = dict(p)
+            if p.get("deep_pending"):
+                new.update(patch)               # Riot-only card → full overlay
+            else:                               # LCU-rich ally → keep fingerprint
+                for k in self._SCOUT_OVERLAY_FIELDS:
+                    if k in patch:
+                        new[k] = patch[k]
+                new["deep_pending"] = False
+            merged.append(new)
+        scout = {**current, "players": merged, "ready": True, "at": time.time()}
+        if premade_groups is not None:
+            scout["premade_groups"] = premade_groups
+        self.state.set("scout", scout)
 
     def _on_live_scout(self, players: list[dict], premade_groups: int = 0) -> None:
         """Merge Riot-scouted players into the scout state. Existing ally LCU

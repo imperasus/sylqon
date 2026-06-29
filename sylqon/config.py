@@ -114,6 +114,20 @@ RIOT_API_MASS_REGION: str = os.getenv("RIOT_API_MASS_REGION", "europe")
 # whole scout is fetched before results publish); raise via env with a production
 # key for richer fingerprints.
 RIOT_MATCH_COUNT: int = int(os.getenv("RIOT_MATCH_COUNT", 20))
+# Global cap on concurrent Riot HTTP requests. Match histories are fetched in
+# parallel (per player, and across the 10-player roster), so a shared ceiling
+# keeps bursts under the key's rate limit no matter how many scout threads run.
+# Dev keys are bursty-but-shallow (~20 req/s, 100/2min) — 10 is a safe default;
+# raise it with a production key.
+RIOT_MAX_CONCURRENCY: int = int(os.getenv("RIOT_MAX_CONCURRENCY", 10))
+# Per-player match-fetch fan-out. Bounded again by RIOT_MAX_CONCURRENCY, so this
+# is just how wide one player's history fetch may spread.
+RIOT_MATCH_FETCH_WORKERS: int = int(os.getenv("RIOT_MATCH_FETCH_WORKERS", 8))
+# MATCH-V5 objects are immutable once a game ends, so they're cached in-process
+# (bounded LRU) — premades share recent games, and re-scouts hit the same ids, so
+# the cache collapses a lot of duplicate fetches. TTL bounds memory on long runs.
+RIOT_MATCH_CACHE_SIZE: int = int(os.getenv("RIOT_MATCH_CACHE_SIZE", 2000))
+RIOT_MATCH_CACHE_TTL: int = int(os.getenv("RIOT_MATCH_CACHE_TTL", 3600))
 # The account owner's PUUID (key-specific — regenerate when the API key changes).
 RIOT_SELF_PUUID: str = os.getenv("RIOT_SELF_PUUID", "")
 

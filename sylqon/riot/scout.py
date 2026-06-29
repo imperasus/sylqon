@@ -177,27 +177,53 @@ def _team_map(match: dict) -> dict[str, int]:
     }
 
 
-def scout_puuid(puuid: str) -> tuple[PlayerFingerprint, dict, dict]:
-    """Full scout for one PUUID: ``(fingerprint, account, comatches)``.
+def scout_account(puuid: str) -> tuple[dict, list | None]:
+    """Cheap half of a scout: ranked stats + top mastery only — no match history.
 
-    ``comatches`` maps ``gameId -> {puuid: teamId}`` for each recent SR game, so
-    ``detect_premades`` can find players who shared a team. Never raises — returns
-    empty structures on any failure."""
+    Returns ``(account_summary, raw_mastery)``. This is the *fast* phase of live
+    scouting: two calls per player, so all 10 cards can show rank + mastery within
+    a second or two while the much slower match-history fingerprint streams in
+    after (see :func:`scout_history`). Never raises."""
     if not puuid or not config.RIOT_API_KEY:
-        return PlayerFingerprint(), account_summary(None), {}
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+        return account_summary(None), None
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
         f_rank    = ex.submit(api.get_ranked_stats, puuid)
         f_mastery = ex.submit(api.get_top_mastery, puuid, 5)
-        f_ids     = ex.submit(api.get_match_ids, puuid, config.RIOT_MATCH_COUNT)
         entries   = f_rank.result()
         mastery   = f_mastery.result()
-        match_ids = f_ids.result() or []
+    return account_summary(entries, mastery), mastery
 
+
+def _fetch_matches(match_ids: list[str]) -> list[dict | None]:
+    """Fetch MATCH-V5 objects for ``match_ids`` in parallel, newest-first order
+    preserved (``fingerprint`` relies on it). Each fetch is cached and bounded by
+    the global Riot concurrency budget, so spreading wide here can't exceed the
+    key's rate limit — it just overlaps network waits instead of serializing
+    ~20 round-trips per player. Failures come back as ``None`` in place."""
+    if not match_ids:
+        return []
+    workers = max(1, min(len(match_ids), config.RIOT_MATCH_FETCH_WORKERS))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+        return list(ex.map(api.get_match, match_ids))
+
+
+def scout_history(puuid: str,
+                  mastery: list | None = None) -> tuple[PlayerFingerprint, dict]:
+    """Expensive half of a scout: the match-history fingerprint + premade
+    ``comatches``. This is the *slow* phase — up to ``RIOT_MATCH_COUNT`` MATCH-V5
+    fetches per player.
+
+    ``mastery`` (the raw list from :func:`scout_account`) enriches the comfort
+    pick and champion pool with mastery points; pass ``None`` to skip that.
+    ``comatches`` maps ``gameId -> {puuid: teamId}`` for each recent SR game, so
+    :func:`detect_premades` can find players who shared a team. Never raises."""
+    if not puuid or not config.RIOT_API_KEY:
+        return PlayerFingerprint(), {}
+
+    match_ids = api.get_match_ids(puuid, config.RIOT_MATCH_COUNT) or []
     games: list[dict] = []
     comatches: dict[str, dict] = {}
-    for mid in match_ids:
-        raw = api.get_match(mid)
+    for mid, raw in zip(match_ids, _fetch_matches(match_ids)):
         if not raw:
             continue
         info = raw.get("info") or {}
@@ -232,24 +258,21 @@ def scout_puuid(puuid: str) -> tuple[PlayerFingerprint, dict, dict]:
         )
         fp.champion_pool = fp.champion_pool[:5]
 
-    return fp, account_summary(entries, mastery), comatches
+    return fp, comatches
 
 
-def scout_all(puuids: list[str],
-              max_workers: int = 5) -> dict[str, tuple[PlayerFingerprint, dict, dict]]:
-    """Scout multiple PUUIDs in parallel.
-    Returns ``{puuid: (fingerprint, account, comatches)}``."""
-    results: dict[str, tuple[PlayerFingerprint, dict, dict]] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(scout_puuid, p): p for p in puuids if p}
-        for fut in concurrent.futures.as_completed(futures):
-            puuid = futures[fut]
-            try:
-                results[puuid] = fut.result()
-            except Exception as exc:
-                log.warning("scout_all: puuid %s… failed: %s", puuid[:8], exc)
-                results[puuid] = (PlayerFingerprint(), account_summary(None), {})
-    return results
+def scout_puuid(puuid: str) -> tuple[PlayerFingerprint, dict, dict]:
+    """Full scout for one PUUID: ``(fingerprint, account, comatches)``.
+
+    Composition of :func:`scout_account` (rank + mastery) and
+    :func:`scout_history` (match-history fingerprint + premade comatches). Live
+    scouting splits these two phases apart to render the board sooner; this stays
+    as the single-call convenience for everything else. Never raises."""
+    if not puuid or not config.RIOT_API_KEY:
+        return PlayerFingerprint(), account_summary(None), {}
+    account, mastery = scout_account(puuid)
+    fp, comatches = scout_history(puuid, mastery)
+    return fp, account, comatches
 
 
 def detect_premades(current_puuids, comatches_by_puuid: dict[str, dict],
