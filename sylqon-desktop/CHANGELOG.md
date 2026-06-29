@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.6.0](https://github.com/imperasus/sylqon/compare/v1.5.2...v1.6.0) (2026-06-29)
+
+
+### Features
+
+* **draft:** full-universe build cache + roster-wide counter/synergy picks ([c994ff1](https://github.com/imperasus/sylqon/commit/c994ff17f8775a5ec053969a766609060a2a1a67))
+
 ### [1.5.2](https://github.com/imperasus/sylqon/compare/v1.5.1...v1.5.2) (2026-06-27)
 
 
