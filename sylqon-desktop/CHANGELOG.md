@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.7.0](https://github.com/imperasus/sylqon/compare/v1.6.0...v1.7.0) (2026-06-29)
+
+
+### Features
+
+* **scout:** stream the live board in two phases + cache match fetches ([9c616f1](https://github.com/imperasus/sylqon/commit/9c616f1920748e9ebb53718cb25075da53e69caf))
+
 ## [1.6.0](https://github.com/imperasus/sylqon/compare/v1.5.2...v1.6.0) (2026-06-29)
 
 
