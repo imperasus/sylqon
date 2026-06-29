@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [Unreleased]
+
+### Features
+
+* **overlay:** voice coaching — reads new/completed missions, dragon-soul moments and objective timers aloud via the Web Speech API (Riot-safe, read-only audio). Off by default with a persisted toggle in the overlay header.
+
+### Bug Fixes
+
+* **deps:** add the web-server stack (fastapi/uvicorn/pydantic) and optional python-dotenv to `requirements.txt`, so `python -m sylqon.server` / `python -m sylqon.main` run from a clean `pip install -r requirements.txt` as documented in the README.
+
+### Continuous Integration
+
+* run the offline test suite on every push to master and on every PR (`.github/workflows/ci.yml`), and gate the release build on the same suite (`release.yml` `test` → `release`).
+* add `requirements-dev.txt` (pytest + numpy, which the flag-gated RAG test modules import) so the suite is reproducible in CI.
+
 ## [1.7.0](https://github.com/imperasus/sylqon/compare/v1.6.0...v1.7.0) (2026-06-29)
 
 
