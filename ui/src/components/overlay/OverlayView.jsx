@@ -1,7 +1,12 @@
-import { Crown, Flame, Trophy, Zap } from "lucide-react";
+import { useState } from "react";
+import { Crown, Flame, Trophy, Volume2, VolumeX, Zap } from "lucide-react";
 import { ROLE_LABELS } from "../../assets.js";
 import { useOverlayState } from "../../hooks/useOverlayState.js";
+import { useCoachSpeech } from "../../hooks/useCoachSpeech.js";
+import { speechSupported } from "./speech.js";
 import MissionCard from "./MissionCard.jsx";
+
+const VOICE_KEY = "sylqon.coach.voice";
 
 const fmtClock = (s) => {
   const t = Math.max(0, Math.floor(s || 0));
@@ -100,6 +105,19 @@ export default function OverlayView() {
   const { active, role, missions, profile, championProgress, game } = useOverlayState();
   const inGame = active && (game?.game_time || 0) > 0;
 
+  // Voice coaching (Web Speech API; Riot-safe — read-only audio). Off by default
+  // so the overlay never surprises a stream/OBS scene with audio; the choice
+  // persists across sessions.
+  const [voiceOn, setVoiceOn] = useState(() => {
+    try { return localStorage.getItem(VOICE_KEY) === "on"; } catch { return false; }
+  });
+  const toggleVoice = () => setVoiceOn((v) => {
+    const next = !v;
+    try { localStorage.setItem(VOICE_KEY, next ? "on" : "off"); } catch { /* ignore */ }
+    return next;
+  });
+  useCoachSpeech({ missions, game }, voiceOn);
+
   return (
     <div className="w-[300px] select-none p-2 font-tech">
       <div className="mb-1.5 flex items-center gap-1.5 px-1">
@@ -107,9 +125,23 @@ export default function OverlayView() {
         <span className="font-display text-xs font-bold tracking-[0.25em] text-white/70">
           SYLQON COACH
         </span>
-        {inGame
-          ? <span className="ml-auto font-mono text-2xs font-bold tracking-wide text-white/45">{fmtClock(game.game_time)}</span>
-          : role && <span className="ml-auto text-2xs font-bold tracking-widest text-white/35">{ROLE_LABELS[role] || role}</span>}
+        <div className="ml-auto flex items-center gap-1.5">
+          {inGame
+            ? <span className="font-mono text-2xs font-bold tracking-wide text-white/45">{fmtClock(game.game_time)}</span>
+            : role && <span className="text-2xs font-bold tracking-widest text-white/35">{ROLE_LABELS[role] || role}</span>}
+          {speechSupported() && (
+            <button
+              onClick={toggleVoice}
+              title={voiceOn ? "Mute voice coaching" : "Enable voice coaching"}
+              aria-label={voiceOn ? "Mute voice coaching" : "Enable voice coaching"}
+              className="rounded p-0.5 text-white/45 transition-colors hover:text-white/80"
+            >
+              {voiceOn
+                ? <Volume2 className="h-3.5 w-3.5 text-accent" />
+                : <VolumeX className="h-3.5 w-3.5" />}
+            </button>
+          )}
+        </div>
       </div>
 
       {!active && missions.length === 0 ? (
