@@ -24,7 +24,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Gate the release on the offline test suite (same one CI runs on PRs). A tag
+  # that fails the tests must never produce a published installer.
+  test:
+    name: Offline test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Run offline test suite
+        run: python -m pytest tests/ -q
+
   release:
+    needs: test                  # only build/publish once the tests are green
     runs-on: windows-latest      # required for NSIS installer generation
     timeout-minutes: 20          # guard against runaway builds eating free-tier minutes
 

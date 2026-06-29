@@ -1,0 +1,42 @@
+name: CI
+
+# Run the offline Python test suite on every push to master and on every PR.
+# The suite is fully offline (no LCU / Ollama / network — see .claude/rules/testing.md
+# and tests/conftest.py, which pins the RAG flags OFF), so it needs nothing but
+# the Python deps. This is the gate the release pipeline reuses (release.yml).
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# A newer push to the same ref makes the in-flight run obsolete — cancel it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Offline test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run offline test suite
+        run: python -m pytest tests/ -q
