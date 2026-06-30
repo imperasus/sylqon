@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -91,6 +94,11 @@ OVERLAY_MAX_MISSIONS = int(os.getenv("OVERLAY_MAX_MISSIONS", 2))
 # Rolling per-champion mission queue size. After each game on a champion, the AI
 # tops the champion's pending queue back up to this many missions (best-effort).
 CHAMPION_MISSION_TARGET = int(os.getenv("CHAMPION_MISSION_TARGET", 3))
+# Whether the desktop overlay auto-appears when a game starts and hides when it
+# ends (the F10 hotkey still toggles it manually). Published in /api/state so the
+# Electron shell honors a change made from the dashboard Settings without a
+# restart; SYLQON_OVERLAY_AUTO=0 disables it by default.
+OVERLAY_AUTO: bool = os.getenv("SYLQON_OVERLAY_AUTO", "1").strip().lower() not in ("0", "false", "no")
 
 # Mission difficulty: the "Standard" defaults live in livegame/missions.py; this
 # optional JSON map overrides individual tuning keys (durations, cs deltas, ward
@@ -189,3 +197,100 @@ RAG_KIT_LIMIT: int = int(os.getenv("SYLQON_RAG_KIT_LIMIT", "6"))
 # the kit index — no new index. Needs enemy scout data (present in-game / normal
 # draft; absent in ranked solo where enemies are anonymised → silently skipped).
 RAG_FUSION_MODE: bool = os.getenv("SYLQON_RAG_FUSION", "0") == "1"
+
+# --- User settings overlay (dashboard Settings panel) -----------------------
+# Persisted user choices live in cache/user_settings.json and take precedence
+# over the env/default constants above. Imported last so every constant a key
+# may override already exists; see sylqon/settings.py for the schema.
+from sylqon.settings import MISSION_TYPE_IDS, SETTINGS_SPEC, UserSettings  # noqa: E402
+
+USER_SETTINGS = UserSettings(CACHE_DIR / "user_settings.json")
+
+
+def _coerce_setting(spec_type: str, value):
+    """Coerce a JSON-stored setting value to the type the config constant uses."""
+    if spec_type == "bool":
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() in ("1", "true", "yes", "on")
+    if spec_type == "int":
+        return int(value)
+    if spec_type == "float":
+        return float(value)
+    if spec_type == "strset":
+        items = [str(v).strip() for v in (value or []) if str(v).strip()]
+        return set(items) or None
+    return str(value)
+
+
+def apply_settings() -> None:
+    """Overlay persisted user settings onto the module constants. Runs at import
+    (startup) and after every PUT /api/settings, so ``config.X`` readers see
+    runtime edits without a restart for keys whose readers re-read ``config.X``."""
+    data = USER_SETTINGS.all()
+    for key, spec in SETTINGS_SPEC.items():
+        if key not in data:
+            continue
+        try:
+            globals()[spec["attr"]] = _coerce_setting(spec["type"], data[key])
+        except (ValueError, TypeError):
+            log.warning("Ignoring invalid persisted setting %s=%r", key, data[key])
+
+
+def settings_payload() -> dict:
+    """Effective settings (env/default overlaid with user overrides) plus per-key
+    metadata for the dashboard. Secret values are masked to a set/unset boolean;
+    set-typed values are returned as sorted lists for JSON."""
+    out: dict = {}
+    for key, spec in SETTINGS_SPEC.items():
+        raw = globals().get(spec["attr"])
+        if spec["type"] == "strset":
+            value = sorted(raw) if raw else []
+        elif spec.get("secret"):
+            value = bool(raw)
+        else:
+            value = raw
+        out[key] = {
+            "value": value,
+            "type": spec["type"],
+            "group": spec["group"],
+            "applies": spec["applies"],
+            "secret": spec.get("secret", False),
+        }
+    return out
+
+
+def update_settings(patch: dict) -> dict:
+    """Validate, persist and live-apply a settings patch from the dashboard.
+
+    Unknown keys and uncoercible values are ignored; an empty secret value means
+    'leave unchanged' (so saving the form never wipes a stored credential).
+    Returns the fresh :func:`settings_payload`."""
+    clean: dict = {}
+    for key, value in (patch or {}).items():
+        spec = SETTINGS_SPEC.get(key)
+        if not spec:
+            continue
+        if spec.get("secret") and (value is None or value == ""):
+            continue
+        try:
+            coerced = _coerce_setting(spec["type"], value)
+        except (ValueError, TypeError):
+            continue
+        if spec["type"] == "strset":
+            # Persist as a JSON-friendly sorted list; drop unknown mission ids so
+            # a stale client can never disable the engine with garbage values.
+            items = sorted(coerced or [])
+            if spec["attr"] == "MISSION_TYPES_ENABLED":
+                items = [i for i in items if i in MISSION_TYPE_IDS]
+            clean[key] = items
+        else:
+            clean[key] = coerced
+    if clean:
+        USER_SETTINGS.update(clean)
+        apply_settings()
+    return settings_payload()
+
+
+# Apply persisted overrides now that the helpers and all constants exist.
+apply_settings()

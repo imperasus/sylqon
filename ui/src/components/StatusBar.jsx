@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Cpu, Loader2, Play, RadioTower, Square, Zap } from "lucide-react";
-import { Button } from "./shared.jsx";
+import {
+  Cpu, Home, Loader2, Package, Play, RadioTower, Settings, Square, Swords, Users, Zap,
+} from "lucide-react";
+import { Button, IconButton } from "./shared.jsx";
 
 /** Installed desktop-app version (same value auto-update compares). Resolves via
  *  the Electron preload bridge; stays empty in a plain browser, so the badge is
@@ -40,7 +42,47 @@ const MODE_TAG = {
   postlock: { label: "LOCKED", tone: "text-good/85 border-good/40" },
 };
 
-export default function StatusBar({ state, mode, act, api, demoActive }) {
+/* Global view switcher: jump between any page at any time. Smart-follow in
+   App.jsx still auto-selects the phase-relevant view, but a manual click sticks
+   until the next phase change. The Players tab carries the live-game dot + the
+   scouted-ally count that used to live on PostlockTabs. */
+const NAV = [
+  { key: "home", label: "Home", icon: Home },
+  { key: "draft", label: "Draft", icon: Swords },
+  { key: "loadout", label: "Loadout", icon: Package },
+  { key: "players", label: "Players", icon: Users },
+];
+
+function NavTabs({ view, onView, scout, live }) {
+  const scouted = (scout?.players || []).filter((p) => !p.hidden && p.games_analyzed > 0).length;
+  const inGame = !!live?.active;
+  return (
+    <nav className="flex items-center gap-1">
+      {NAV.map((t) => {
+        const on = t.key === view;
+        return (
+          <button
+            key={t.key}
+            onClick={() => onView?.(t.key)}
+            className={`flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-bold tracking-wide transition-colors
+              ${on ? "bg-accent/18 text-accent-bright" : "text-white/45 hover:bg-white/5 hover:text-white/80"}`}
+          >
+            <t.icon className="h-4 w-4" />
+            {t.label}
+            {t.key === "players" && inGame && (
+              <span className="h-2 w-2 rounded-full bg-bad pulse-soft" title="live game" />
+            )}
+            {t.key === "players" && scouted > 0 && (
+              <span className="rounded-full bg-white/10 px-1.5 text-2xs font-mono text-white/60">{scouted}</span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+export default function StatusBar({ state, mode, act, api, demoActive, view, onView, onOpenSettings }) {
   const lcu = state?.lcu || {};
   const ollama = state?.ollama || {};
   const sync = state?.sync || {};
@@ -65,9 +107,14 @@ export default function StatusBar({ state, mode, act, api, demoActive }) {
           </button>
         )}
       </div>
-      <span className={`rounded border px-1.5 py-px font-display text-xs font-bold tracking-[0.2em] ${tag.tone}`}>
+      <span className={`rounded border px-1.5 py-px font-display text-xs font-bold tracking-[0.2em] ${tag.tone}`}
+            title="Aktuális játékfázis (a megtekintett nézet ettől eltérhet)">
         {tag.label}
       </span>
+
+      <div className="mx-1 h-4 w-px bg-white/10" />
+
+      <NavTabs view={view} onView={onView} scout={state?.scout} live={state?.live} />
 
       <div className="mx-1 h-4 w-px bg-white/10" />
 
@@ -95,6 +142,7 @@ export default function StatusBar({ state, mode, act, api, demoActive }) {
         >
           {demoActive ? "STOP" : "DEMO"}
         </Button>
+        <IconButton icon={Settings} title="Beállítások" onClick={onOpenSettings} />
       </div>
     </header>
   );

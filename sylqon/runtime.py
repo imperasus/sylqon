@@ -1785,6 +1785,12 @@ class PipelineRunner:
         """Pool edits change the scout's candidate set — drop its cache."""
         self._scout_cache.clear()
 
+    def on_settings_changed(self) -> None:
+        """Settings edited from the dashboard — drop derived caches so the next
+        request reflects the new region / feature flags (which config readers
+        pick up live via ``config.X``)."""
+        self._scout_cache.clear()
+
     def scout(self, role: str) -> dict:
         """A single 'who should I play' recommendation for a role, drawn from
         the meta tier list crossed with the user's pool and personal win-rate.

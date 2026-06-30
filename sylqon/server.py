@@ -69,6 +69,10 @@ class PoolRequest(BaseModel):
     pool: dict[str, list[str]]   # role -> [champion names]
 
 
+class SettingsRequest(BaseModel):
+    settings: dict               # setting key -> value (only known keys applied)
+
+
 class OPGGBuildRequest(BaseModel):
     champion: str
     role: str                        # top/jungle/middle/bottom/utility
@@ -154,7 +158,11 @@ class ProBuildReq(BaseModel):
 
 @app.get("/api/state")
 def get_state() -> dict:
-    return runner.state.snapshot()
+    snap = runner.state.snapshot()
+    # Surface the dashboard-controlled overlay auto show/hide flag so the Electron
+    # shell can honor a Settings change without a restart (it already polls state).
+    snap["overlay_auto"] = config.OVERLAY_AUTO
+    return snap
 
 
 @app.get("/api/live/state")
@@ -325,6 +333,23 @@ def put_pool(req: PoolRequest) -> dict:
     saved = runner.store.set_pool(req.pool)
     runner.on_pool_changed()
     return {"pool": saved}
+
+
+@app.get("/api/settings")
+def get_settings() -> dict:
+    """Effective user settings (env/default overlaid with persisted overrides),
+    with per-key metadata (group, type, whether it applies live or needs a
+    restart). Secrets are masked to a set/unset boolean."""
+    return {"settings": config.settings_payload()}
+
+
+@app.put("/api/settings")
+def put_settings(req: SettingsRequest) -> dict:
+    """Persist + live-apply a settings patch from the dashboard. Unknown keys and
+    uncoercible values are ignored; returns the fresh effective settings."""
+    payload = config.update_settings(req.settings)
+    runner.on_settings_changed()
+    return {"settings": payload}
 
 
 @app.get("/api/champion-stats")

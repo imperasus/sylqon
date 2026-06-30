@@ -227,21 +227,29 @@ function registerHotkeys(): void {
 /**
  * Auto show/hide the overlay by polling the backend game state. Shows it when a
  * game becomes active, hides it when the game ends; the F10 hotkey still works as
- * a manual override (overlay.applyGameActive only acts on edges). Disabled via
- * SYLQON_OVERLAY_AUTO=0 / `autoOverlay: false`.
+ * a manual override (overlay.applyGameActive only acts on edges).
+ *
+ * The poll always runs: whether auto show/hide is enabled is read LIVE from the
+ * backend's `overlay_auto` flag (driven by the dashboard Settings panel), so a
+ * user can turn it on/off without restarting the app. The desktop config
+ * (SYLQON_OVERLAY_AUTO / `autoOverlay`) only supplies the initial default used
+ * until the backend answers.
  */
 function startOverlayAutoToggle(): void {
-  if (!getOverlayAutoDefault()) {
-    console.log("[sylqon-desktop] overlay auto show/hide disabled (manual F10 only)");
-    return;
-  }
   const stateUrl = getBaseUrl() + "/api/state";
+  const initialAuto = getOverlayAutoDefault();
   overlayAutoPoll = setInterval(async () => {
-    const data = await fetchJson<{ overlay?: { active?: boolean }; live?: { active?: boolean } }>(stateUrl);
+    const data = await fetchJson<{
+      overlay_auto?: boolean;
+      overlay?: { active?: boolean };
+      live?: { active?: boolean };
+    }>(stateUrl);
     if (!data) return; // backend not ready / unreachable → leave state unchanged
+    const auto = typeof data.overlay_auto === "boolean" ? data.overlay_auto : initialAuto;
+    if (!auto) return; // auto disabled from Settings → manual F10 only
     applyGameActive(!!(data.overlay?.active || data.live?.active));
   }, OVERLAY_POLL_MS);
-  console.log("[sylqon-desktop] overlay auto show/hide enabled");
+  console.log("[sylqon-desktop] overlay auto show/hide poll started");
 }
 
 function stopOverlayAutoToggle(): void {

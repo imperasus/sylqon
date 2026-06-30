@@ -122,6 +122,45 @@ export function usePool() {
   return { pool, buildable, saving, save, reload: load };
 }
 
+/** Dashboard Settings: lazy GET on open + PUT save. The backend returns the
+ * effective values (env/default overlaid with persisted overrides) keyed by
+ * setting name, each with { value, type, group, applies, secret } metadata. */
+export function useSettings() {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await (await fetch("/api/settings")).json();
+      setSettings(r.settings || {});
+    } catch {
+      /* ignore — modal shows a degraded state */
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const save = useCallback(async (patch) => {
+    setSaving(true);
+    try {
+      const r = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: patch }),
+      });
+      const j = await r.json();
+      if (j.settings) setSettings(j.settings);
+      return j.settings;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  return { settings, loading, saving, load, save };
+}
+
 /** Per-champion personal win-rate + games from local match history.
  * Keyed by champion name; refreshed on a slow poll (history rarely changes). */
 export function useChampionStats() {
