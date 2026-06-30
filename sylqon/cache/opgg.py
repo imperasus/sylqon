@@ -100,7 +100,7 @@ def opgg_to_build(payload: dict, catalog: Catalog) -> dict | None:
 
     if len(items) < 4:
         log.warning("opgg_to_build: only %d items resolved from IDs %s",
-                    len(items), boot_ids + core_ids)
+                    len(items), all_boot_ids + core_ids)
         return None
 
     starting_items = resolve_items(payload.get("starter_item_ids", []))
