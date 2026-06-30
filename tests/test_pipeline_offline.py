@@ -132,6 +132,28 @@ def test_opgg_converter():
     assert len(build_j["items"]) == 6, f"Non-ADC expected 6 items, got {len(build_j['items'])}"
 
 
+def test_opgg_converter_under_resolved_returns_none():
+    """A payload that resolves fewer than 4 items (e.g. a support whose op.gg
+    core item ids aren't in the catalog) must return None — and the
+    under-resolution warning must not itself raise. Regression: the warning
+    referenced an undefined `boot_ids`, raising NameError instead of logging.
+    """
+    cat = FakeCatalog()
+    payload = {
+        "champion": "Thresh", "role": "utility",
+        # None of these item ids exist in FakeCatalog → nothing resolves,
+        # so items ends up shorter than 4 and the warning path fires.
+        "boot_ids": [9001], "core_item_ids": [9002, 9003, 9004],
+        "fourth_item_ids": [], "fifth_item_ids": [], "sixth_item_ids": [],
+        "primary_page_id": 8000, "primary_rune_ids": [8008, 9111, 9104, 8014],
+        "secondary_page_id": 8300, "secondary_rune_ids": [8313, 8321],
+        "stat_mod_ids": [5005, 5008, 5011],
+        "starter_item_ids": [], "summoner_spell_ids": [4, 3],
+    }
+    # Returns None gracefully — does not raise NameError from the warning line.
+    assert opgg_to_build(payload, cat) is None
+
+
 def test_stat_shard_tail_routing():
     runes = [8008, 9111, 9104, 8014, 8234, 8236]
     shards = [5005, 5008, 5011]
