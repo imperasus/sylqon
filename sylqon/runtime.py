@@ -13,14 +13,19 @@ import logging
 import threading
 import time
 
-from sylqon import config, loadout as loadout_mod
+from sylqon import config
+from sylqon import loadout as loadout_mod
 from sylqon.ai import build_variants, open_build_prompt
 from sylqon.ai.engine import OllamaEngine
-from sylqon.ai.prompts import compile_prompt
 from sylqon.ai.pick_prompt import (
-    apply_ai_pick, apply_universe_ai_pick, build_candidates, compile_pick_prompt,
-    compile_universe_pick_prompt, heuristic_rank,
+    apply_ai_pick,
+    apply_universe_ai_pick,
+    build_candidates,
+    compile_pick_prompt,
+    compile_universe_pick_prompt,
+    heuristic_rank,
 )
+from sylqon.ai.prompts import compile_prompt
 from sylqon.analysis import build_archetype, draft_intel
 from sylqon.analysis.scoring import ChampionScorer
 from sylqon.cache.store import MetaCache
@@ -29,18 +34,29 @@ from sylqon.data.catalog import Catalog
 from sylqon.lcu import scout as scout_mod
 from sylqon.lcu.client import LCUClient
 from sylqon.lcu.events import (
-    CHAMP_SELECT_TOPIC, EOG_TOPIC, GAMEFLOW_TOPIC, LOBBY_TOPIC, LcuEventBus,
+    CHAMP_SELECT_TOPIC,
+    EOG_TOPIC,
+    GAMEFLOW_TOPIC,
+    LOBBY_TOPIC,
+    LcuEventBus,
 )
 from sylqon.lcu.history import champion_stats
 from sylqon.lcu.injector import Injector
 from sylqon.lcu.lobby import (
-    EnemyProfile, MatchContext, display_signature, parse_timer, read_match_context,
+    EnemyProfile,
+    MatchContext,
+    display_signature,
+    parse_timer,
+    read_match_context,
 )
 from sylqon.livegame.client import LiveClient
 from sylqon.livegame.engine import MissionEngine
 from sylqon.livegame.state import LiveGameState, parse_live_state
 from sylqon.state import (
-    AppState, StateLogHandler, serialize_enemy, serialize_loadout,
+    AppState,
+    StateLogHandler,
+    serialize_enemy,
+    serialize_loadout,
 )
 
 log = logging.getLogger(__name__)
@@ -520,7 +536,8 @@ class PipelineRunner:
         session = None
         try:
             from sylqon.ai.match_review import MatchReviewAnalyzer
-            from sylqon.db import matches as match_store, queries
+            from sylqon.db import matches as match_store
+            from sylqon.db import queries
             from sylqon.db.schema import MatchAnalysis
             from sylqon.db.session import get_session
             if self.client is None:
@@ -1013,8 +1030,8 @@ class PipelineRunner:
             role = self.last_ctx.my_role if self.last_ctx else ""
             if not champ or self.client is None:
                 return
-            from sylqon.db.session import get_session
             from sylqon.db.matches import sync_recent_matches
+            from sylqon.db.session import get_session
             from sylqon.livegame import champion_missions
             from sylqon.livegame.progression import ProgressionService
             session = get_session()
@@ -1320,8 +1337,8 @@ class PipelineRunner:
     def _flex_warnings(self, ctx: MatchContext) -> list[dict]:
         """Revealed enemies that can play more than one lane — their final role
         (and thus the matchup) is not yet settled. Best-effort against the DB."""
-        from sylqon.db.session import get_session
         from sylqon.db.schema import Champion
+        from sylqon.db.session import get_session
         out: list[dict] = []
         try:
             session = get_session()
@@ -1389,8 +1406,8 @@ class PipelineRunner:
         pool in ``role`` (advantage_score > 0 against a pool champion)."""
         if not pool:
             return {}
-        from sylqon.db.session import get_session
         from sylqon.db.schema import Champion, ChampionCounter
+        from sylqon.db.session import get_session
         try:
             session = get_session()
         except Exception:
@@ -1434,8 +1451,8 @@ class PipelineRunner:
         """Best champions for the player's role given the live draft — scored
         across ALL role champions (not just the pool). Each is flagged with
         whether it's in the player's pool so the UI can distinguish them."""
-        from sylqon.db.session import get_session
         from sylqon.db import queries
+        from sylqon.db.session import get_session
         try:
             session = get_session()
         except Exception:
@@ -1635,8 +1652,8 @@ class PipelineRunner:
         panel uses), shaped like ``_meta_positions`` rows. Fallback for ban
         suggestions when ``meta_report.json`` is absent. Best-effort: [] on any
         error."""
-        from sylqon.db.session import get_session
         from sylqon.db import queries
+        from sylqon.db.session import get_session
         try:
             session = get_session()
         except Exception:

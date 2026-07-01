@@ -20,7 +20,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sylqon.rag import item_index, item_retrieve
 
-
 # ---------------------------------------------------------------------------
 # Deterministic offline fakes
 # ---------------------------------------------------------------------------

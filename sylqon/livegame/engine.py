@@ -16,7 +16,10 @@ from typing import Callable
 
 from sylqon import config
 from sylqon.livegame.missions import (
-    ROLE_CATALOG, MissionRuntime, evaluate, make_runtime,
+    ROLE_CATALOG,
+    MissionRuntime,
+    evaluate,
+    make_runtime,
 )
 from sylqon.livegame.state import LiveGameState
 

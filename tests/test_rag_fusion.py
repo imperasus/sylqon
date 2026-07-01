@@ -19,7 +19,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sylqon.ai import scout_fusion
 from sylqon.rag import kit_index
 
-
 # ---------------------------------------------------------------------------
 # Fakes
 # ---------------------------------------------------------------------------
@@ -177,7 +176,7 @@ def test_block_empty_when_disabled(monkeypatch):
 
 def test_block_built_when_enabled(monkeypatch):
     from sylqon import config
-    from sylqon.ai import lane_plan, scout_fusion as sf
+    from sylqon.ai import lane_plan
 
     monkeypatch.setattr(config, "RAG_FUSION_MODE", True)
     # avoid the kit-index disk read; force behavioural-only

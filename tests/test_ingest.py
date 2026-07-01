@@ -16,7 +16,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from sylqon.mcp import ingest
 from sylqon.db.schema import (
     Base,
     Champion,
@@ -24,6 +23,7 @@ from sylqon.db.schema import (
     ChampionCounter,
     ChampionSynergy,
 )
+from sylqon.mcp import ingest
 
 NAMES = ["Jinx", "Kalista", "Hwei", "Blitzcrank", "Thresh"]
 

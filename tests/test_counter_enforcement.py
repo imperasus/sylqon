@@ -22,7 +22,6 @@ from sylqon import loadout as loadout_mod
 from sylqon.data import rune_pool, static
 from sylqon.lcu.lobby import EnemyProfile, MatchContext
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

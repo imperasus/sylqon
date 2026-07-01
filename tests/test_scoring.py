@@ -23,7 +23,6 @@ from sylqon.db.schema import (
     Champion,
     ChampionBuild,
     ChampionCounter,
-    ChampionSynergy,
 )
 
 

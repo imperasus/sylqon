@@ -13,6 +13,7 @@ import json
 
 from sylqon.data import static
 from sylqon.data.catalog import Catalog
+
 # Re-exported so existing imports (`from sylqon.ai.prompts import
 # rune_pool_for_champion`) keep working while the implementation now lives in
 # the seed-driven rune_pool module.

@@ -20,7 +20,6 @@ import pytest
 
 from sylqon.runtime import AppState, PipelineRunner
 
-
 # ------------------------------------------------------------------ helpers
 
 _RMC_PATH = "sylqon.runtime.read_match_context"

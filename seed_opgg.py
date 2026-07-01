@@ -5,12 +5,12 @@ manually after updating the BUILDS table in sylqon/cache/seed.py to
 force a full re-seed without restarting the application.
 """
 import logging
+
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
-from sylqon.data.catalog import Catalog
-from sylqon.cache.store import MetaCache
 from sylqon.cache.seed import BUILDS, seed_cache
-from sylqon.cache.opgg import opgg_to_build
+from sylqon.cache.store import MetaCache
+from sylqon.data.catalog import Catalog
 
 catalog = Catalog()
 catalog.refresh_if_stale()

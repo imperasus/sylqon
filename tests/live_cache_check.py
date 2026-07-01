@@ -9,6 +9,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 
 from sylqon.cache.parser import BuildParser
 from sylqon.cache.search import get_provider
+
 from sylqon.cache.store import MetaCache
 from sylqon.data.catalog import Catalog
 

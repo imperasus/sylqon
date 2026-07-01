@@ -46,8 +46,8 @@ def test_self_puuid_config_override(monkeypatch):
 
 
 def test_self_puuid_resolves_via_account_v1_and_caches(monkeypatch):
-    from sylqon import config
     import sylqon.riot.api as api
+    from sylqon import config
     r = _runner()
     r._my_puuid = "a2dab73d-316d-5f39"
     r._my_riot_id = ("Imperasus", "EUNE")
@@ -119,8 +119,8 @@ def test_ban_suggestions_empty_when_no_source(monkeypatch):
 
 def test_db_role_rows_shapes_and_sorts(monkeypatch):
     r = _runner()
-    import sylqon.db.session as sess
     import sylqon.db.queries as q
+    import sylqon.db.session as sess
 
     class C:
         def __init__(self, name, slug, stats):
@@ -259,8 +259,8 @@ def test_patch_scout_players_applies_deep_and_preserves_lcu_ally():
 def test_do_live_scout_shows_all_ten_before_deep_stats(monkeypatch):
     # The whole point of 1+2: a full 10-card push happens (Phase A) *before* any
     # match-history fingerprint resolves, then deep stats stream in (Phase B).
-    import sylqon.riot.scout as riot_scout
     import sylqon.riot.api as riot_api
+    import sylqon.riot.scout as riot_scout
     from sylqon.lcu.scout import PlayerFingerprint
 
     r = _runner()

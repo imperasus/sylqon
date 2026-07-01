@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sylqon.analysis import macro_coach
 from sylqon.ai.macro_coach_prompt import MacroCoachAnalyzer
+from sylqon.analysis import macro_coach
 
 
 def _match(*, role="bottom", result="Win", cs_min=8.0, vision=25, deaths=3,

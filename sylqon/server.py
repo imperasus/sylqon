@@ -12,7 +12,6 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -28,12 +27,15 @@ from sylqon.cache.opgg import opgg_to_build
 from sylqon.db import matches as match_store
 from sylqon.db import queries
 from sylqon.db.schema import (
-    Champion, ChampionCounter, ChampionSynergy, MatchHistory,
+    Champion,
+    ChampionCounter,
+    ChampionSynergy,
+    MatchHistory,
 )
+from sylqon.db.session import get_session, init_db
 from sylqon.main import setup_logging
 from sylqon.mcp import ingest
 from sylqon.runtime import PipelineRunner
-from sylqon.db.session import get_session, init_db
 
 HOST, PORT = "127.0.0.1", 8077
 UI_DIST = config.PROJECT_ROOT / "ui" / "dist"
@@ -358,8 +360,8 @@ def live_demo_last_match() -> dict:
     """Populate the live state with end-of-game stats from the account owner's
     last ranked match. Useful for testing PlayersView without a running game.
     Requires RIOT_API_KEY and RIOT_SELF_PUUID to be configured."""
-    from sylqon.riot import api as riot_api
     from sylqon.livegame.demo import match_to_live_state
+    from sylqon.riot import api as riot_api
 
     puuid = config.RIOT_SELF_PUUID
     if not puuid or not config.RIOT_API_KEY:
@@ -505,8 +507,8 @@ def _coach_payload(force: bool = False) -> dict:
     games, compute the deterministic scorecard, and attach the cached (or freshly
     generated) LLM 'top 3'. The scorecard is always returned; the priorities
     degrade gracefully when Ollama is offline."""
-    from sylqon.analysis.macro_coach import build_scorecard
     from sylqon.ai.macro_coach_prompt import MacroCoachAnalyzer
+    from sylqon.analysis.macro_coach import build_scorecard
     from sylqon.db.schema import MacroCoachReport
 
     session = get_session()

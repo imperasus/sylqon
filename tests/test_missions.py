@@ -15,7 +15,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sylqon.livegame.engine import MissionEngine
 from sylqon.livegame.missions import (
-    FARM_CS_DELTA, NO_DEATH, OBJECTIVE, WARDING, Mission, evaluate, make_runtime,
+    FARM_CS_DELTA,
+    NO_DEATH,
+    OBJECTIVE,
+    WARDING,
+    Mission,
+    evaluate,
+    make_runtime,
 )
 from sylqon.livegame.state import LiveGameState
 

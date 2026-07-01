@@ -13,7 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sylqon import config, loadout as loadout_mod
+from sylqon import config
+from sylqon import loadout as loadout_mod
 from sylqon.ai.prompts import compile_prompt
 from sylqon.cache.opgg import opgg_to_build
 from sylqon.cache.store import MetaCache
@@ -624,7 +625,9 @@ def test_profile_title_constant():
 def test_recommendation_heuristic():
     """The pick heuristic favours synergy/counter and stays inside the pool."""
     from sylqon.ai.pick_prompt import (
-        apply_ai_pick, build_candidates, heuristic_rank,
+        apply_ai_pick,
+        build_candidates,
+        heuristic_rank,
     )
 
     # Marksman candidate into a 2-tank enemy comp + an engage ally → top score.
@@ -907,7 +910,9 @@ def test_pick_prompt_schema():
     """Both pick prompts constrain the model to the pool with JSON-serialized
     names (not a Python list repr) and ask for raw JSON output."""
     from sylqon.ai.pick_prompt import (
-        compile_pick_prompt, compile_universe_pick_prompt, format_scout_block,
+        compile_pick_prompt,
+        compile_universe_pick_prompt,
+        format_scout_block,
     )
 
     ctx = make_ctx(role="bottom", enemies=[threat("Ahri", threats=["burst_ap"])])
