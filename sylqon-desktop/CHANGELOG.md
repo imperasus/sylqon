@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.9.0](https://github.com/imperasus/sylqon/compare/v1.8.0...v1.9.0) (2026-07-01)
+
+
+### Features
+
+* **draft:** live countdown timer, hover state, and real pick order ([7110a6e](https://github.com/imperasus/sylqon/commit/7110a6e85fafa25cd4b5ca2c1d4df0f9495f33bb))
+* **landing:** add marketing landing page ([0f336d1](https://github.com/imperasus/sylqon/commit/0f336d1a8bd0381e9bca16d99b9c3e2311c7b44f))
+* **ui:** global view navigation + dashboard Settings panel ([579255e](https://github.com/imperasus/sylqon/commit/579255e459ff075fd7d4e1a65a513ec02c7e9129))
+
+
+### Bug Fixes
+
+* **cache:** avoid NameError in opgg_to_build under-resolution warning ([0c931d3](https://github.com/imperasus/sylqon/commit/0c931d3a58dbdc4d865de1329e9e4285e6897f73))
+
+
+### Refactoring
+
+* extract AppState + serializers into sylqon/state.py ([bcb5071](https://github.com/imperasus/sylqon/commit/bcb50715fb3a2c9c7060352539dd4d4f762c6a2f))
+
 ## [1.8.0](https://github.com/imperasus/sylqon/compare/v1.7.0...v1.8.0) (2026-06-29)
 
 
