@@ -1,15 +1,44 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Ban, Crown, EyeOff, Radar, Shuffle, Sparkles, Swords, Target, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Ban, Crown, EyeOff, Radar, Shuffle, Sparkles, Swords, Target, Timer, X,
+} from "lucide-react";
 import { useStaticData } from "../api.js";
 import { useElementRem, useFitCount } from "../hooks/useFitCount.js";
+import { useDraftClock } from "../hooks/useDraftClock.js";
 import { DAMAGE_COLORS, ROLE_LABELS, pct, squareUrl } from "../assets.js";
 import {
   Bar, ChampPortrait, ChampionRow, Chip, DraftScorecard, Panel, Score100,
   SpellPips, ThreatBadge,
 } from "./shared.jsx";
 
+/* Urgency → tone/class lookups. Written out as static class strings (not
+   template-interpolated) so Tailwind's build-time scanner picks them up. */
+const URGENCY_TONE = { calm: "accent", warn: "amber", danger: "enemy" };
+const TONE_TEXT = { accent: "text-accent-bright", amber: "text-amber", enemy: "text-enemy" };
+const RING_TONE = { accent: "ring-accent/60", ally: "ring-ally/60", enemy: "ring-enemy/60" };
+
+/* Compact "on the clock" countdown, folded into the DraftProgress header row
+   so it doesn't grow the fixed-height layout. Hidden outside champ select
+   (no active timer). */
+function DraftClock({ clock }) {
+  if (!clock?.phase) return null;
+  const tone = URGENCY_TONE[clock.urgency] || "accent";
+  const textCls = TONE_TEXT[tone];
+  return (
+    <div className="flex shrink-0 items-center gap-1.5 border-l border-white/10 pl-2.5">
+      <Timer className={`h-3.5 w-3.5 ${textCls} ${clock.urgency === "danger" ? "pulse-urgent" : ""}`} />
+      <span className={`font-mono text-sm font-extrabold tabular-nums ${textCls}
+        ${clock.urgency === "danger" ? "pulse-urgent" : ""}`}>
+        {clock.seconds}s
+      </span>
+      <div className="w-16"><Bar value={clock.fraction * 100} tone={tone} /></div>
+    </div>
+  );
+}
+
 /* Segmented progress: one cell per draft slot, lit as picks lock in. */
-function DraftProgress({ allyCount, enemyCount, phase }) {
+function DraftProgress({ allyCount, enemyCount, phase, clock }) {
   const total = 10;
   const locked = Math.min(total, allyCount + enemyCount);
   const phaseLabel = {
@@ -33,6 +62,7 @@ function DraftProgress({ allyCount, enemyCount, phase }) {
         })}
       </div>
       <span className="shrink-0 text-xs font-bold tracking-wide text-accent/80">{phaseLabel}</span>
+      <DraftClock clock={clock} />
     </div>
   );
 }
@@ -146,24 +176,41 @@ function ScoutStrip({ p, patch }) {
   );
 }
 
-/* One tight player row in a team column. */
-function PlayerRow({ pick, patch, side, isMe }) {
+/* One tight player row in a team column. ``isActiveTurn`` pulses the row (or
+   the empty placeholder) when this slot's pick action is the one currently in
+   progress — mirrors the native client's own "on the clock" affordance.
+   ``pick.locked === false`` means merely hovering (not yet locked in); enemy
+   hovers are never exposed by Riot's API, so this only ever applies to the
+   ally column + the local player. */
+function PlayerRow({ pick, patch, side, isMe, isActiveTurn, pulseClass = "pulse-soft" }) {
+  const ringTone = isMe ? "accent" : side;
+  const ringCls = isActiveTurn ? `ring-2 ${RING_TONE[ringTone] || RING_TONE.accent} ${pulseClass}` : "";
   if (!pick) {
     return (
-      <div className="frost flex min-h-[2.75rem] items-center gap-2 px-2.5 opacity-35">
+      <div className={`frost flex min-h-[2.75rem] items-center gap-2 px-2.5 ${ringCls || "opacity-35"}`}>
         <div className="h-9 w-9 rounded border border-dashed border-white/15" />
-        <span className="text-xs tracking-widest text-white/30">AWAITING</span>
+        <span className="text-xs tracking-widest text-white/30">
+          {isActiveTurn ? "ON THE CLOCK" : "AWAITING"}
+        </span>
       </div>
     );
   }
   const accent = isMe ? "accent" : side;
+  const hovering = !pick.locked;
   return (
-    <div className={`frost ${isMe ? "frost-accent" : ""} flex min-h-[2.75rem] items-center gap-2.5 px-2.5 py-1.5`}>
-      <ChampPortrait slug={pick.slug} patch={patch} size="h-9 w-9" accent={accent} title={pick.name} />
+    <div className={`frost ${isMe ? "frost-accent" : ""} flex min-h-[2.75rem] items-center gap-2.5 px-2.5 py-1.5 ${ringCls}`}>
+      <motion.div initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ scale: hovering ? 0.92 : 1, opacity: hovering ? 0.6 : 1 }}
+                  transition={{ duration: 0.25 }}>
+        <ChampPortrait slug={pick.slug} patch={patch} size="h-9 w-9" accent={accent} title={pick.name} />
+      </motion.div>
       <div className="min-w-0 flex-1 leading-tight">
         <div className="flex items-center gap-1">
-          <span className="truncate text-base font-bold text-white/90">{pick.name || "…"}</span>
+          <span className={`truncate text-base font-bold ${hovering ? "text-white/65" : "text-white/90"}`}>
+            {pick.name || "…"}
+          </span>
           {isMe && <span className="text-3xs font-bold tracking-widest text-accent">YOU</span>}
+          {hovering && <span className="pulse-soft text-3xs font-bold tracking-widest text-white/45">HOVERING</span>}
         </div>
         <div className="flex items-center gap-1 text-2xs font-bold tracking-widest text-white/40">
           <span>{ROLE_LABELS[pick.role] || "—"}</span>
@@ -192,13 +239,18 @@ function PlayerRow({ pick, patch, side, isMe }) {
 
 /* A pick row plus its roster-wide Top-3 list (counters for enemies, synergies
    for allies) — only once the pick is locked and a list exists. */
-function PlayerCard({ pick, patch, side, isMe, scout, miniMax = 3, showScout = true }) {
-  if (!pick) return <PlayerRow pick={null} patch={patch} side={side} />;
+function PlayerCard({ pick, patch, side, isMe, scout, miniMax = 3, showScout = true,
+                     isActiveTurn, pulseClass }) {
+  if (!pick) {
+    return <PlayerRow pick={null} patch={patch} side={side}
+                       isActiveTurn={isActiveTurn} pulseClass={pulseClass} />;
+  }
   const isEnemy = side === "enemy";
   const list = isEnemy ? pick.counters : pick.synergies;
   return (
     <div className="flex flex-col">
-      <PlayerRow pick={pick} patch={patch} side={side} isMe={isMe} />
+      <PlayerRow pick={pick} patch={patch} side={side} isMe={isMe}
+                 isActiveTurn={isActiveTurn} pulseClass={pulseClass} />
       {/* Pre-game scout fingerprint at the player's own card (teammates + self). */}
       {showScout && scout && <ScoutStrip p={scout} patch={patch} />}
       {pick.locked && !isMe && miniMax > 0 && (
@@ -216,8 +268,10 @@ function PlayerCard({ pick, patch, side, isMe, scout, miniMax = 3, showScout = t
 
 /* Always exactly 5 slots, so instead of scrolling we adapt the per-card detail
    (pool counter/synergy list length, scout strip) to the column height. */
-function TeamColumn({ title, icon, side, picks, patch, comp, scoutByRole }) {
+function TeamColumn({ title, icon, side, picks, patch, comp, scoutByRole,
+                     activeIndex = -1, urgency = "calm" }) {
   const slots = [...picks, ...Array(Math.max(0, 5 - picks.length)).fill(null)].slice(0, 5);
+  const pulseClass = urgency === "danger" ? "pulse-urgent" : "pulse-soft";
   const [boxRef, boxRem] = useElementRem();
   // Per-card vertical budget (5 fixed slots) → how much detail fits without
   // scrolling. A full card is a player row (~3rem) + scout strip (~1.2rem) + a
@@ -239,29 +293,36 @@ function TeamColumn({ title, icon, side, picks, patch, comp, scoutByRole }) {
         {slots.map((p, i) => (
           <PlayerCard key={p ? `${side}-${p.champion_id}` : `${side}-e-${i}`}
                       pick={p} patch={patch} side={side} isMe={p?.isMe} miniMax={miniMax} showScout={showScout}
-                      scout={p ? scoutByRole?.[p.role] : null} />
+                      scout={p ? scoutByRole?.[p.role] : null}
+                      isActiveTurn={i === activeIndex} pulseClass={pulseClass} />
         ))}
       </div>
     </Panel>
   );
 }
 
-/* A single ban slot: revealed (struck-through portrait) or pending placeholder. */
+/* A single ban slot: revealed (struck-through portrait) or pending placeholder.
+   Crossfades between the two on reveal instead of popping instantly. */
 function BanSlot({ slot, patch }) {
-  if (!slot?.revealed) {
-    return (
-      <div className="grid h-6 w-6 place-items-center rounded border border-dashed border-white/12 text-white/20">
-        <Ban className="h-3 w-3" />
-      </div>
-    );
-  }
   return (
-    <div className="relative grayscale" title={`Banned: ${slot.name}`}>
-      <ChampPortrait slug={slot.slug} patch={patch} size="h-6 w-6" title={slot.name} />
-      <span className="pointer-events-none absolute inset-0 grid place-items-center">
-        <span className="h-px w-[140%] rotate-45 bg-enemy/80" />
-      </span>
-    </div>
+    <AnimatePresence mode="wait" initial={false}>
+      {!slot?.revealed ? (
+        <motion.div key="pending" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.2 }}
+                    className="grid h-6 w-6 place-items-center rounded border border-dashed border-white/12 text-white/20">
+          <Ban className="h-3 w-3" />
+        </motion.div>
+      ) : (
+        <motion.div key="revealed" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.2 }}
+                    className="relative grayscale" title={`Banned: ${slot.name}`}>
+          <ChampPortrait slug={slot.slug} patch={patch} size="h-6 w-6" title={slot.name} />
+          <span className="pointer-events-none absolute inset-0 grid place-items-center">
+            <span className="h-px w-[140%] rotate-45 bg-enemy/80" />
+          </span>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -545,6 +606,7 @@ export default function DraftCockpit({ state }) {
   const reco = state?.recommendation;
   const intel = state?.draft_intel;
   const patch = state?.cache?.patch || "16.12.1";
+  const clock = useDraftClock(state?.draft_clock);
 
   const slugOf = useMemo(() => {
     const m = {};
@@ -576,6 +638,7 @@ export default function DraftCockpit({ state }) {
   const me = {
     name: lobby.my_champion || "Choosing…", slug: lobby.my_slug, role: lobby.my_role,
     champion_id: lobby.my_champion_id ?? -1, damage_type: "—", spells: [], isMe: true,
+    locked: lobby.locked,
   };
   const allyPicks = [me, ...(lobby.allies || [])];
   const enemyPicks = lobby.enemies || [];
@@ -584,17 +647,27 @@ export default function DraftCockpit({ state }) {
   const allyComp = intel?.ally_comp;
   const enemyComp = intel?.enemy_comp;
 
+  // "me" is always the fixed first ally slot on screen, so the backend's
+  // active_pick.index (which excludes the local player) needs a +1 offset;
+  // my own turn is already signalled by lobby.my_turn, mapping to slot 0.
+  const activePick = lobby.active_pick;
+  const allyActiveIndex = lobby.my_turn ? 0
+    : activePick?.side === "ally" ? activePick.index + 1
+    : -1;
+  const enemyActiveIndex = activePick?.side === "enemy" ? activePick.index : -1;
+
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_1fr_auto] gap-2">
       <div className="flex flex-col gap-2">
         <DraftProgress allyCount={(lobby.allies || []).length + (lobby.my_champion ? 1 : 0)}
-                       enemyCount={enemyPicks.length} phase={intel?.counter_pick?.phase} />
+                       enemyCount={enemyPicks.length} phase={intel?.counter_pick?.phase} clock={clock} />
         <BansRow bans={lobby.bans} patch={patch} />
       </div>
 
       <div className="grid min-h-0 grid-cols-[1fr_1.15fr_1fr] gap-2">
         <TeamColumn title="YOUR TEAM" icon={Sparkles} side="ally" picks={allyPicks}
-                    patch={patch} comp={allyComp} scoutByRole={scoutByRole} />
+                    patch={patch} comp={allyComp} scoutByRole={scoutByRole}
+                    activeIndex={allyActiveIndex} urgency={clock.urgency} />
 
         <div className="flex min-h-0 flex-col gap-2 overflow-hidden pr-0.5">
           <BanBanner suggestion={intel?.ban_now ? intel?.ban_suggestions?.[0] : null} patch={patch} />
@@ -606,7 +679,8 @@ export default function DraftCockpit({ state }) {
         </div>
 
         <TeamColumn title="ENEMY TEAM" icon={Swords} side="enemy" picks={enemyPicks}
-                    patch={patch} comp={enemyComp} />
+                    patch={patch} comp={enemyComp}
+                    activeIndex={enemyActiveIndex} urgency={clock.urgency} />
       </div>
 
       {/* bottom intel strip */}

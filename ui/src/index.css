@@ -142,6 +142,12 @@ body {
 }
 .pulse-soft { animation: pulse-soft 1.8s ease-in-out infinite; }
 
+@keyframes pulse-urgent {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.pulse-urgent { animation: pulse-urgent 0.6s ease-in-out infinite; }
+
 @keyframes sweep {
   to { transform: rotate(360deg); }
 }

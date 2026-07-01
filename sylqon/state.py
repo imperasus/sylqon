@@ -32,6 +32,7 @@ class AppState:
             "ollama": {"available": False, "model": config.OLLAMA_MODEL, "processing": False},
             "cache": {"patch": "", "short_patch": "", "builds": 0, "last_sync": None},
             "lobby": None,
+            "draft_clock": None,
             "draft_intel": None,
             "recommendation": None,
             "build": None,

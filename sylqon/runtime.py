@@ -34,7 +34,7 @@ from sylqon.lcu.events import (
 from sylqon.lcu.history import champion_stats
 from sylqon.lcu.injector import Injector
 from sylqon.lcu.lobby import (
-    EnemyProfile, MatchContext, display_signature, read_match_context,
+    EnemyProfile, MatchContext, display_signature, parse_timer, read_match_context,
 )
 from sylqon.livegame.client import LiveClient
 from sylqon.livegame.engine import MissionEngine
@@ -295,6 +295,7 @@ class PipelineRunner:
                     self.state.set("lobby", None)
                     self.state.set("draft_intel", None)
                     self.state.set("recommendation", None)
+                    self.state.set("draft_clock", None)
             elif phase in ("WaitingForStats", "PreEndOfGame", "EndOfGame"):
                 # Post-game: keep the bus alive so the end-of-game stats block push
                 # (and its seed) can trigger the auto-review. The post-game report is
@@ -306,6 +307,7 @@ class PipelineRunner:
                     self.state.set("lobby", None)
                     self.state.set("draft_intel", None)
                     self.state.set("recommendation", None)
+                    self.state.set("draft_clock", None)
             elif phase in ("Matchmaking", "None"):
                 self._stop_event_bus()
                 self._reset_draft_state()
@@ -314,6 +316,7 @@ class PipelineRunner:
                     self.state.set("lobby", None)
                     self.state.set("draft_intel", None)
                     self.state.set("recommendation", None)
+                    self.state.set("draft_clock", None)
 
     # ------------------------------------------------- LCU event bus
     def _ensure_event_bus(self) -> None:
@@ -1095,6 +1098,9 @@ class PipelineRunner:
         asleep until a champion actually locks in or it becomes our turn."""
         if event_type == "Delete" or not isinstance(data, dict):
             return
+        # Countdown for the live-draft UI: published on every push (~1/sec),
+        # bypassing the display-signature gate below so the timer never stalls.
+        self.state.set("draft_clock", parse_timer(data))
         sig = display_signature(data)
         if sig == self._last_display_sig:
             return  # timer tick / nothing visible changed — ignore entirely
@@ -1201,6 +1207,8 @@ class PipelineRunner:
             "bans": ctx.ban_slots,
             "threat_summary": ctx.team_threat_summary(),
             "ally_summary": self._ally_summary(ctx),
+            "active_pick": ({"side": ctx.active_pick_side, "index": ctx.active_pick_index}
+                            if ctx.active_pick_side else None),
         })
         self.state.set("demo", demo)
         self.last_ctx = ctx
@@ -2251,20 +2259,30 @@ class PipelineRunner:
             info = self.catalog.champion_by_name(name)
             if info:
                 enemies.append(_demo_profile(info, role))
+        # One teammate still hovering (not locked) so the Demo control also
+        # exercises the live-draft cockpit's hover-vs-locked styling.
+        allies = []
+        ally_info = self.catalog.champion_by_name("Braum")
+        if ally_info:
+            allies.append(_demo_ally_hover(ally_info, "utility"))
         # Model an in-progress champ select (enemies locked, your counter-pick
         # turn) so the demo lands on the live-draft cockpit — the headline view —
-        # rather than skipping straight to the post-lock build screen.
+        # rather than skipping straight to the post-lock build screen. The
+        # hovering ally is also flagged as the active turn (index 0 of the
+        # allies list) so the "on the clock" pulse has something to demo too.
         ctx = MatchContext(
             summoner_id=(self.client.current_summoner() or {}).get("summonerId", 0)
             if self.client else 0,
             my_champion="Jinx", my_champion_id=int(me["key"]), my_role="bottom",
-            locked=False, all_locked=False, my_turn=True, enemies=enemies, allies=[],
+            locked=False, all_locked=False, my_turn=True, enemies=enemies, allies=allies,
             fingerprint=f"demo-{time.time():.0f}",
+            active_pick_side="ally" if allies else None, active_pick_index=0 if allies else None,
         )
         log.info("Demo lobby assembled: Jinx vs %s", ", ".join(e.name for e in enemies))
         # Drop any sticky injection flag from a previous game so deriveMode can't
         # push the demo past champ select.
         self.state.set("injection", {"status": "idle", "at": None, "detail": ""})
+        self.state.set("draft_clock", {"phase": "PICK", "remaining_ms": 25000, "total_ms": 30000})
         self._publish_lobby(ctx, demo=True)
         self._last_reco_fp = None
         self._maybe_recommend(ctx)
@@ -2277,6 +2295,7 @@ class PipelineRunner:
         self.state.set("draft_intel", None)
         self.state.set("recommendation", None)
         self.state.set("build", None)
+        self.state.set("draft_clock", None)
         self.last_ctx = None
         self._reset_draft_state()
         return {"ok": True, "detail": "demo cleared"}
@@ -2330,4 +2349,16 @@ def _demo_profile(info: dict, role: str) -> EnemyProfile:
         damage_type=_damage_type(info), tags=info.get("tags", []),
         threats=_threats(info["name"]),
         spell1="Ignite", spell2="Flash", locked=True,
+    )
+
+
+def _demo_ally_hover(info: dict, role: str) -> EnemyProfile:
+    """A teammate still hovering (not locked) — exercises the live-draft
+    cockpit's hover-vs-locked styling from the Demo control."""
+    from sylqon.lcu.lobby import _damage_type, _threats
+    return EnemyProfile(
+        name=info["name"], champion_id=int(info["key"]), role=role, side="ally",
+        damage_type=_damage_type(info), tags=info.get("tags", []),
+        threats=_threats(info["name"]),
+        spell1="Exhaust", spell2="Flash", locked=False,
     )

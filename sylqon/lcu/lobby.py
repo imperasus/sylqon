@@ -64,6 +64,14 @@ class MatchContext:
     ally_picks_after_me: int = 0       # ally pick actions still to come after ours
     is_last_pick: bool = False         # our pick is the last one in the draft order
     my_ban_turn: bool = False          # our ban action is in progress (act on a ban now)
+    # Actor cellIds of pick actions in real chronological draft order, per side —
+    # drives the live-draft card insertion order (see ``_turn_orders``).
+    ally_turn_order: list[int] = field(default_factory=list)
+    enemy_turn_order: list[int] = field(default_factory=list)
+    # Side + index (within that side's turn order) of the pick action currently
+    # in progress, or (None, None) between actions / during a ban (see ``_active_pick``).
+    active_pick_side: str | None = None
+    active_pick_index: int | None = None
 
     def trigger_signature(self) -> str:
         """Signature of the *meaningful* draft state — the bits that should
@@ -219,6 +227,62 @@ def _action_team(action: dict, ally_cells: set[int]) -> str:
     return "ally" if action.get("actorCellId") in ally_cells else "enemy"
 
 
+def parse_timer(session: dict) -> dict | None:
+    """Countdown snapshot for the live-draft UI: remaining/total ms in the
+    current phase. Reads the raw session directly (no catalog lookup, no
+    dataclass build) so the caller can publish it on every ~1/sec LCU push,
+    independent of :func:`display_signature`'s gate that skips heavier work
+    on pure timer ticks."""
+    if not isinstance(session, dict):
+        return None
+    timer = session.get("timer")
+    if not isinstance(timer, dict):
+        return None
+    return {
+        "phase": timer.get("phase", ""),
+        "remaining_ms": max(0, timer.get("adjustedTimeLeftInPhase", 0)),
+        "total_ms": timer.get("totalTimeInPhase", 0),
+    }
+
+
+def _turn_orders(session: dict, ally_cells: set[int],
+                  my_cell_id: int) -> tuple[list[int], list[int]]:
+    """Actor cellIds of pick actions in real chronological draft order, split
+    per side. Unlike raw ``myTeam``/``theirTeam`` order (seat order), this
+    reflects the actual sequence picks happen in — drives the live-draft
+    card insertion order and locates the active turn even before anyone has
+    hovered a champion for it. ``my_cell_id`` is excluded from the ally order:
+    the local player's own row is always a fixed first slot on the frontend,
+    and its turn is already signalled separately via ``MatchContext.my_turn``."""
+    ally_order: list[int] = []
+    enemy_order: list[int] = []
+    for group in session.get("actions", []):
+        for a in group:
+            if a.get("type") != "pick":
+                continue
+            cell = a.get("actorCellId")
+            if cell == my_cell_id:
+                continue
+            (ally_order if _action_team(a, ally_cells) == "ally" else enemy_order).append(cell)
+    return ally_order, enemy_order
+
+
+def _active_pick(session: dict, ally_cells: set[int], ally_order: list[int],
+                  enemy_order: list[int]) -> tuple[str | None, int | None]:
+    """Side + index (within that side's turn order) of the pick action
+    currently in progress, or ``(None, None)`` between actions or during a
+    ban — the moment to pulse the "on the clock" card in the live draft."""
+    for group in session.get("actions", []):
+        for a in group:
+            if a.get("type") != "pick" or not a.get("isInProgress") or a.get("completed"):
+                continue
+            cell = a.get("actorCellId")
+            if _action_team(a, ally_cells) == "ally":
+                return ("ally", ally_order.index(cell)) if cell in ally_order else (None, None)
+            return ("enemy", enemy_order.index(cell)) if cell in enemy_order else (None, None)
+    return None, None
+
+
 def parse_bans(session: dict, catalog: Catalog) -> dict:
     """Per-team ban slots in draft order, ready for the dashboard.
 
@@ -352,15 +416,33 @@ def read_match_context(client: LCUClient, catalog: Catalog,
 
     if summoner_id is None:
         summoner_id = (client.current_summoner() or {}).get("summonerId", 0)
+
+    # Order enemies/allies by real chronological pick order (not raw LCU seat
+    # order) so the live-draft cards fill in the order picks actually happen.
+    # Falls back to raw seat order when the queue has no pick actions to scan
+    # (e.g. ARAM) — unchanged from prior behaviour.
+    ally_cells = {p.get("cellId") for p in session.get("myTeam", [])}
+    ally_order, enemy_order = _turn_orders(session, ally_cells, cell_id)
+    active_pick_side, active_pick_index = _active_pick(
+        session, ally_cells, ally_order, enemy_order)
+
+    their_by_cell = {p.get("cellId"): p for p in session.get("theirTeam", [])}
+    enemy_players = ([their_by_cell[c] for c in enemy_order if c in their_by_cell]
+                      if enemy_order else session.get("theirTeam", []))
     enemies = [
         _profile(p, "enemy", catalog, locked_cells)
-        for p in session.get("theirTeam", [])
+        for p in enemy_players
         if p.get("championId")
     ]
+
+    my_by_cell = {p.get("cellId"): p for p in session.get("myTeam", [])}
+    ally_players = ([my_by_cell[c] for c in ally_order if c in my_by_cell and c != cell_id]
+                     if ally_order else
+                     [p for p in session.get("myTeam", []) if p.get("cellId") != cell_id])
     allies = [
         _profile(p, "ally", catalog, locked_cells)
-        for p in session.get("myTeam", [])
-        if p.get("championId") and p.get("cellId") != cell_id
+        for p in ally_players
+        if p.get("championId")
     ]
 
     my_role = static.ROLE_ALIASES.get(me.get("assignedPosition", ""),
@@ -392,4 +474,8 @@ def read_match_context(client: LCUClient, catalog: Catalog,
         ally_picks_after_me=ally_after,
         is_last_pick=is_last,
         my_ban_turn=my_ban_turn,
+        ally_turn_order=ally_order,
+        enemy_turn_order=enemy_order,
+        active_pick_side=active_pick_side,
+        active_pick_index=active_pick_index,
     )

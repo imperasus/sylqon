@@ -146,7 +146,8 @@ export function Chip({ tone = "muted", children, title }) {
 
 /* Thin progress / confidence bar. */
 export function Bar({ value = 0, tone = "accent" }) {
-  const bg = { accent: "bg-accent", ally: "bg-ally", enemy: "bg-enemy", good: "bg-good" }[tone] || "bg-accent";
+  const bg = { accent: "bg-accent", ally: "bg-ally", enemy: "bg-enemy", good: "bg-good",
+               amber: "bg-amber" }[tone] || "bg-accent";
   return (
     <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
       <div className={`h-full ${bg}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
