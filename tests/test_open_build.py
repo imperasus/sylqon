@@ -16,12 +16,10 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import pytest
 
 from sylqon.ai.open_build_prompt import _active_threat_tags, _merge_pools, compile_open_prompt
 from sylqon.data.catalog import Catalog
 from sylqon.loadout import Loadout, apply_ai_open_decision
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures

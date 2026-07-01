@@ -13,7 +13,10 @@ from __future__ import annotations
 
 from sylqon.data import static
 from sylqon.livegame.state import (
-    LiveGameState, _dragon_soul, _infer_roles, _item_spike,
+    LiveGameState,
+    _dragon_soul,
+    _infer_roles,
+    _item_spike,
 )
 
 SPEED = 10.0         # in-game seconds per real second (fast-forward for testing)

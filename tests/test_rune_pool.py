@@ -12,25 +12,22 @@ No LCU, Ollama, or network required.
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import pytest
 
+from sylqon.ai.prompts import compile_prompt, rune_pool_for_champion
 from sylqon.data import static
 from sylqon.data.catalog import Catalog
-from sylqon.ai.prompts import compile_prompt, rune_pool_for_champion
 from sylqon.loadout import (
     Loadout,
     _valid_rune_block,
     apply_ai_decision,
     apply_ai_open_decision,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

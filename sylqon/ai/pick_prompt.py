@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import logging
 
-from sylqon.data import static
 from sylqon.data.catalog import Catalog
 from sylqon.lcu.lobby import MatchContext, _damage_type, _threats
 

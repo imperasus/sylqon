@@ -14,8 +14,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sylqon.analysis import draft_intel
 from sylqon.lcu.lobby import (
-    ChampPick, MatchContext, _banned_champions, _is_my_ban_turn, _pick_timing,
-    display_signature, parse_bans,
+    ChampPick,
+    MatchContext,
+    _banned_champions,
+    _is_my_ban_turn,
+    _pick_timing,
+    display_signature,
+    parse_bans,
 )
 
 

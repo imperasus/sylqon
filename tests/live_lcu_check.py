@@ -12,9 +12,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-from sylqon import config, loadout as loadout_mod
+from sylqon import config
+from sylqon import loadout as loadout_mod
 from sylqon.cache.store import MetaCache
-from sylqon.data.catalog import Catalog
 from sylqon.lcu.client import LCUClient
 from sylqon.lcu.injector import Injector
 from sylqon.lcu.lobby import MatchContext

@@ -19,12 +19,19 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from sylqon.db.schema import (
-    Base, Champion, ChampionMission, ChampionProgress, MatchHistory,
+    Base,
+    Champion,
+    ChampionMission,
+    MatchHistory,
 )
 from sylqon.livegame import champion_missions
 from sylqon.livegame.engine import MissionEngine
 from sylqon.livegame.missions import (
-    FARM_CS_DELTA, NO_DEATH, OBJECTIVE, WARDING, mission_from_row, normalize_mission,
+    FARM_CS_DELTA,
+    NO_DEATH,
+    OBJECTIVE,
+    mission_from_row,
+    normalize_mission,
 )
 from sylqon.livegame.progression import ProgressionService
 from sylqon.livegame.state import LiveGameState

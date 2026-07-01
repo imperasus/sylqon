@@ -13,8 +13,14 @@ from __future__ import annotations
 import json
 
 from sylqon.livegame.missions import (
-    CS_PER_MIN, FARM_CS_DELTA, GANK_ASSIST, MISSION_TYPE_SCHEMA, NO_DEATH,
-    OBJECTIVE, ROAM_ASSIST, WARDING,
+    CS_PER_MIN,
+    FARM_CS_DELTA,
+    GANK_ASSIST,
+    MISSION_TYPE_SCHEMA,
+    NO_DEATH,
+    OBJECTIVE,
+    ROAM_ASSIST,
+    WARDING,
 )
 
 # Short human description per type, shown to the model alongside the param schema.

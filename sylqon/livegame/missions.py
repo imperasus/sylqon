@@ -8,7 +8,7 @@ never hidden state. Standard tuning lives here; Phase 5 lets `config` override i
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from sylqon import config
 from sylqon.livegame.state import LiveGameState

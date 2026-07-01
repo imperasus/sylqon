@@ -134,7 +134,7 @@ def compile_open_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) ->
     """
     from sylqon import config as cfg
     from sylqon import loadout as loadout_mod
-    from sylqon.ai.prompts import threat_directives, _tag_label
+    from sylqon.ai.prompts import _tag_label, threat_directives
 
     threat = ctx.team_threat_summary()
     a1, a2 = loadout_mod.allowed_spells(candidate, ctx.my_role)

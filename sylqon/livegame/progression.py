@@ -14,7 +14,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from sylqon.db.schema import (
-    ChampionMission, ChampionProgress, MissionRun, PlayerProfile,
+    ChampionMission,
+    ChampionProgress,
+    MissionRun,
+    PlayerProfile,
 )
 from sylqon.livegame.missions import NO_DEATH, OBJECTIVE, WARDING
 

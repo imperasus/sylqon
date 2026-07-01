@@ -8,6 +8,10 @@
 
 pytest>=8.0
 
+# Linter/formatter (config in pyproject.toml). Used by the CI lint job and
+# locally via `ruff check .`.
+ruff>=0.8
+
 # Imported by sylqon/rag/{item,rune,kit}_retrieve.py. Not in the base runtime
 # requirements because the RAG paths are off by default and lazily imported.
 numpy>=1.26

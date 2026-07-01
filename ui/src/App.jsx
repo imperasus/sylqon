@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Package, Swords, Users } from "lucide-react";
-import { useSylqon } from "./api.js";
+import { useSylqon, debugEnabled } from "./api.js";
 import StatusBar from "./components/StatusBar.jsx";
 import HomeCockpit from "./components/HomeCockpit.jsx";
 import DraftCockpit from "./components/DraftCockpit.jsx";
@@ -49,8 +49,11 @@ export default function App() {
   const [toast, setToast] = useState("");
   const act = async (fn) => {
     const res = await fn();
-    if (res?.detail) {
-      setToast(res.detail);
+    // Surface both success details and action errors (previously errors from a
+    // failed POST were swallowed and only the state silently refreshed).
+    const msg = res?.detail || (res?.error ? `Hiba: ${res.error}` : "");
+    if (msg) {
+      setToast(msg);
       setTimeout(() => setToast(""), 3500);
     }
     return res;
@@ -75,7 +78,7 @@ export default function App() {
   const prevIsInGame = useRef(null);
 
   useEffect(() => {
-    if (!state) return;
+    if (!state || !debugEnabled()) return; // verbose state-log only with ?debug=1
     const phase = state?.lcu?.phase ?? null;
     const liveActive = state?.live?.active ?? false;
     const liveGameTime = state?.live?.game_time ?? 0;

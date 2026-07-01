@@ -24,10 +24,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
 
-from sylqon.runtime import AppState, PipelineRunner, _norm_position
-from sylqon.runtime import _scout_players_from_lobby, _scout_players_from_session
 from sylqon.lcu.scout import PlayerFingerprint
-
+from sylqon.runtime import (
+    AppState,
+    PipelineRunner,
+    _norm_position,
+    _scout_players_from_lobby,
+    _scout_players_from_session,
+)
 
 # ------------------------------------------------------------------ catalog stub
 

@@ -18,7 +18,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sylqon.rag import rune_index, rune_retrieve
 
-
 # ---------------------------------------------------------------------------
 # Deterministic offline fakes (keyword bag-of-words)
 # ---------------------------------------------------------------------------

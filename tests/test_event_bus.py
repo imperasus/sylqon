@@ -15,7 +15,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sylqon.lcu.client import LCUCredentials
 from sylqon.lcu.events import (
-    CHAMP_SELECT_TOPIC, LOBBY_TOPIC, ChampSelectListener, LcuEventBus,
+    CHAMP_SELECT_TOPIC,
+    LOBBY_TOPIC,
+    ChampSelectListener,
+    LcuEventBus,
 )
 
 CREDS = LCUCredentials(port=12345, token="tok")

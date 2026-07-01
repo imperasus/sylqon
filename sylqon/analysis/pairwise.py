@@ -25,7 +25,11 @@ from __future__ import annotations
 import logging
 
 from sylqon.ai.pick_prompt import (
-    _is_enchanter, _is_engage, _is_frontline, _pick_threats, _tags,
+    _is_enchanter,
+    _is_engage,
+    _is_frontline,
+    _pick_threats,
+    _tags,
 )
 from sylqon.db import queries
 

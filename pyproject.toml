@@ -1,0 +1,38 @@
+# Tooling config for the Sylqon Python backend. There is intentionally no build
+# system section: the backend runs from source / is bundled with PyInstaller, so
+# this file exists purely to configure ruff (lint + format).
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+# The offline suite and the app both live here; lint the backend package and the
+# tests. Generated/vendored dirs are excluded.
+extend-exclude = ["ui", "sylqon-desktop", "sylqon-overlay-shell", "cache", "build", "dist"]
+
+[tool.ruff.lint]
+# A pragmatic starter set: pyflakes (F) catches real bugs (undefined names,
+# unused imports), pycodestyle errors (E), import sorting (I), and a few
+# bug-prone-pattern checks (B). Kept deliberately small so the gate is
+# actionable rather than a wall of style noise; widen over time.
+select = ["E", "F", "I", "B"]
+ignore = [
+    "E501",  # line length is enforced by the formatter, not the linter
+    "B008",  # FastAPI uses function calls (Depends/Query) in argument defaults
+    # Pre-existing stylistic patterns across the codebase. Silenced to keep the
+    # gate focused on real bugs (pyflakes/bugbear) rather than legacy style; drop
+    # these from `ignore` and clean up if a style pass is ever wanted.
+    "E702",  # multiple statements on one line (semicolon)
+    "E731",  # assign a lambda to a variable
+    "E741",  # ambiguous variable name (e.g. `l`)
+    "B905",  # zip() without an explicit strict= (behavioural — leave as-is)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests favour readability over import hygiene (inline fixtures, star-ish setup)
+# and often bind a value only for its side effect / documentation.
+"tests/*" = ["E402", "F841"]
+# One-shot bootstrap script: imports intentionally follow a sys.path tweak.
+"seed_opgg.py" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"

@@ -1,0 +1,101 @@
+name: Auto Release
+
+# Every push to master cuts a release: bump the version from the commit history
+# (Conventional Commits, via standard-version), tag it, then build & publish the
+# Windows installer by calling release.yml with that tag.
+#
+# Why two workflows: pushes made with the built-in GITHUB_TOKEN do NOT re-trigger
+# other workflows, so the tag this creates can't fire release.yml's `push: tags`
+# path on its own — we invoke release.yml explicitly (workflow_call) instead.
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+# One auto-release at a time; never cancel a run that may be mid-publish.
+concurrency:
+  group: auto-release-master
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Bump version & tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    # Ignore the release commit standard-version pushes back to master, otherwise
+    # each release would trigger another release forever.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0                       # standard-version needs prior tags
+          token: ${{ secrets.GITHUB_TOKEN }}   # used to push the bump commit + tag
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # Gate: never tag/release a commit that fails the offline suite.
+      - name: Run offline test suite
+        run: python -m pytest tests/ -q
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: sylqon-desktop/package-lock.json
+
+      - name: Install desktop dependencies
+        working-directory: sylqon-desktop
+        run: npm ci                            # provides standard-version
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # standard-version bumps sylqon-desktop/package.json from the Conventional
+      # Commit history, writes the changelog, commits ("chore(release): X.Y.Z")
+      # and creates the vX.Y.Z tag. The package.json version stays in sync with
+      # the tag, which release.yml validates before building.
+      - name: Bump version & create tag
+        id: bump
+        working-directory: sylqon-desktop
+        run: |
+          npx standard-version
+          TAG=$(git describe --tags --abbrev=0)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Created tag $TAG"
+
+      - name: Push commit & tag to master
+        run: git push --follow-tags origin HEAD:refs/heads/master
+
+  release:
+    name: Build & publish installer
+    needs: version
+    # Reuse the existing build/publish pipeline for the freshly created tag. It
+    # re-runs the offline suite (a cheap belt-and-suspenders gate) before the
+    # Windows build.
+    uses: ./.github/workflows/release.yml
+    with:
+      ref: ${{ needs.version.outputs.tag }}
+    permissions:
+      contents: write
+    secrets: inherit

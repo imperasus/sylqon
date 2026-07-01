@@ -8,18 +8,9 @@ from __future__ import annotations
 
 import logging
 
-from sylqon import config
-
-
-def setup_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler(config.LOG_PATH, encoding="utf-8"),
-        ],
-    )
+# Re-exported for backwards compatibility: server.py and tests import
+# ``setup_logging`` from here. The implementation now lives in one place.
+from sylqon.logging_setup import setup_logging  # noqa: F401
 
 
 def run() -> None:

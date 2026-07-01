@@ -1,7 +1,8 @@
 name: Release
 
-# Build the Sylqon Windows installer and publish it to GitHub Releases
-# whenever a version tag (vX.Y.Z) is pushed.
+# Build the Sylqon Windows installer and publish it to GitHub Releases.
+# Runs on an explicit vX.Y.Z tag push (manual release), and is also called by
+# auto-release.yml (workflow_call) to build the tag it cut from a master push.
 #
 # NOTE: sylqon-desktop is part of a monorepo. The Electron build depends on:
 #   - the React UI in  ../ui          (built by `npm run build:backend`)
@@ -11,7 +12,17 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'          # only explicit version tags — never on main or PRs
+      - 'v*.*.*'          # explicit version tags (manual releases)
+  # Reusable entry point: auto-release.yml (master push → bump → tag) calls this
+  # to build & publish the tag it just created. GITHUB_TOKEN pushes don't
+  # re-trigger the `push: tags` path, hence this explicit call.
+  workflow_call:
+    inputs:
+      ref:
+        description: Git tag to check out, build and publish (e.g. v1.9.1).
+        required: false
+        type: string
+        default: ''
 
 # electron-builder needs write access to create the GitHub Release and upload assets.
 permissions:
@@ -20,7 +31,7 @@ permissions:
 # Only one release build per tag at a time. Never cancel — a half-finished
 # release build could leave a partial/broken release.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.ref || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -61,6 +72,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # For a tag push this is the tag; when called by auto-release, build the
+          # exact tag it created (the triggering ref is master, not the tag).
+          ref: ${{ inputs.ref || github.ref_name }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -80,7 +95,8 @@ jobs:
         shell: pwsh
         working-directory: .
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = "${{ inputs.ref }}"
+          if (-not $tag) { $tag = "${{ github.ref_name }}" }
           $version = $tag -replace '^v', ''
           # semver CLI prints the normalized version when valid, nothing when not.
           $normalized = (npx --yes semver $version) | Select-Object -Last 1

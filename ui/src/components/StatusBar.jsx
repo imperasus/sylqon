@@ -118,6 +118,16 @@ export default function StatusBar({ state, mode, act, api, demoActive, view, onV
 
       <div className="mx-1 h-4 w-px bg-white/10" />
 
+      {api && api.online === false && (
+        <span
+          className="rounded border border-bad/50 bg-bad/15 px-1.5 py-px font-display text-xs font-bold tracking-[0.18em] text-bad"
+          title={api.lastError?.message
+            ? `A backend nem elérhető: ${api.lastError.message}`
+            : "A backend (http://127.0.0.1:8077) nem válaszol"}
+        >
+          BACKEND OFFLINE
+        </span>
+      )}
       <Stat icon={RadioTower} ok={lcu.connected} label={lcu.summoner || (lcu.connected ? "connected" : "no client")}
             title="League client connection" />
       <Stat icon={Cpu} ok={ollama.available} label={ollama.processing ? "thinking…" : (ollama.model || "Ollama")}

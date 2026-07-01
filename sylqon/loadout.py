@@ -527,7 +527,6 @@ def apply_ai_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
 
         # Validate core_items: same count as default, max 1 swap, swapped item in pool
         ai_core = ai.get("core_items", [])
-        core_valid = False
         final_core_names = default_core_names
         if isinstance(ai_core, list) and len(ai_core) == len(base.core_items):
             ai_core_names = [str(n) for n in ai_core]
@@ -539,7 +538,6 @@ def apply_ai_decision(base: Loadout, ai: dict | None, ctx: MatchContext,
             eligible = all(_item_eligible_for_champion(n, ctx.my_champion)
                            for n in ai_core_names)
             if swaps <= 1 and swapped_in_pool and all_exist and eligible:
-                core_valid = True
                 final_core_names = ai_core_names
             else:
                 log.debug(

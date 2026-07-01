@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass, field
 
 from sylqon.data import static
 
+
 # Live Client Data API positions are upper-case (TOP/JUNGLE/MIDDLE/BOTTOM/UTILITY).
 def _norm_role(position: str) -> str:
     p = (position or "").lower().strip()

@@ -14,7 +14,8 @@ import threading
 import time
 from collections import deque
 
-from sylqon import config, loadout as loadout_mod
+from sylqon import config
+from sylqon import loadout as loadout_mod
 from sylqon.data import static
 from sylqon.data.catalog import Catalog
 from sylqon.lcu.injector import merge_stat_shards

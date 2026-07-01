@@ -151,6 +151,18 @@ LOBBY_POLL_SECONDS = 2.0
 # Writable log location. Overridable via SYLQON_LOG_DIR (see CACHE_DIR note).
 LOG_PATH = Path(os.getenv("SYLQON_LOG_DIR", str(PROJECT_ROOT))) / "sylqon.log"
 
+# --- Logging / debug --------------------------------------------------------
+# Runtime log verbosity. ``SYLQON_DEBUG=1`` is a convenience shortcut that
+# forces DEBUG (so the ~23 log.debug() calls scattered across the pipeline
+# become visible); otherwise ``SYLQON_LOG_LEVEL`` picks the level by name.
+SYLQON_DEBUG: bool = os.getenv("SYLQON_DEBUG", "0") == "1"
+LOG_LEVEL: str = "DEBUG" if SYLQON_DEBUG else os.getenv("SYLQON_LOG_LEVEL", "INFO").upper()
+# Emit one JSON object per line instead of the human format (off by default).
+LOG_JSON: bool = os.getenv("SYLQON_LOG_JSON", "0") == "1"
+# Rotating file handler bounds so sylqon.log can't grow without limit.
+LOG_MAX_BYTES: int = int(os.getenv("SYLQON_LOG_MAX_BYTES", str(5 * 1024 * 1024)))
+LOG_BACKUP_COUNT: int = int(os.getenv("SYLQON_LOG_BACKUP_COUNT", "3"))
+
 # --- OpenBuild mode ---------------------------------------------------------
 # When enabled, the counter-loadout prompt draws from the full Data Dragon
 # catalog rather than just the op.gg situational pool.
