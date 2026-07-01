@@ -40,3 +40,45 @@ jobs:
 
       - name: Run offline test suite
         run: python -m pytest tests/ -q
+
+  lint:
+    name: Lint (ruff + eslint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Non-blocking for now: the linters were introduced against an existing
+    # codebase with pre-existing findings. This surfaces issues on every PR;
+    # flip `continue-on-error` off once the backlog is cleared to make it a gate.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install ruff
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Ruff (Python lint)
+        run: ruff check .
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI deps
+        run: npm ci --prefix ui
+
+      - name: ESLint (dashboard)
+        run: npm run lint --prefix ui

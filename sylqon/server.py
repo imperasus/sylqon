@@ -9,13 +9,15 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -55,6 +57,40 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_log = logging.getLogger("sylqon.server")
+
+
+@app.middleware("http")
+async def _trace_requests(request: Request, call_next):
+    """Tag every request with a short trace id and log its timing at DEBUG.
+    Invisible in normal (INFO) operation; ``SYLQON_DEBUG=1`` surfaces slow
+    op.gg/Ollama-backed endpoints and ties an error back to its request."""
+    trace_id = uuid.uuid4().hex[:8]
+    request.state.trace_id = trace_id
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        elapsed = (time.perf_counter() - started) * 1000
+        _log.exception("[%s] %s %s failed after %.0fms", trace_id, request.method, request.url.path, elapsed)
+        raise
+    elapsed = (time.perf_counter() - started) * 1000
+    _log.debug("[%s] %s %s -> %s (%.0fms)", trace_id, request.method, request.url.path, response.status_code, elapsed)
+    response.headers["X-Trace-Id"] = trace_id
+    return response
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
+    """Turn an escaped exception into a structured JSON body (with the request's
+    trace id) instead of an opaque 500, and record the traceback server-side."""
+    trace_id = getattr(request.state, "trace_id", "-")
+    _log.exception("[%s] unhandled error on %s %s", trace_id, request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"error": type(exc).__name__, "detail": str(exc), "trace_id": trace_id},
+    )
 
 
 class InjectRequest(BaseModel):
@@ -218,6 +254,87 @@ def overlay_reset() -> dict:
         session.close()
     runner.reset_overlay()
     return {"ok": True, "detail": "overlay progression reset"}
+
+
+@app.get("/api/debug/health")
+def debug_health() -> dict:
+    """One-glance integration health — the runbook's first stop. Re-checks
+    every dependency at request time (not the startup cache) so a service that
+    came up after launch — or died since — is reported correctly."""
+    snap = runner.state.snapshot()
+
+    # Ollama: live re-probe rather than the cached startup flag.
+    try:
+        ollama_ok = runner.engine.available()
+    except Exception:
+        ollama_ok = False
+
+    # DB: a trivial round-trip proves the session/file is usable.
+    db_ok = True
+    try:
+        session = get_session()
+        try:
+            session.query(Champion).limit(1).all()
+        finally:
+            session.close()
+    except Exception:
+        db_ok = False
+
+    # op.gg: host reachability with a tight timeout (any HTTP reply == reachable).
+    opgg_ok = False
+    try:
+        import requests
+        resp = requests.get("https://lol-api-champion.op.gg/", timeout=3)
+        opgg_ok = resp.status_code < 500
+    except Exception:
+        opgg_ok = False
+
+    return {
+        "ok": db_ok,
+        "lcu": {"connected": bool((snap.get("lcu") or {}).get("connected"))},
+        "ollama": {"available": ollama_ok, "url": config.OLLAMA_URL, "model": config.OLLAMA_MODEL},
+        "opgg": {"reachable": opgg_ok, "region": config.OPGG_REGION},
+        "database": {"ok": db_ok, "path": str(config.DB_PATH)},
+        "cache": {"builds": (snap.get("cache") or {}).get("builds", 0)},
+        "log": {"level": config.LOG_LEVEL, "path": str(config.LOG_PATH)},
+    }
+
+
+@app.get("/api/debug/config")
+def debug_config() -> dict:
+    """Effective (non-secret) runtime configuration — answers 'what settings is
+    it actually running with?' without shell access. Secrets (Riot API key) are
+    reported only as present/absent, never echoed."""
+    return {
+        "log_level": config.LOG_LEVEL,
+        "log_json": config.LOG_JSON,
+        "ollama_url": config.OLLAMA_URL,
+        "ollama_model": config.OLLAMA_MODEL,
+        "ollama_timeout": config.OLLAMA_TIMEOUT_SECONDS,
+        "opgg_region": config.OPGG_REGION,
+        "opgg_timeout": config.OPGG_TIMEOUT_SECONDS,
+        "opgg_retries": config.OPGG_RETRIES,
+        "cache_ttl_seconds": config.CACHE_TTL_SECONDS,
+        "cache_dir": str(config.CACHE_DIR),
+        "db_path": str(config.DB_PATH),
+        "open_build_mode": config.OPEN_BUILD_MODE,
+        "overlay_auto": config.OVERLAY_AUTO,
+        "riot_api_key_set": bool(config.RIOT_API_KEY),
+    }
+
+
+@app.get("/api/debug/logs")
+def debug_logs(level: str = "", limit: int = 80) -> dict:
+    """Recent pipeline log events (from the in-memory dashboard feed) over HTTP,
+    so a caller can diagnose without opening sylqon.log. Optional ``level``
+    filter (info/warning/error); ``limit`` caps the count."""
+    events = runner.state.snapshot().get("events", [])
+    wanted = level.strip().lower()
+    if wanted:
+        events = [e for e in events if e.get("level") == wanted]
+    if limit > 0:
+        events = events[-limit:]
+    return {"events": events, "count": len(events)}
 
 
 class LiveDemoReq(BaseModel):
@@ -702,7 +819,10 @@ if UI_DIST.exists():
 def run() -> None:
     setup_logging()
     logging.getLogger(__name__).info("Dashboard bridge on http://%s:%d", HOST, PORT)
-    uvicorn.run(app, host=HOST, port=PORT, log_level="warning")
+    # Follow the pipeline's verbosity: DEBUG surfaces uvicorn's access logs too,
+    # otherwise keep the HTTP layer quiet (warning) so the pipeline logs dominate.
+    uv_level = "debug" if config.SYLQON_DEBUG else "warning"
+    uvicorn.run(app, host=HOST, port=PORT, log_level=uv_level)
 
 
 if __name__ == "__main__":

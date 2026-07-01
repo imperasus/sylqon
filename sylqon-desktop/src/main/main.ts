@@ -127,6 +127,12 @@ function createMainWindow(): void {
 
   mainWindow.setMenuBarVisibility(false);
 
+  // Open DevTools automatically in dev, or when SYLQON_DEVTOOLS=1 is set, so the
+  // dashboard renderer can be inspected without a rebuild.
+  if (process.env.SYLQON_DEVTOOLS === "1" || process.env.NODE_ENV === "development") {
+    mainWindow.webContents.openDevTools({ mode: "detach" });
+  }
+
   // Remember size/position across runs (debounced inside the store). Persist the
   // normal (non-maximized) bounds so un-maximizing restores the prior size.
   const persistBounds = () => {

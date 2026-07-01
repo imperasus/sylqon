@@ -2,13 +2,50 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const POLL_MS = 1500;
 
+/** Debug toggle: `?debug=1` in the URL or `localStorage.sylqon_debug=1`.
+ * Off by default; when on, the fetch layer logs verbose timing/detail. */
+export function debugEnabled() {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("debug") === "1") return true;
+    return window.localStorage.getItem("sylqon_debug") === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Single place where fetch failures become visible. Previously every caller
+ * swallowed errors silently (`catch {}`), so a broken endpoint left no trace in
+ * the console. This always logs; degradation (returning empty/null) stays the
+ * caller's choice. */
+export function logApiError(where, err) {
+  console.error(`[sylqon] ${where} failed:`, err?.message || err);
+}
+
+/** fetch + status check + JSON parse. Throws a contextual error on non-2xx so a
+ * 4xx/5xx no longer slips through as if it were a valid body. */
+export async function apiFetch(path, options) {
+  const started = performance.now();
+  const res = await fetch(path, options);
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status} on ${path}`);
+    err.status = res.status;
+    err.path = path;
+    throw err;
+  }
+  const data = await res.json();
+  if (debugEnabled()) {
+    console.debug(`[sylqon] ${options?.method || "GET"} ${path} -> ${res.status} (${Math.round(performance.now() - started)}ms)`);
+  }
+  return data;
+}
+
 async function post(path, body) {
-  const res = await fetch(path, {
+  return apiFetch(path, {
     method: body === null ? "DELETE" : "POST",
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
-  return res.json();
 }
 
 /** Polls the FastAPI bridge and exposes dashboard actions. */
@@ -16,15 +53,19 @@ export function useSylqon() {
   const [state, setState] = useState(null);
   const [online, setOnline] = useState(false);
   const [busy, setBusy] = useState("");
+  const [lastError, setLastError] = useState(null);
   const timer = useRef(null);
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/state");
-      setState(await res.json());
+      setState(await apiFetch("/api/state"));
       setOnline(true);
-    } catch {
+    } catch (e) {
+      // Distinguish "backend down / errored" from "no data yet" — the UI can
+      // now show an explicit offline banner instead of a bare empty state.
       setOnline(false);
+      setLastError({ where: "state", message: e?.message || String(e) });
+      logApiError("GET /api/state", e);
     }
   }, []);
 
@@ -38,7 +79,14 @@ export function useSylqon() {
     async (name, path, body) => {
       setBusy(name);
       try {
-        return await post(path, body);
+        const res = await post(path, body);
+        setLastError(null);
+        return res;
+      } catch (e) {
+        // Action failures used to vanish in the `finally`; surface them.
+        setLastError({ where: name, message: e?.message || String(e) });
+        logApiError(`${name} ${path}`, e);
+        return { error: e?.message || String(e) };
       } finally {
         setBusy("");
         refresh();
@@ -51,6 +99,7 @@ export function useSylqon() {
     state,
     online,
     busy,
+    lastError,
     inject: (variant) => action("inject", "/api/inject", { variant }),
     injectVariant: (index) => action("inject", "/api/inject/variant", { index }),
     startDemo: () => action("demo", "/api/demo", {}),
@@ -68,14 +117,14 @@ export function useStaticData() {
     (async () => {
       try {
         const [c, m] = await Promise.all([
-          fetch("/api/champions").then((r) => r.json()),
-          fetch("/api/meta").then((r) => r.json()),
+          apiFetch("/api/champions"),
+          apiFetch("/api/meta"),
         ]);
         if (cancelled) return;
         setChampions(c.champions || []);
         setMeta(m || { positions: {} });
-      } catch {
-        /* degrade to empty */
+      } catch (e) {
+        logApiError("useStaticData", e); // degrade to empty, but visibly
       }
     })();
     return () => (cancelled = true);
@@ -91,11 +140,11 @@ export function usePool() {
 
   const load = useCallback(async () => {
     try {
-      const r = await (await fetch("/api/pool")).json();
+      const r = await apiFetch("/api/pool");
       setPool(r.pool || {});
       setBuildable(r.buildable || {});
-    } catch {
-      /* ignore */
+    } catch (e) {
+      logApiError("usePool.load", e);
     }
   }, []);
 
@@ -107,13 +156,14 @@ export function usePool() {
     setSaving(true);
     setPool(nextPool); // optimistic
     try {
-      const r = await fetch("/api/pool", {
+      const j = await apiFetch("/api/pool", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pool: nextPool }),
       });
-      const j = await r.json();
       setPool(j.pool || nextPool);
+    } catch (e) {
+      logApiError("usePool.save", e); // keep optimistic value; surface the failure
     } finally {
       setSaving(false);
     }
@@ -133,10 +183,10 @@ export function useSettings() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await (await fetch("/api/settings")).json();
+      const r = await apiFetch("/api/settings");
       setSettings(r.settings || {});
-    } catch {
-      /* ignore — modal shows a degraded state */
+    } catch (e) {
+      logApiError("useSettings.load", e); // modal shows a degraded state
     } finally {
       setLoading(false);
     }
@@ -145,14 +195,16 @@ export function useSettings() {
   const save = useCallback(async (patch) => {
     setSaving(true);
     try {
-      const r = await fetch("/api/settings", {
+      const j = await apiFetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings: patch }),
       });
-      const j = await r.json();
       if (j.settings) setSettings(j.settings);
       return j.settings;
+    } catch (e) {
+      logApiError("useSettings.save", e);
+      return undefined;
     } finally {
       setSaving(false);
     }
@@ -169,10 +221,10 @@ export function useChampionStats() {
     let cancelled = false;
     const load = async () => {
       try {
-        const r = await (await fetch("/api/champion-stats")).json();
+        const r = await apiFetch("/api/champion-stats");
         if (!cancelled) setStats(r.stats || {});
-      } catch {
-        /* ignore */
+      } catch (e) {
+        logApiError("useChampionStats", e);
       }
     };
     load();
@@ -194,15 +246,15 @@ export function useScout(role) {
     let timer = null;
     const load = async () => {
       try {
-        const r = await (await fetch(`/api/scout?role=${role}`)).json();
+        const r = await apiFetch(`/api/scout?role=${role}`);
         if (cancelled) return;
         setScout(r);
         // If still heuristic, the AI may be refining in the background — peek again.
         if (r?.source === "heuristic" && r?.pick) {
           timer = setTimeout(load, 4000);
         }
-      } catch {
-        /* ignore */
+      } catch (e) {
+        logApiError("useScout", e);
       }
     };
     setScout(null);
@@ -215,28 +267,30 @@ export function useScout(role) {
   return scout;
 }
 
-/* --- v2 champion browser + match history (plain fetchers) ----------------- */
+/* --- v2 champion browser + match history (plain fetchers) -----------------
+ * These go through apiFetch so a non-2xx response throws (with context) instead
+ * of parsing an error body as if it were valid data. Callers already `catch`. */
 export async function fetchChampionsByRole(role) {
-  return (await fetch(`/api/champions/role/${role}`)).json();
+  return apiFetch(`/api/champions/role/${role}`);
 }
 export async function fetchChampionDetails(id, role) {
-  return (await fetch(`/api/champions/${id}/details?role=${role}`)).json();
+  return apiFetch(`/api/champions/${id}/details?role=${role}`);
 }
 export async function fetchRecentMatches(limit = 10) {
-  return (await fetch(`/api/matches/recent?limit=${limit}`)).json();
+  return apiFetch(`/api/matches/recent?limit=${limit}`);
 }
 export async function fetchMatchAnalysis(id) {
-  return (await fetch(`/api/matches/${id}/analysis`)).json();
+  return apiFetch(`/api/matches/${id}/analysis`);
 }
 export async function fetchMacroCoach() {
-  return (await fetch(`/api/coach`)).json();
+  return apiFetch(`/api/coach`);
 }
 export async function refreshMacroCoach() {
-  return (await fetch(`/api/coach/refresh`, { method: "POST" })).json();
+  return apiFetch(`/api/coach/refresh`, { method: "POST" });
 }
 export async function fetchProBuilds(champion, role = "") {
   const q = new URLSearchParams({ champion, ...(role ? { role } : {}) });
-  return (await fetch(`/api/pro-builds?${q}`)).json();
+  return apiFetch(`/api/pro-builds?${q}`);
 }
 
 const CDRAGON =
@@ -260,8 +314,8 @@ export function usePerkIcons() {
         for (const s of styles.styles || [])
           map[s.id] = { url: toUrl(s.iconPath), name: s.name };
         if (!cancelled) setIcons(map);
-      } catch {
-        /* icons degrade to placeholders */
+      } catch (e) {
+        logApiError("usePerkIcons", e); // icons degrade to placeholders
       }
     })();
     return () => (cancelled = true);

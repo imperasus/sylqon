@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import OverlayApp from "./OverlayApp.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import "./index.css";
 
 // Lightweight routing (the project has no react-router): the /overlay path
@@ -16,6 +17,8 @@ if (!isOverlay) document.documentElement.classList.add("app-fluid-root");
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {isOverlay ? <OverlayApp /> : <App />}
+    <ErrorBoundary>
+      {isOverlay ? <OverlayApp /> : <App />}
+    </ErrorBoundary>
   </React.StrictMode>
 );

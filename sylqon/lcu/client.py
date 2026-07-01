@@ -80,7 +80,7 @@ class LCUClient:
                 log.info("Connected to LCU on port %d", creds.port)
                 return client
         except requests.RequestException:
-            pass
+            log.debug("LCU handshake failed on port %d", creds.port, exc_info=True)
         return None
 
     def _request(self, method: str, path: str, **kwargs) -> requests.Response:
@@ -132,5 +132,5 @@ class LCUClient:
             if resp.status_code == 200:
                 return resp.json()
         except (requests.RequestException, ValueError):
-            pass
+            log.debug("gameflow-phase read failed", exc_info=True)
         return "None"

@@ -102,7 +102,7 @@ class LcuEventBus:
             try:
                 ws.close()
             except Exception:
-                pass
+                log.debug("WebSocket close during stop() failed", exc_info=True)
         self._thread = None
 
     def is_running(self) -> bool:
@@ -190,7 +190,7 @@ class LcuEventBus:
             try:
                 ws.close()
             except Exception:
-                pass
+                log.debug("WebSocket close during reconnect failed", exc_info=True)
 
 
 class ChampSelectListener:
