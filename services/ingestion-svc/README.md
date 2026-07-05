@@ -32,6 +32,18 @@ python -m app.cli ingest "Name#TAG" --count 20
 python -m app.cli advise EUN1_1234567890 <puuid> --lang hu
 ```
 
+## Discord bot (slash commands)
+
+Set `DISCORD_BOT_TOKEN`, then `python -m app.bot`. Commands: `/link Név#TAG`
+(account linking + backfill; linked users are auto-watched), `/utolsomeccs`
+(latest match's lesson with 👍/👎 buttons → `advice_feedback`), `/riport`
+(weekly summary), `/build <champion>` and `/matchup <a> <b>` (own-data
+aggregation — honest "not enough data yet" below the sample floor),
+`/beallitas` (advice channel + guild language, needs Manage Server). The
+match watcher runs inside the bot process and posts advice embeds to the
+configured channel, mentioning the linked user; without a configured channel
+it falls back to the webhook below.
+
 ## Discord delivery (webhook MVP)
 
 Set `DISCORD_WEBHOOK_URL` (service-local `.env` is picked up), then:

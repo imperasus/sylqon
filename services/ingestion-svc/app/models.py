@@ -123,6 +123,49 @@ class ComputedBenchmark(Base):
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class LinkedAccount(Base):
+    """Discord user ↔ Riot PUUID link (Riot-ID-based fallback linking; RSO
+    OAuth replaces the verification story later, roadmap §4.1)."""
+
+    __tablename__ = "linked_accounts"
+
+    discord_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    puuid: Mapped[str] = mapped_column(Text, unique=True)
+    game_name: Mapped[str] = mapped_column(Text)
+    tag_line: Mapped[str] = mapped_column(Text)
+    lang: Mapped[str] = mapped_column(Text, default="hu")
+    linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class GuildConfig(Base):
+    """Per-guild bot settings (advice channel + language)."""
+
+    __tablename__ = "guild_configs"
+
+    guild_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    advice_channel_id: Mapped[int | None] = mapped_column(BigInteger)
+    lang: Mapped[str] = mapped_column(Text, default="hu")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class AdviceFeedback(Base):
+    """👍/👎 votes on delivered advice — the roadmap's advice_log seed, the
+    future training signal for the ML death-audit swap (S7)."""
+
+    __tablename__ = "advice_feedback"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    match_id: Mapped[str] = mapped_column(Text)
+    puuid: Mapped[str] = mapped_column(Text)
+    discord_user_id: Mapped[int] = mapped_column(BigInteger)
+    vote: Mapped[int] = mapped_column(Integer)  # +1 / -1
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("match_id", "puuid", "discord_user_id", name="uq_feedback_once"),
+    )
+
+
 class Delivery(Base):
     """One row per advice actually pushed to a channel (or baselined on watcher
     startup) — the dedupe guard that keeps the watcher from re-posting."""

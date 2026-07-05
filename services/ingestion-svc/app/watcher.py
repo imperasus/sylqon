@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app import aggregate, config, store
 from app.advice.pipeline import AdviceNotPossible, get_or_generate_advice
 from app.crawler import IngestService
-from app.models import Delivery, MatchParticipant
+from app.models import Delivery, LinkedAccount, MatchParticipant
 from app.notifier import DiscordWebhookNotifier
 
 log = logging.getLogger(__name__)
@@ -55,10 +55,19 @@ class MatchWatcher:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
+    def _tracked_puuids(self) -> list[str]:
+        """Static config accounts + every /link-ed Discord user."""
+        puuids = list(self._puuids)
+        with self._session_factory() as session:
+            for row in session.execute(select(LinkedAccount.puuid)):
+                if row[0] not in puuids:
+                    puuids.append(row[0])
+        return puuids
+
     def run_once(self) -> int:
         """One poll cycle. Returns the number of advice messages delivered."""
         delivered = 0
-        for puuid in self._puuids:
+        for puuid in self._tracked_puuids():
             try:
                 delivered += self._poll_puuid(puuid)
             except Exception:

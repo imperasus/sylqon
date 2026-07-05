@@ -66,6 +66,7 @@ BENCHMARK_MIN_SAMPLES = int(_env("BENCHMARK_MIN_SAMPLES", "40"))
 # later with account linking). Watcher polls tracked PUUIDs and posts the
 # post-game advice to the webhook channel.
 DISCORD_WEBHOOK_URL = _env("DISCORD_WEBHOOK_URL", "")
+DISCORD_BOT_TOKEN = _env("DISCORD_BOT_TOKEN", "")
 WATCH_PUUIDS = [p.strip() for p in _env("WATCH_PUUIDS", "", "RIOT_SELF_PUUID").split(",") if p.strip()]
 WATCH_POLL_SECONDS = float(_env("WATCH_POLL_SECONDS", "180"))
 WATCH_MATCH_COUNT = int(_env("WATCH_MATCH_COUNT", "5"))
