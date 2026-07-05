@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.10.2](https://github.com/imperasus/sylqon/compare/v1.10.1...v1.10.2) (2026-07-05)
+
+
+### Bug Fixes
+
+* **landing:** real download CTA + repo GitHub link ([a23ccdf](https://github.com/imperasus/sylqon/commit/a23ccdf2d364e88987c4d33b76a7398667ad5420))
+
 ### [1.10.1](https://github.com/imperasus/sylqon/compare/v1.10.0...v1.10.1) (2026-07-05)
 
 ## [1.10.0](https://github.com/imperasus/sylqon/compare/v1.9.1...v1.10.0) (2026-07-05)
