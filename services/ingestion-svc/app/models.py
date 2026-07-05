@@ -111,16 +111,32 @@ class Advice(Base):
 
 
 class ComputedBenchmark(Base):
-    """Role-level benchmark medians aggregated from our own stored matches —
-    the replacement path for the seed tables in advice/benchmarks.py. Applied
-    only once the per-role sample count clears BENCHMARK_MIN_SAMPLES."""
+    """Role×rank-band benchmark medians aggregated from our own stored matches
+    — the replacement path for the seed tables in advice/benchmarks.py. Band
+    "ALL" always exists; rank bands appear as player_ranks coverage grows.
+    Applied only once the sample count clears BENCHMARK_MIN_SAMPLES."""
 
     __tablename__ = "computed_benchmarks"
 
     role: Mapped[str] = mapped_column(Text, primary_key=True)
+    band: Mapped[str] = mapped_column(Text, primary_key=True, default="ALL")
     data: Mapped[dict] = mapped_column(JsonCol)  # {cs10, cs15, wards_per_min, control_wards}
     samples: Mapped[int] = mapped_column(Integer)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class PlayerRank(Base):
+    """Latest known solo-queue rank per PUUID (League-V4), fetched during the
+    seed crawl — partitions the benchmark aggregation into rank bands."""
+
+    __tablename__ = "player_ranks"
+
+    puuid: Mapped[str] = mapped_column(Text, primary_key=True)
+    platform: Mapped[str] = mapped_column(Text)
+    tier: Mapped[str] = mapped_column(Text)  # IRON..CHALLENGER or UNRANKED
+    division: Mapped[str | None] = mapped_column(Text)
+    league_points: Mapped[int | None] = mapped_column(Integer)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class CrawlTarget(Base):

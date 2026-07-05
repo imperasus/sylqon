@@ -72,6 +72,18 @@ def _cmd_crawl(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_ranks(args: argparse.Namespace) -> int:
+    from app import seedcrawl
+
+    engine = db.init_db()
+    service = IngestService(
+        RiotClient(rate_limiter=build_rate_limiter()), db.get_session_factory(engine)
+    )
+    done = seedcrawl.backfill_ranks(service, db.get_session_factory(engine), limit=args.limit)
+    print(f"fetched {done} rank(s)")
+    return 0
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
     from app import config, report
     from app.notifier import DiscordWebhookNotifier
@@ -175,6 +187,10 @@ def main(argv: list[str] | None = None) -> int:
     p_crawl = sub.add_parser("crawl", help="run co-player seed-crawl cycles")
     p_crawl.add_argument("--cycles", type=int, default=1)
     p_crawl.set_defaults(func=_cmd_crawl)
+
+    p_ranks = sub.add_parser("ranks", help="backfill solo-queue ranks for stored players")
+    p_ranks.add_argument("--limit", type=int, default=None)
+    p_ranks.set_defaults(func=_cmd_ranks)
 
     p_report = sub.add_parser("report", help="weekly trend report for a tracked account")
     p_report.add_argument("--puuid", default=None)

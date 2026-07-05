@@ -97,3 +97,9 @@ class RiotClient:
     def get_timeline(self, match_id: str) -> dict | None:
         """MATCH-V5: per-minute frame/event timeline for a match."""
         return self._get(self.mass_region, f"/lol/match/v5/matches/{match_id}/timeline")
+
+    def get_ranked_stats(self, puuid: str, platform: str | None = None) -> list | None:
+        """LEAGUE-V4: ranked entries for a puuid (platform route, e.g. eun1)."""
+        return self._get(
+            platform or self.platform_region, f"/lol/league/v4/entries/by-puuid/{puuid}"
+        )

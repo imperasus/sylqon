@@ -67,8 +67,8 @@ def test_compute_medians_per_role(session_factory):
     seed_matches(session_factory, count=3, cs_at_10=70)
     with session_factory() as s:
         computed = aggregate.compute_role_benchmarks(s)
-    assert set(computed) == {"TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"}
-    top = computed["TOP"]
+    assert set(computed) == {(r, "ALL") for r in aggregate.ROLES}
+    top = computed[("TOP", "ALL")]
     assert top["samples"] == 6  # 2 TOP per match × 3 matches
     assert top["cs10"] == 70
     assert top["cs15"] == 105
@@ -93,6 +93,50 @@ def test_refresh_persists_and_overrides_apply_above_threshold(session_factory, m
     assert cs_over["TOP"] == {10: 80, 15: 120}
     assert "UTILITY" not in cs_over  # support stays CS-exempt
     assert vision_over["UTILITY"]["control_wards"] == 2
+
+
+def test_band_partitioning_and_preference(session_factory, monkeypatch):
+    from app.models import PlayerRank
+
+    seed_matches(session_factory, count=25, cs_at_10=80)  # 50 ALL samples/role
+    monkeypatch.setattr(config, "BENCHMARK_MIN_SAMPLES", 40)
+    with session_factory() as s:
+        # p-0 and p-5 are the two TOPs of every match → 50 samples in the band
+        for puuid in ("p-0", "p-5"):
+            s.add(PlayerRank(puuid=puuid, platform="eun1", tier="GOLD"))
+        s.commit()
+        computed = aggregate.refresh_benchmarks(s)
+        assert computed[("TOP", "silver-gold")]["samples"] == 50
+        assert ("JUNGLE", "silver-gold") not in computed  # no ranked junglers
+
+        # band row wins for TOP when asking for silver-gold; others fall to ALL
+        cs_band, _ = aggregate.load_effective_overrides(s, band="silver-gold")
+        cs_all, _ = aggregate.load_effective_overrides(s)
+        assert cs_band["TOP"] == {10: 80, 15: 120}
+        assert cs_band.keys() == cs_all.keys()  # ALL fallback keeps other roles
+
+
+def test_band_for_tier():
+    assert aggregate.band_for_tier("GOLD") == "silver-gold"
+    assert aggregate.band_for_tier("EMERALD") == "plat-emerald"
+    assert aggregate.band_for_tier("CHALLENGER") == "diamond+"
+    assert aggregate.band_for_tier("UNRANKED") is None
+    assert aggregate.band_for_tier(None) is None
+
+
+def test_old_shape_table_is_dropped_on_init():
+    from sqlalchemy import create_engine, inspect, text
+
+    from app import db as app_db
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    with engine.begin() as conn:  # simulate the pre-band table shape
+        conn.execute(text(
+            "CREATE TABLE computed_benchmarks (role TEXT PRIMARY KEY, data JSON, "
+            "samples INTEGER, computed_at TIMESTAMP)"
+        ))
+    app_db.init_db(engine)
+    assert "band" in {c["name"] for c in inspect(engine).get_columns("computed_benchmarks")}
 
 
 def test_overrides_empty_below_threshold(session_factory, monkeypatch):

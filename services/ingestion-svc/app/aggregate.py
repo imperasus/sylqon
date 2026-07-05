@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import config
-from app.models import ComputedBenchmark, Match, Timeline
+from app.models import ComputedBenchmark, Match, PlayerRank, Timeline
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +24,18 @@ log = logging.getLogger(__name__)
 SR_QUEUES = {420, 440, 400, 430}
 
 ROLES = ("TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY")
+
+_BANDS = {
+    "IRON": "iron-bronze", "BRONZE": "iron-bronze",
+    "SILVER": "silver-gold", "GOLD": "silver-gold",
+    "PLATINUM": "plat-emerald", "EMERALD": "plat-emerald",
+    "DIAMOND": "diamond+", "MASTER": "diamond+",
+    "GRANDMASTER": "diamond+", "CHALLENGER": "diamond+",
+}
+
+
+def band_for_tier(tier: str | None) -> str | None:
+    return _BANDS.get((tier or "").upper())
 
 
 def _cs_at(frames: list[dict], pid: int, minute: int) -> int | None:
@@ -35,12 +47,20 @@ def _cs_at(frames: list[dict], pid: int, minute: int) -> int | None:
     return int(pf.get("minionsKilled", 0)) + int(pf.get("jungleMinionsKilled", 0))
 
 
-def compute_role_benchmarks(session: Session) -> dict[str, dict]:
-    """Aggregate per-role medians from every stored SR match + timeline."""
-    samples: dict[str, dict[str, list[float]]] = {
-        role: {"cs10": [], "cs15": [], "wards_per_min": [], "control_wards": []}
-        for role in ROLES
+def compute_role_benchmarks(session: Session) -> dict[tuple[str, str], dict]:
+    """Aggregate (role, band) medians from every stored SR match + timeline.
+    Every sample lands in band "ALL"; ranked players additionally land in
+    their tier band (player_ranks coverage grows with the seed crawl)."""
+    bands_by_puuid = {
+        r.puuid: band_for_tier(r.tier)
+        for r in session.execute(select(PlayerRank)).scalars()
     }
+    samples: dict[tuple[str, str], dict[str, list[float]]] = {}
+
+    def bucket(role: str, band: str) -> dict[str, list[float]]:
+        return samples.setdefault(
+            (role, band), {"cs10": [], "cs15": [], "wards_per_min": [], "control_wards": []}
+        )
 
     rows = session.execute(
         select(Match, Timeline).join(Timeline, Timeline.match_id == Match.match_id)
@@ -55,60 +75,74 @@ def compute_role_benchmarks(session: Session) -> dict[str, dict]:
         for p in match.raw.get("participants", []):
             role = p.get("teamPosition")
             pid = p.get("participantId")
-            if role not in samples or not pid:
+            if role not in ROLES or not pid:
                 continue
-            bucket = samples[role]
+            targets = [bucket(role, "ALL")]
+            band = bands_by_puuid.get(p.get("puuid"))
+            if band:
+                targets.append(bucket(role, band))
             cs10 = _cs_at(frames, pid, 10)
             cs15 = _cs_at(frames, pid, 15)
-            if cs10 is not None:
-                bucket["cs10"].append(cs10)
-            if cs15 is not None:
-                bucket["cs15"].append(cs15)
-            bucket["wards_per_min"].append(p.get("wardsPlaced", 0) / duration_min)
-            bucket["control_wards"].append(p.get("visionWardsBoughtInGame", 0))
+            for b in targets:
+                if cs10 is not None:
+                    b["cs10"].append(cs10)
+                if cs15 is not None:
+                    b["cs15"].append(cs15)
+                b["wards_per_min"].append(p.get("wardsPlaced", 0) / duration_min)
+                b["control_wards"].append(p.get("visionWardsBoughtInGame", 0))
 
-    out: dict[str, dict] = {}
-    for role, bucket in samples.items():
-        n = len(bucket["wards_per_min"])
+    out: dict[tuple[str, str], dict] = {}
+    for key, b in samples.items():
+        n = len(b["wards_per_min"])
         if n == 0:
             continue
-        out[role] = {
-            "cs10": round(median(bucket["cs10"])) if bucket["cs10"] else None,
-            "cs15": round(median(bucket["cs15"])) if bucket["cs15"] else None,
-            "wards_per_min": round(median(bucket["wards_per_min"]), 2),
-            "control_wards": round(median(bucket["control_wards"])),
+        out[key] = {
+            "cs10": round(median(b["cs10"])) if b["cs10"] else None,
+            "cs15": round(median(b["cs15"])) if b["cs15"] else None,
+            "wards_per_min": round(median(b["wards_per_min"]), 2),
+            "control_wards": round(median(b["control_wards"])),
             "samples": n,
         }
     return out
 
 
-def refresh_benchmarks(session: Session) -> dict[str, dict]:
+def refresh_benchmarks(session: Session) -> dict[tuple[str, str], dict]:
     """Recompute and upsert the computed_benchmarks table."""
     computed = compute_role_benchmarks(session)
-    for role, data in computed.items():
-        row = session.get(ComputedBenchmark, role) or ComputedBenchmark(role=role)
+    for (role, band), data in computed.items():
+        row = session.get(ComputedBenchmark, (role, band)) or ComputedBenchmark(
+            role=role, band=band
+        )
         row.data = {k: v for k, v in data.items() if k != "samples"}
         row.samples = data["samples"]
         session.add(row)
     session.commit()
     log.info("benchmarks refreshed: %s",
-             {r: d["samples"] for r, d in computed.items()})
+             {f"{r}/{b}": d["samples"] for (r, b), d in computed.items()})
     return computed
 
 
-def load_effective_overrides(session: Session) -> tuple[dict, dict]:
-    """(cs_benchmarks, vision_benchmarks) overlays for roles whose own-data
-    sample count clears the threshold; empty dicts → seeds stay in charge."""
-    cs: dict[str, dict[int, int]] = {}
-    vision: dict[str, dict[str, float]] = {}
+def load_effective_overrides(session: Session, band: str | None = None) -> tuple[dict, dict]:
+    """(cs_benchmarks, vision_benchmarks) overlays. Per role, the player's
+    rank band wins if it clears the threshold, then "ALL", else the seed
+    stays in charge (role simply absent from the returned dicts)."""
+    best: dict[str, ComputedBenchmark] = {}
     for row in session.execute(select(ComputedBenchmark)).scalars():
         if row.samples < config.BENCHMARK_MIN_SAMPLES:
             continue
+        current = best.get(row.role)
+        if row.band == band or (current is None and row.band == "ALL"):
+            if current is None or row.band == band:
+                best[row.role] = row
+
+    cs: dict[str, dict[int, int]] = {}
+    vision: dict[str, dict[str, float]] = {}
+    for role, row in best.items():
         data = row.data
         # UTILITY stays exempt from the CS heuristic even with own data
-        if row.role != "UTILITY" and data.get("cs10") is not None and data.get("cs15") is not None:
-            cs[row.role] = {10: data["cs10"], 15: data["cs15"]}
-        vision[row.role] = {
+        if role != "UTILITY" and data.get("cs10") is not None and data.get("cs15") is not None:
+            cs[role] = {10: data["cs10"], 15: data["cs15"]}
+        vision[role] = {
             "wards_per_min": data["wards_per_min"],
             "control_wards": data["control_wards"],
         }

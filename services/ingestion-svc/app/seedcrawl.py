@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app import config
 from app.crawler import IngestService
-from app.models import CrawlTarget, LinkedAccount, MatchParticipant
+from app.models import CrawlTarget, LinkedAccount, Match, MatchParticipant, PlayerRank
 
 log = logging.getLogger(__name__)
 
@@ -57,6 +57,56 @@ def next_batch(session: Session, batch: int | None = None) -> list[CrawlTarget]:
     return rows
 
 
+def _platform_for(session: Session, puuid: str) -> str:
+    """The platform (eun1/euw1/…) of a match we saw this player in."""
+    platform = session.execute(
+        select(Match.platform)
+        .join(MatchParticipant, MatchParticipant.match_id == Match.match_id)
+        .where(MatchParticipant.puuid == puuid)
+        .limit(1)
+    ).scalar()
+    return (platform or config.RIOT_PLATFORM_REGION).lower()
+
+
+def fetch_rank(ingest: IngestService, session: Session, puuid: str) -> PlayerRank | None:
+    """LEAGUE-V4 solo-queue rank → player_ranks upsert (1 request)."""
+    platform = _platform_for(session, puuid)
+    entries = ingest._riot.get_ranked_stats(puuid, platform)
+    solo = None
+    for e in entries or []:
+        if e.get("queueType") == "RANKED_SOLO_5x5":
+            solo = e
+            break
+    row = session.get(PlayerRank, puuid) or PlayerRank(puuid=puuid)
+    row.platform = platform
+    row.tier = (solo or {}).get("tier", "UNRANKED")
+    row.division = (solo or {}).get("rank")
+    row.league_points = (solo or {}).get("leaguePoints")
+    row.fetched_at = datetime.now(timezone.utc)
+    session.merge(row)
+    session.commit()
+    return row
+
+
+def backfill_ranks(ingest: IngestService, session_factory: sessionmaker,
+                   limit: int | None = None) -> int:
+    """Fetch ranks for stored participants that have none yet (quota-paced)."""
+    with session_factory() as session:
+        have = {r[0] for r in session.execute(select(PlayerRank.puuid))}
+        missing = [
+            p for (p,) in session.execute(select(MatchParticipant.puuid).distinct())
+            if p not in have
+        ]
+    if limit:
+        missing = missing[:limit]
+    done = 0
+    for puuid in missing:
+        with session_factory() as session:
+            fetch_rank(ingest, session, puuid)
+        done += 1
+    return done
+
+
 def crawl_cycle(ingest: IngestService, session_factory: sessionmaker) -> int:
     """One discovery + crawl batch. Returns matches newly inserted."""
     if not config.CRAWL_ENABLED:
@@ -72,6 +122,7 @@ def crawl_cycle(ingest: IngestService, session_factory: sessionmaker) -> int:
         result = ingest.ingest_by_puuid(target.puuid, count=config.CRAWL_MATCH_COUNT)
         inserted += result.inserted
         with session_factory() as session:
+            fetch_rank(ingest, session, target.puuid)
             row = session.get(CrawlTarget, target.puuid)
             if row:
                 row.last_crawled_at = datetime.now(timezone.utc)

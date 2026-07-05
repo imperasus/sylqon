@@ -108,3 +108,8 @@ python -m app.cli ingest "Name#TAG" --count 20   # → skipped_existing: 20, ins
   (every match contributes all 10 participants); once a role clears
   `BENCHMARK_MIN_SAMPLES` (default 40), the own-data values override the seed
   in the advice pipeline. The watcher refreshes them after every new ingest.
+  Aggregation is partitioned by rank band (`iron-bronze`, `silver-gold`,
+  `plat-emerald`, `diamond+`, plus `ALL`): the seed crawl fetches each crawled
+  player's solo-queue rank (League-V4 → `player_ranks`), and advice prefers
+  the player's own band once it clears the threshold, falling back to ALL.
+  Backfill ranks for already-stored players: `python -m app.cli ranks`.

@@ -12,11 +12,19 @@ from app.advice.selector import select_top
 from app.advice.timeline import TimelineView
 
 
-def _tuning_with_own_benchmarks(session: Session) -> dict:
+def _tuning_with_own_benchmarks(session: Session, puuid: str | None = None) -> dict:
     """Threshold tuning + benchmark tables, with own-data aggregation overlaid
-    on the seeds for every role that cleared the sample threshold."""
+    on the seeds for every role that cleared the sample threshold. When the
+    player's rank is known, their band's medians take precedence over ALL."""
+    from app.models import PlayerRank
+
+    band = None
+    if puuid:
+        rank = session.get(PlayerRank, puuid)
+        if rank:
+            band = aggregate.band_for_tier(rank.tier)
     tun = benchmarks.tuning()
-    cs_over, vision_over = aggregate.load_effective_overrides(session)
+    cs_over, vision_over = aggregate.load_effective_overrides(session, band=band)
     tun["cs_benchmarks"] = {**benchmarks.CS_BENCHMARKS, **cs_over}
     tun["vision_benchmarks"] = {**benchmarks.VISION_BENCHMARKS, **vision_over}
     return tun
@@ -85,7 +93,7 @@ def generate_findings(session: Session, match_id: str, puuid: str):
         wards_placed=participant.wards_placed or 0,
         control_wards_bought=participant.control_wards_bought or 0,
     )
-    return participant, run_all(view, ctx, _tuning_with_own_benchmarks(session))
+    return participant, run_all(view, ctx, _tuning_with_own_benchmarks(session, puuid))
 
 
 def get_or_generate_advice(
