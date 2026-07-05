@@ -1,0 +1,38 @@
+name: ingestion-svc
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "services/ingestion-svc/**"
+      - ".github/workflows/ingestion-svc.yml"
+  pull_request:
+    paths:
+      - "services/ingestion-svc/**"
+      - ".github/workflows/ingestion-svc.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: services/ingestion-svc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/ingestion-svc/requirements.txt
+      - run: pip install -r requirements.txt pytest
+      - run: python -m pytest tests -q

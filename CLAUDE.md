@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Sylqon** — a League of Legends counter-draft AI assistant. It watches live Champion Select via the League Client Universal (LCU) API, recommends the best champion from the user's pool, then generates counter-loadouts (items, runes, summoner spells) using a local Ollama LLM and injects them directly into the client. A second, read-only **in-game overlay** ("coach") watches the Live Client Data API and surfaces role-aware missions while you play.
 
-This is a monorepo: the Python backend (`sylqon/`), the React dashboard (`ui/`), and two Electron shells (`sylqon-desktop/`, `sylqon-overlay-shell/`) that frame backend URLs as desktop/overlay windows.
+This is a monorepo: the Python backend (`sylqon/`), the React dashboard (`ui/`), two Electron shells (`sylqon-desktop/`, `sylqon-overlay-shell/`) that frame backend URLs as desktop/overlay windows, and hosted services under `services/` (currently `ingestion-svc/`, the Match-V5 ingestion + post-game advice service).
 
 ## Commands
 
@@ -22,7 +22,7 @@ This is a monorepo: the Python backend (`sylqon/`), the React dashboard (`ui/`),
 ```bash
 python -m sylqon.server          # Start with dashboard (port 8077)
 python -m sylqon.main            # Headless CLI mode
-python -m pytest tests/ -q            # Run the offline test suite (~116 tests)
+python -m pytest tests/ -q            # Run the offline test suite (543 tests)
 python -m pytest tests/test_scoring.py -q   # Run a single test file
 python -m pytest tests/ -k scoring    # Run tests matching an expression
 ```
@@ -37,6 +37,14 @@ npm run build --prefix ui             # Production build → ui/dist/
 ```bash
 npm run dev   --prefix sylqon-desktop   # Run the Electron shell in dev
 npm run build --prefix sylqon-desktop   # Build the Windows installer (NSIS)
+```
+
+**Hosted services (`services/ingestion-svc/`)** — standalone FastAPI service (does NOT import `sylqon/`): Riot Match-V5 ingestion into Postgres + rule-based post-game advice. Needs `RIOT_API_KEY`; Postgres/Redis via docker compose.
+```bash
+docker compose -f services/ingestion-svc/docker-compose.yml up -d   # Postgres 16 + Redis 7
+python -m pytest services/ingestion-svc/tests -q                    # Offline service tests
+uvicorn app.main:app --app-dir services/ingestion-svc --port 8090   # Run the service
+python -m app.cli ingest "Name#TAG" --count 20                      # Headless ingest (cwd: services/ingestion-svc)
 ```
 
 **Live integration checks** (require running services — not part of the offline suite)
@@ -93,6 +101,7 @@ Strictly **read-only and observational** — see "Riot-safe" below. Polls Riot's
 | `cache/` | `meta_cache.json` keyed by champion name; op.gg payload conversion + fetch; seed builds |
 | `db/` | SQLite via SQLAlchemy — champion counters/synergies, match ingestion, migration |
 | `data/` | Static Data Dragon catalog, rune/spell/item tables, hardcoded seed builds |
+| `riot/` | Official Riot REST client (`api.py`: Account-V1, Match-V5, League-V4, Spectator-V5, Mastery-V4; concurrency budget + 429 Retry-After backoff) and PUUID-based opponent scouting (`scout.py`: rank/mastery fingerprint, premade detection) |
 | `mcp/` | Model Context Protocol integration for op.gg data ingestion |
 
 ### Frontend layout (`ui/src/`)

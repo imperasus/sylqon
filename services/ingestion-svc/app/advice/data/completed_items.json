@@ -1,0 +1,377 @@
+{
+ "source_patch": "16.13.1",
+ "core_items": {
+  "2501": {
+   "name": "Overlord's Bloodmail",
+   "gold": 3300
+  },
+  "2502": {
+   "name": "Unending Despair",
+   "gold": 2800
+  },
+  "2503": {
+   "name": "Blackfire Torch",
+   "gold": 2800
+  },
+  "2504": {
+   "name": "Kaenic Rookern",
+   "gold": 2900
+  },
+  "2510": {
+   "name": "Dusk and Dawn",
+   "gold": 3100
+  },
+  "2512": {
+   "name": "Fiendhunter Bolts",
+   "gold": 2650
+  },
+  "2517": {
+   "name": "Endless Hunger",
+   "gold": 3100
+  },
+  "2520": {
+   "name": "Bastionbreaker",
+   "gold": 3200
+  },
+  "2522": {
+   "name": "Actualizer",
+   "gold": 2800
+  },
+  "2523": {
+   "name": "Hexoptics C44",
+   "gold": 2800
+  },
+  "2524": {
+   "name": "Bandlepipes",
+   "gold": 2300
+  },
+  "2525": {
+   "name": "Protoplasm Harness",
+   "gold": 2500
+  },
+  "3026": {
+   "name": "Guardian Angel",
+   "gold": 3200
+  },
+  "3031": {
+   "name": "Infinity Edge",
+   "gold": 3500
+  },
+  "3032": {
+   "name": "Yun Tal Wildarrows",
+   "gold": 3100
+  },
+  "3033": {
+   "name": "Mortal Reminder",
+   "gold": 3000
+  },
+  "3036": {
+   "name": "Lord Dominik's Regards",
+   "gold": 3300
+  },
+  "3046": {
+   "name": "Phantom Dancer",
+   "gold": 2650
+  },
+  "3053": {
+   "name": "Sterak's Gage",
+   "gold": 3200
+  },
+  "3065": {
+   "name": "Spirit Visage",
+   "gold": 2700
+  },
+  "3068": {
+   "name": "Sunfire Aegis",
+   "gold": 2700
+  },
+  "3071": {
+   "name": "Black Cleaver",
+   "gold": 3000
+  },
+  "3072": {
+   "name": "Bloodthirster",
+   "gold": 3400
+  },
+  "3073": {
+   "name": "Experimental Hexplate",
+   "gold": 3000
+  },
+  "3074": {
+   "name": "Ravenous Hydra",
+   "gold": 3300
+  },
+  "3078": {
+   "name": "Trinity Force",
+   "gold": 3333
+  },
+  "3083": {
+   "name": "Warmog's Armor",
+   "gold": 3100
+  },
+  "3084": {
+   "name": "Heartsteel",
+   "gold": 3000
+  },
+  "3085": {
+   "name": "Runaan's Hurricane",
+   "gold": 2650
+  },
+  "3087": {
+   "name": "Statikk Shiv",
+   "gold": 3000
+  },
+  "3089": {
+   "name": "Rabadon's Deathcap",
+   "gold": 3500
+  },
+  "3091": {
+   "name": "Wit's End",
+   "gold": 2800
+  },
+  "3094": {
+   "name": "Rapid Firecannon",
+   "gold": 2650
+  },
+  "3097": {
+   "name": "Stormrazor",
+   "gold": 3200
+  },
+  "3100": {
+   "name": "Lich Bane",
+   "gold": 2900
+  },
+  "3102": {
+   "name": "Banshee's Veil",
+   "gold": 3000
+  },
+  "3115": {
+   "name": "Nashor's Tooth",
+   "gold": 2900
+  },
+  "3116": {
+   "name": "Rylai's Crystal Scepter",
+   "gold": 2600
+  },
+  "3118": {
+   "name": "Malignance",
+   "gold": 2700
+  },
+  "3124": {
+   "name": "Guinsoo's Rageblade",
+   "gold": 3000
+  },
+  "3135": {
+   "name": "Void Staff",
+   "gold": 3000
+  },
+  "3137": {
+   "name": "Cryptbloom",
+   "gold": 3000
+  },
+  "3139": {
+   "name": "Mercurial Scimitar",
+   "gold": 3200
+  },
+  "3142": {
+   "name": "Youmuu's Ghostblade",
+   "gold": 2800
+  },
+  "3143": {
+   "name": "Randuin's Omen",
+   "gold": 2700
+  },
+  "3152": {
+   "name": "Hextech Rocketbelt",
+   "gold": 2650
+  },
+  "3153": {
+   "name": "Blade of The Ruined King",
+   "gold": 3200
+  },
+  "3156": {
+   "name": "Maw of Malmortius",
+   "gold": 3100
+  },
+  "3157": {
+   "name": "Zhonya's Hourglass",
+   "gold": 3250
+  },
+  "3161": {
+   "name": "Spear of Shojin",
+   "gold": 3100
+  },
+  "3165": {
+   "name": "Morellonomicon",
+   "gold": 2850
+  },
+  "3179": {
+   "name": "Umbral Glaive",
+   "gold": 2800
+  },
+  "3181": {
+   "name": "Hullbreaker",
+   "gold": 3000
+  },
+  "3504": {
+   "name": "Ardent Censer",
+   "gold": 2200
+  },
+  "4005": {
+   "name": "Imperial Mandate",
+   "gold": 2400
+  },
+  "6616": {
+   "name": "Staff of Flowing Water",
+   "gold": 2250
+  },
+  "6617": {
+   "name": "Moonstone Renewer",
+   "gold": 2200
+  },
+  "6620": {
+   "name": "Echoes of Helia",
+   "gold": 2200
+  },
+  "6621": {
+   "name": "Dawncore",
+   "gold": 2500
+  },
+  "6657": {
+   "name": "Rod of Ages",
+   "gold": 2600
+  },
+  "8020": {
+   "name": "Abyssal Mask",
+   "gold": 2650
+  },
+  "3302": {
+   "name": "Terminus",
+   "gold": 3000
+  },
+  "3508": {
+   "name": "Essence Reaver",
+   "gold": 3050
+  },
+  "3742": {
+   "name": "Dead Man's Plate",
+   "gold": 2900
+  },
+  "3748": {
+   "name": "Titanic Hydra",
+   "gold": 3300
+  },
+  "3814": {
+   "name": "Edge of Night",
+   "gold": 3000
+  },
+  "4401": {
+   "name": "Force of Nature",
+   "gold": 2800
+  },
+  "4628": {
+   "name": "Horizon Focus",
+   "gold": 2700
+  },
+  "4629": {
+   "name": "Cosmic Drive",
+   "gold": 3000
+  },
+  "4633": {
+   "name": "Riftmaker",
+   "gold": 3100
+  },
+  "4645": {
+   "name": "Shadowflame",
+   "gold": 3200
+  },
+  "4646": {
+   "name": "Stormsurge",
+   "gold": 2800
+  },
+  "6333": {
+   "name": "Death's Dance",
+   "gold": 3300
+  },
+  "6609": {
+   "name": "Chempunk Chainsword",
+   "gold": 3000
+  },
+  "6610": {
+   "name": "Sundered Sky",
+   "gold": 3100
+  },
+  "6631": {
+   "name": "Stridebreaker",
+   "gold": 3300
+  },
+  "6653": {
+   "name": "Liandry's Torment",
+   "gold": 3000
+  },
+  "6655": {
+   "name": "Luden's Echo",
+   "gold": 2750
+  },
+  "6662": {
+   "name": "Iceborn Gauntlet",
+   "gold": 2900
+  },
+  "6664": {
+   "name": "Hollow Radiance",
+   "gold": 2800
+  },
+  "6665": {
+   "name": "Jak'Sho, The Protean",
+   "gold": 3200
+  },
+  "6672": {
+   "name": "Kraken Slayer",
+   "gold": 3000
+  },
+  "6673": {
+   "name": "Immortal Shieldbow",
+   "gold": 3000
+  },
+  "6675": {
+   "name": "Navori Flickerblade",
+   "gold": 2650
+  },
+  "6676": {
+   "name": "The Collector",
+   "gold": 3000
+  },
+  "6692": {
+   "name": "Eclipse",
+   "gold": 2900
+  },
+  "6694": {
+   "name": "Serylda's Grudge",
+   "gold": 3000
+  },
+  "6695": {
+   "name": "Serpent's Fang",
+   "gold": 2500
+  },
+  "6696": {
+   "name": "Axiom Arc",
+   "gold": 2750
+  },
+  "6697": {
+   "name": "Hubris",
+   "gold": 2800
+  },
+  "6698": {
+   "name": "Profane Hydra",
+   "gold": 2850
+  },
+  "6699": {
+   "name": "Voltaic Cyclosword",
+   "gold": 3000
+  },
+  "8010": {
+   "name": "Bloodletter's Curse",
+   "gold": 2900
+  }
+ }
+}

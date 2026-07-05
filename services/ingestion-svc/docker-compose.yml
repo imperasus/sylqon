@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sylqon-ingestion-postgres
+    environment:
+      POSTGRES_USER: sylqon
+      POSTGRES_PASSWORD: sylqon
+      POSTGRES_DB: sylqon
+    ports:
+      - "5433:5432"   # 5433 on the host — 5432 is commonly taken by a native Postgres
+    volumes:
+      - sylqon_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sylqon -d sylqon"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: sylqon-ingestion-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  sylqon_pg_data:
