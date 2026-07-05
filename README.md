@@ -240,7 +240,7 @@ Served by `server.py` on port 8077.
 ## Testing
 
 ```bash
-python -m pytest tests/ -q     # 29 offline tests, no client/Ollama/network needed
+python -m pytest tests/ -q     # 543 offline tests, no client/Ollama/network needed
 ```
 
 Covers the extraction/conversion pipeline, spell + stat-shard guardrails,
