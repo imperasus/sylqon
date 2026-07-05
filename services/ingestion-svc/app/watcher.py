@@ -72,6 +72,14 @@ class MatchWatcher:
                 delivered += self._poll_puuid(puuid)
             except Exception:
                 log.exception("watcher cycle failed for %s", puuid)
+        try:
+            from app import seedcrawl
+
+            if seedcrawl.crawl_cycle(self._ingest, self._session_factory):
+                with self._session_factory() as session:
+                    aggregate.refresh_benchmarks(session)
+        except Exception:
+            log.exception("seed crawl cycle failed")
         return delivered
 
     def _poll_puuid(self, puuid: str) -> int:

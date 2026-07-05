@@ -78,7 +78,8 @@ Dedupe lives in the `deliveries` table; failed sends are retried next cycle.
 | `DATABASE_URL` | `postgresql+psycopg://sylqon:sylqon@localhost:5432/sylqon` | |
 | `REDIS_URL` | `redis://localhost:6379/0` | |
 | `RATELIMIT_MODE` | `redis` | `memory` = single-process fallback |
-| `RATE_LIMIT_BURST` / `RATE_LIMIT_SUSTAINED` | `450/10` / `27000/600` | production key with 10% margin; personal key: `18/1` / `95/120` |
+| `RATE_LIMIT_BURST` / `RATE_LIMIT_SUSTAINED` | `450/10` / `27000/600` | production key with 10% margin; personal key: `18/1` / `95/120` — if you see a 429 with a ~95s Retry-After, your key runs personal limits: use the latter |
+| `CRAWL_ENABLED` / `CRAWL_BATCH` / `CRAWL_MATCH_COUNT` | `1` / `3` / `10` | co-player seed crawl: each watch cycle also ingests the least-recently-crawled discovered players, growing the benchmark/build/matchup pool; `CRAWL_RECRAWL_HOURS` (72) throttles re-visits |
 | `RIOT_MATCH_COUNT` | `20` | ids per ingest run |
 | `ADVICE_TUNING_JSON` | `{}` | heuristic threshold overrides |
 

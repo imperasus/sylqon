@@ -123,6 +123,18 @@ class ComputedBenchmark(Base):
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class CrawlTarget(Base):
+    """PUUIDs discovered from stored matches' co-players — the seed-crawl
+    frontier. last_crawled_at=None → never crawled yet."""
+
+    __tablename__ = "crawl_targets"
+
+    puuid: Mapped[str] = mapped_column(Text, primary_key=True)
+    source: Mapped[str] = mapped_column(Text, default="co-player")
+    discovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    last_crawled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class LinkedAccount(Base):
     """Discord user ↔ Riot PUUID link (Riot-ID-based fallback linking; RSO
     OAuth replaces the verification story later, roadmap §4.1)."""

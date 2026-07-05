@@ -62,6 +62,14 @@ ADVICE_TUNING: dict = json.loads(_env("ADVICE_TUNING_JSON", "{}"))
 # have been aggregated for that role (every stored SR match adds 2 per role).
 BENCHMARK_MIN_SAMPLES = int(_env("BENCHMARK_MIN_SAMPLES", "40"))
 
+# Co-player seed crawl: every stored match discovers 9 more PUUIDs; each watch
+# cycle additionally crawls CRAWL_BATCH of the least-recently-crawled ones.
+# Widens the benchmark/build/matchup pool without extra tracked accounts.
+CRAWL_ENABLED = _env("CRAWL_ENABLED", "1") not in ("0", "false", "")
+CRAWL_BATCH = int(_env("CRAWL_BATCH", "3"))
+CRAWL_MATCH_COUNT = int(_env("CRAWL_MATCH_COUNT", "10"))
+CRAWL_RECRAWL_HOURS = float(_env("CRAWL_RECRAWL_HOURS", "72"))
+
 # Discord delivery (webhook MVP — the JDA-style gateway/slash-commands come
 # later with account linking). Watcher polls tracked PUUIDs and posts the
 # post-game advice to the webhook channel.
