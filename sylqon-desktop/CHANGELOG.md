@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.10.0](https://github.com/imperasus/sylqon/compare/v1.9.1...v1.10.0) (2026-07-05)
+
+
+### Features
+
+* **services:** add co-player seed crawl to widen the data pool ([4401bb0](https://github.com/imperasus/sylqon/commit/4401bb09c8c3823c1c68769bfbff55d052209a54))
+* **services:** add Discord bot with slash commands and feedback loop ([709542f](https://github.com/imperasus/sylqon/commit/709542f9dd9237b5437ad4a31d8203236c46985f))
+* **services:** add ingestion-svc — Match-V5 ingestion + post-game advice ([019feae](https://github.com/imperasus/sylqon/commit/019feae4862465cc1a1d1e325cac000c942979a0))
+* **services:** rank-banded benchmarks from own League-V4 data ([7bd2966](https://github.com/imperasus/sylqon/commit/7bd2966235aa72734ad0c905d26a791506cf2954))
+
 ### [1.9.1](https://github.com/imperasus/sylqon/compare/v1.9.0...v1.9.1) (2026-07-01)
 
 ## [1.9.0](https://github.com/imperasus/sylqon/compare/v1.8.0...v1.9.0) (2026-07-01)
