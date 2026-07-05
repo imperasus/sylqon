@@ -1,0 +1,97 @@
+# Sylqon Ingestion Service
+
+Hosted-side Match-V5 ingestion + rule-based post-game advice (roadmap Phase 0 +
+the codeable core of Phase 1, see `docs/FEJLESZTESI_TERV.md`). Standalone
+FastAPI app — does **not** import the local `sylqon/` package.
+
+## What it does
+
+1. **Ingest** — Riot ID → PUUID → last N match ids → match + timeline →
+   Postgres, idempotently (`ON CONFLICT DO NOTHING`; known matches skip the API
+   entirely). All Riot calls go through a dual-window token-bucket rate limiter
+   (Redis Lua script shared across workers; in-memory fallback).
+2. **Advice** — for a stored (match, player): five deterministic heuristics
+   (death context, CS benchmark, item timing, vision, objective presence) →
+   weighted top-1 lesson → 2–3 sentence HU + EN template text, cached per
+   match+player in the `advice` table.
+
+## Prerequisites
+
+- Python 3.11+, `pip install -r requirements.txt`
+- Docker (Postgres 16 + Redis 7 via compose)
+- `RIOT_API_KEY` env var (the repo-root `.env` is picked up automatically)
+
+## Run
+
+```bash
+docker compose up -d                          # Postgres + Redis (from this dir)
+uvicorn app.main:app --port 8090              # API (creates tables on startup)
+
+# or headless:
+python -m app.cli ingest "Name#TAG" --count 20
+python -m app.cli advise EUN1_1234567890 <puuid> --lang hu
+```
+
+## Discord delivery (webhook MVP)
+
+Set `DISCORD_WEBHOOK_URL` (service-local `.env` is picked up), then:
+
+```bash
+python -m app.cli watch            # poll tracked accounts, post advice for new matches
+python -m app.cli watch --once     # single cycle (first run baselines the backlog silently)
+python -m app.cli notify <match_id> <puuid> --lang hu   # one-off manual send
+python -m app.cli report --days 7 --lang hu --send      # weekly trend report → webhook
+python -m app.cli benchmarks                            # recompute own-data role medians
+```
+
+Tracked accounts: `WATCH_PUUIDS` (comma-separated; falls back to `RIOT_SELF_PUUID`).
+Poll cadence `WATCH_POLL_SECONDS` (default 180), language `WATCH_LANG` (`hu`/`en`).
+The uvicorn app starts the watcher automatically when the webhook URL is set.
+Dedupe lives in the `deliveries` table; failed sends are retried next cycle.
+
+## API
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/ingest?game_name=X&tag_line=Y&count=20` | Fetch + persist matches and timelines; returns insert/skip/fail counts |
+| `GET /api/advice/{match_id}/{puuid}?lang=hu` | Top-1 post-game lesson (HU/EN), generated on first call, cached after |
+| `GET /healthz` | Liveness |
+
+## Configuration (env)
+
+| Variable | Default | Notes |
+|---|---|---|
+| `RIOT_API_KEY` | — | required; fail-fast at startup |
+| `RIOT_MASS_REGION` / `RIOT_PLATFORM_REGION` | `europe` / `euw1` | falls back to the local app's `RIOT_API_MASS_REGION` / `RIOT_API_REGION` |
+| `DATABASE_URL` | `postgresql+psycopg://sylqon:sylqon@localhost:5432/sylqon` | |
+| `REDIS_URL` | `redis://localhost:6379/0` | |
+| `RATELIMIT_MODE` | `redis` | `memory` = single-process fallback |
+| `RATE_LIMIT_BURST` / `RATE_LIMIT_SUSTAINED` | `450/10` / `27000/600` | production key with 10% margin; personal key: `18/1` / `95/120` |
+| `RIOT_MATCH_COUNT` | `20` | ids per ingest run |
+| `ADVICE_TUNING_JSON` | `{}` | heuristic threshold overrides |
+
+## Tests
+
+```bash
+python -m pytest tests -q      # offline: no network, no Docker (Redis tests auto-skip)
+```
+
+## Exit-criterion demo (Phase 0)
+
+```bash
+docker compose up -d
+python -m app.cli ingest "Name#TAG" --count 20   # → inserted: 20, timelines: 20
+python -m app.cli ingest "Name#TAG" --count 20   # → skipped_existing: 20, inserted: 0  (idempotent)
+```
+
+## Notes
+
+- `app/advice/data/completed_items.json` is generated from the repo's
+  `cache/ddragon_catalog.json` (core-item detection for the item-timing
+  heuristic; filter: `completed && gold >= 2000 && id < 100000` — the id cap
+  excludes Arena-mode item variants). Regenerate on patch bumps.
+- Benchmark tables in `app/advice/benchmarks.py` are Iron–Gold seed medians.
+  `app/aggregate.py` computes role medians from our own stored SR matches
+  (every match contributes all 10 participants); once a role clears
+  `BENCHMARK_MIN_SAMPLES` (default 40), the own-data values override the seed
+  in the advice pipeline. The watcher refreshes them after every new ingest.

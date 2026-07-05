@@ -1,0 +1,99 @@
+"""Riot REST client — a port of the local app's ``sylqon/riot/api.py`` behavior
+with the rate limiter replacing the concurrency semaphore, plus the Match-V5
+timeline endpoint the local client does not use.
+
+Contract (mirrors the reference): 429 → honor Retry-After, install a shared
+penalty, retry the same request; 404 → ``None`` immediately; any other failure
+→ warn + retry budget → ``None`` (callers treat it as a per-item failure, never
+a run abort).
+"""
+from __future__ import annotations
+
+import logging
+import time
+from urllib.parse import quote
+
+import requests
+
+from app import config
+from app.ratelimit import RateLimiter
+
+log = logging.getLogger(__name__)
+
+_BASE = "https://{region}.api.riotgames.com"
+
+
+class RiotClient:
+    def __init__(
+        self,
+        rate_limiter: RateLimiter,
+        api_key: str | None = None,
+        mass_region: str | None = None,
+        platform_region: str | None = None,
+        session: requests.Session | None = None,
+        sleep=time.sleep,
+    ) -> None:
+        self._limiter = rate_limiter
+        self._api_key = api_key if api_key is not None else config.RIOT_API_KEY
+        self.mass_region = mass_region or config.RIOT_MASS_REGION
+        self.platform_region = platform_region or config.RIOT_PLATFORM_REGION
+        self._session = session or requests.Session()
+        self._sleep = sleep
+
+    # -- plumbing ----------------------------------------------------------
+
+    def _get(self, region: str, path: str, params: dict | None = None) -> dict | list | None:
+        url = _BASE.format(region=region) + path
+        for attempt in range(config.RIOT_MAX_RETRIES + 1):
+            try:
+                self._limiter.acquire(region)
+                r = self._session.get(
+                    url,
+                    headers={"X-Riot-Token": self._api_key},
+                    params=params,
+                    timeout=config.RIOT_REQUEST_TIMEOUT,
+                )
+                if r.status_code == 429:
+                    retry_after = float(r.headers.get("Retry-After", 2))
+                    log.warning("Riot API rate-limited (%s), waiting %.1fs", region, retry_after)
+                    self._limiter.on_rate_limit_exceeded(region, retry_after)
+                    self._sleep(retry_after)
+                    continue
+                if r.status_code == 404:
+                    return None
+                r.raise_for_status()
+                return r.json()
+            except requests.RequestException as exc:
+                log.warning("Riot API request failed (attempt %d, %s): %s", attempt + 1, path, exc)
+        return None
+
+    # -- endpoints (all Phase 0 calls route to the mass-region cluster) -----
+
+    def get_account_by_riot_id(self, game_name: str, tag_line: str) -> dict | None:
+        """ACCOUNT-V1: Riot ID → {puuid, gameName, tagLine}."""
+        if not game_name or not tag_line:
+            return None
+        return self._get(
+            self.mass_region,
+            "/riot/account/v1/accounts/by-riot-id/"
+            f"{quote(game_name, safe='')}/{quote(tag_line, safe='')}",
+        )
+
+    def get_match_ids(self, puuid: str, count: int | None = None,
+                      queue: int | None = None) -> list[str]:
+        """MATCH-V5: newest match IDs for a puuid."""
+        params: dict = {"count": count or config.RIOT_MATCH_COUNT}
+        if queue is not None:
+            params["queue"] = queue
+        result = self._get(
+            self.mass_region, f"/lol/match/v5/matches/by-puuid/{puuid}/ids", params
+        )
+        return result if isinstance(result, list) else []
+
+    def get_match(self, match_id: str) -> dict | None:
+        """MATCH-V5: full match object."""
+        return self._get(self.mass_region, f"/lol/match/v5/matches/{match_id}")
+
+    def get_timeline(self, match_id: str) -> dict | None:
+        """MATCH-V5: per-minute frame/event timeline for a match."""
+        return self._get(self.mass_region, f"/lol/match/v5/matches/{match_id}/timeline")

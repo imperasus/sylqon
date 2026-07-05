@@ -1,0 +1,137 @@
+"""SQLAlchemy models: matches, match_participants, timelines, advice.
+
+Typed columns cover what the advice heuristics query or aggregate on; the full
+Riot payloads are kept verbatim in JSON columns (JSONB on Postgres) so later
+heuristics never need a re-crawl. Portable across Postgres and SQLite so the
+store layer is unit-testable offline.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+JsonCol = JSON().with_variant(JSONB(), "postgresql")
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class Match(Base):
+    __tablename__ = "matches"
+
+    match_id: Mapped[str] = mapped_column(Text, primary_key=True)  # "EUN1_123..."
+    platform: Mapped[str] = mapped_column(Text)  # parsed from the match_id prefix
+    region: Mapped[str] = mapped_column(Text)  # routing cluster used ("europe")
+    queue_id: Mapped[int | None] = mapped_column(Integer)
+    game_creation: Mapped[int | None] = mapped_column(BigInteger)  # epoch ms
+    game_duration: Mapped[int | None] = mapped_column(Integer)  # seconds
+    game_version: Mapped[str | None] = mapped_column(Text)
+    patch: Mapped[str | None] = mapped_column(Text)  # "15.13" — benchmark bucketing
+    raw: Mapped[dict] = mapped_column(JsonCol)  # full match "info" payload
+    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    __table_args__ = (Index("ix_matches_queue_patch", "queue_id", "patch"),)
+
+
+class MatchParticipant(Base):
+    __tablename__ = "match_participants"
+
+    match_id: Mapped[str] = mapped_column(
+        ForeignKey("matches.match_id", ondelete="CASCADE"), primary_key=True
+    )
+    puuid: Mapped[str] = mapped_column(Text, primary_key=True)
+    participant_id: Mapped[int] = mapped_column(Integer)  # 1..10, joins timeline frames
+    team_id: Mapped[int | None] = mapped_column(Integer)
+    champion_id: Mapped[int | None] = mapped_column(Integer)
+    champion_name: Mapped[str | None] = mapped_column(Text)
+    team_position: Mapped[str | None] = mapped_column(Text)  # TOP/JUNGLE/MIDDLE/BOTTOM/UTILITY
+    win: Mapped[bool | None] = mapped_column(Boolean)
+    kills: Mapped[int | None] = mapped_column(Integer)
+    deaths: Mapped[int | None] = mapped_column(Integer)
+    assists: Mapped[int | None] = mapped_column(Integer)
+    gold_earned: Mapped[int | None] = mapped_column(Integer)
+    total_minions_killed: Mapped[int | None] = mapped_column(Integer)
+    neutral_minions_killed: Mapped[int | None] = mapped_column(Integer)
+    vision_score: Mapped[int | None] = mapped_column(Integer)
+    wards_placed: Mapped[int | None] = mapped_column(Integer)
+    control_wards_bought: Mapped[int | None] = mapped_column(Integer)
+    damage_to_champions: Mapped[int | None] = mapped_column(Integer)
+    stats: Mapped[dict] = mapped_column(JsonCol)  # full participant object
+
+    __table_args__ = (
+        Index("ix_participants_puuid", "puuid"),
+        Index("ix_participants_champ_role", "champion_id", "team_position"),
+    )
+
+
+class Timeline(Base):
+    __tablename__ = "timelines"
+
+    match_id: Mapped[str] = mapped_column(
+        ForeignKey("matches.match_id", ondelete="CASCADE"), primary_key=True
+    )
+    payload: Mapped[dict] = mapped_column(JsonCol)  # frames + events
+    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class Advice(Base):
+    __tablename__ = "advice"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    match_id: Mapped[str] = mapped_column(
+        ForeignKey("matches.match_id", ondelete="CASCADE")
+    )
+    puuid: Mapped[str] = mapped_column(Text)
+    top_finding: Mapped[dict] = mapped_column(JsonCol)
+    all_findings: Mapped[list] = mapped_column(JsonCol)
+    text_hu: Mapped[str] = mapped_column(Text)
+    text_en: Mapped[str] = mapped_column(Text)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    # Deterministic pipeline → one advice row per (match, player); reruns reuse it.
+    __table_args__ = (UniqueConstraint("match_id", "puuid", name="uq_advice_match_puuid"),)
+
+
+class ComputedBenchmark(Base):
+    """Role-level benchmark medians aggregated from our own stored matches —
+    the replacement path for the seed tables in advice/benchmarks.py. Applied
+    only once the per-role sample count clears BENCHMARK_MIN_SAMPLES."""
+
+    __tablename__ = "computed_benchmarks"
+
+    role: Mapped[str] = mapped_column(Text, primary_key=True)
+    data: Mapped[dict] = mapped_column(JsonCol)  # {cs10, cs15, wards_per_min, control_wards}
+    samples: Mapped[int] = mapped_column(Integer)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class Delivery(Base):
+    """One row per advice actually pushed to a channel (or baselined on watcher
+    startup) — the dedupe guard that keeps the watcher from re-posting."""
+
+    __tablename__ = "deliveries"
+
+    match_id: Mapped[str] = mapped_column(
+        ForeignKey("matches.match_id", ondelete="CASCADE"), primary_key=True
+    )
+    puuid: Mapped[str] = mapped_column(Text, primary_key=True)
+    channel: Mapped[str] = mapped_column(Text)  # "discord" | "baseline"
+    delivered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

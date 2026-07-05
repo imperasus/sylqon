@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn>=0.29
+requests>=2.31
+sqlalchemy>=2.0
+psycopg[binary]>=3.1
+redis>=5.0
+python-dotenv>=1.0
