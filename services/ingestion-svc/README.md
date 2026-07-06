@@ -78,6 +78,7 @@ pool-coverage framing — no skill-rating vocabulary (enforced by a test).
 | `POST /api/ingest?game_name=X&tag_line=Y&count=20` | Fetch + persist matches and timelines; returns insert/skip/fail counts |
 | `GET /api/advice/{match_id}/{puuid}?lang=hu` | Top-1 post-game lesson (HU/EN), generated on first call, cached after |
 | `GET /api/pool/{game_name}/{tag_line}` | Champion-pool coverage report (Phase 2 / S3 core): per-role performance + blind-pick safety + counter coverage from own aggregation, with a suggested 3-champion pool; `?refresh=false` skips the ingest. CLI: `python -m app.cli pool "Name#TAG"` |
+| `GET /api/meta-sync/full?min_games=8` | The complete op.gg-replacement bundle in one response: per-role meta stats (tier/WR/presence), build payloads, lane counters and same-team synergies for every champion+role above the sample floor. The local app's full sync consumes this via `sylqon/mcp/svc_http.py` when `SYLQON_META_URL` is set (op.gg only as fallback). Prewarm: `python -m app.cli metasync` |
 | `GET /api/meta-build/{champion}?role=bottom` | Own-data build payload (items from timeline purchase order, modal rune pages/shards/spells, Q/W/E max order) in the exact op.gg payload shape the local client's `opgg_to_build` consumes — the op.gg replacement source. 404 below the sample floor; cached in `meta_builds` for 24h. Local opt-in: set `SYLQON_META_URL` for the desktop app |
 | `GET /healthz` | Liveness |
 

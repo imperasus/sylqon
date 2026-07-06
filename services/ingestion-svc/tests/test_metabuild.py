@@ -35,6 +35,7 @@ def jinx_match(match_id, *, win=True, core=None, spells=(4, 7), keystone=8008):
             "participantId": i + 1,
             "teamId": 100 if i < 5 else 200,
             "championName": "Jinx" if i == 3 else f"Filler{i}",
+            "championId": 222 if i == 3 else 1000 + i,
             "teamPosition": ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"][i % 5],
             "win": (i < 5) == win,
         }

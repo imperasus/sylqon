@@ -97,6 +97,17 @@ def pool_report(game_name: str, tag_line: str, refresh: bool = Query(default=Tru
     return report
 
 
+@app.get("/api/meta-sync/full")
+def meta_sync_full(min_games: int = Query(default=8, ge=3)) -> dict:
+    """Everything the local app's full sync needs in one response (meta stats,
+    build payloads, counters, synergies) — the bulk op.gg replacement. Heavy on
+    a cold cache; prewarm with `python -m app.cli metasync`."""
+    from app import metasync
+
+    with db.open_session() as session:
+        return metasync.build_sync_bundle(session, min_games=min_games)
+
+
 @app.get("/api/meta-build/{champion}")
 def meta_build(champion: str, role: str = Query(..., min_length=2)) -> dict:
     """Own-data build payload in the op.gg payload shape the local client's

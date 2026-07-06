@@ -117,7 +117,17 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
     from sylqon.db.migrate import seed_champions
     from sylqon.db.schema import Champion
     from sylqon.db.session import get_session, init_db
-    from sylqon.mcp import ingest, opgg_http
+    from sylqon.mcp import ingest, opgg_http, svc_http
+
+    # Source selection (op.gg exit): when the hosted Sylqon service is
+    # configured and reachable, the whole sync — meta stats, builds, counters,
+    # synergies — comes from our own aggregation; op.gg only as fallback.
+    if svc_http.available():
+        source, src_label, sleep = svc_http, "svc-sync", 0.0
+        log.info("Full sync source: Sylqon service (own aggregation)")
+    else:
+        source, src_label = opgg_http, "opgg-sync"
+        log.info("Full sync source: op.gg")
 
     init_db()
     if catalog is None:
@@ -134,9 +144,9 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
         session.commit()
         rows = {c.riot_key: c for c in session.query(Champion).all() if c.riot_key}
 
-        meta = opgg_http.fetch_all_meta(region)
+        meta = source.fetch_all_meta(region)
         if not meta:
-            return {"error": "op.gg meta fetch returned nothing", **counts}
+            return {"error": "meta fetch returned nothing", **counts}
 
         # 1) roles + per-role meta stats (one pass, no network beyond the meta call)
         for cid, positions in meta.items():
@@ -168,13 +178,14 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
         def fetch_one(task: tuple[int, str]):
             cid, role = task
             try:
-                payload, counters = opgg_http.fetch_detail(cid, role, region)
-                synergies = opgg_http.fetch_synergies(cid, role, region)
+                payload, counters = source.fetch_detail(cid, role, region)
+                synergies = source.fetch_synergies(cid, role, region)
             except Exception:
-                log.warning("op.gg fetch failed for cid=%s %s", cid, role, exc_info=True)
+                log.warning("%s fetch failed for cid=%s %s", src_label, cid, role,
+                            exc_info=True)
                 payload, counters, synergies = None, [], []
             if sleep:
-                time.sleep(sleep)  # per-worker politeness delay
+                time.sleep(sleep)  # per-worker politeness delay (op.gg only)
             return cid, role, payload, counters, synergies
 
         workers = max(1, config.OPGG_SYNC_WORKERS)
@@ -190,7 +201,7 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
                     if payload:
                         build = opgg_to_build(payload, catalog)
                         if build and ingest.mirror_build(session, champ.name, role, build,
-                                                         "opgg-sync", catalog.patch):
+                                                         src_label, catalog.patch):
                             counts["builds"] += 1
                             # Mirror into the live injection cache too (batched
                             # write below) so every champion is instantly buildable.

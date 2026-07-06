@@ -72,6 +72,19 @@ def _cmd_crawl(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_metasync(args: argparse.Namespace) -> int:
+    """Prewarm the meta-build payload cache for every eligible champ+role."""
+    from app import metasync
+
+    db.init_db()
+    with db.open_session() as session:
+        bundle = metasync.build_sync_bundle(session, min_games=args.min_games)
+    with_payload = sum(1 for e in bundle["entries"] if e["payload"])
+    print(f"entries: {len(bundle['entries'])} | with build payload: {with_payload} "
+          f"| patch: {bundle['patch']}")
+    return 0
+
+
 def _cmd_pool(args: argparse.Namespace) -> int:
     from app import config, pool
 
@@ -213,6 +226,10 @@ def main(argv: list[str] | None = None) -> int:
     p_crawl = sub.add_parser("crawl", help="run co-player seed-crawl cycles")
     p_crawl.add_argument("--cycles", type=int, default=1)
     p_crawl.set_defaults(func=_cmd_crawl)
+
+    p_msync = sub.add_parser("metasync", help="prewarm the bulk meta-sync bundle")
+    p_msync.add_argument("--min-games", type=int, default=8)
+    p_msync.set_defaults(func=_cmd_metasync)
 
     p_pool = sub.add_parser("pool", help="champion-pool coverage report")
     p_pool.add_argument("riot_id", nargs="?", default="", help='"Name#TAG" (omit → RIOT_SELF_PUUID)')
