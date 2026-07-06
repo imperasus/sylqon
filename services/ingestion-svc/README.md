@@ -63,6 +63,14 @@ Poll cadence `WATCH_POLL_SECONDS` (default 180), language `WATCH_LANG` (`hu`/`en
 The uvicorn app starts the watcher automatically when the webhook URL is set.
 Dedupe lives in the `deliveries` table; failed sends are retried next cycle.
 
+## Public web pages (S3 website MVP)
+
+Served by the same FastAPI app (no build step): `/` (Riot ID form),
+`/pool-report?riot_id=Name%23TAG` (server-rendered pool-coverage audit),
+`/champions` and `/champion/{name}` (SEO-friendly presence/win-rate, core
+items and lane-matchup pages from our own aggregation). All copy follows the
+pool-coverage framing — no skill-rating vocabulary (enforced by a test).
+
 ## API
 
 | Endpoint | Purpose |
