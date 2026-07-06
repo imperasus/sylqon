@@ -15,6 +15,21 @@ FastAPI app — does **not** import the local `sylqon/` package.
    weighted top-1 lesson → 2–3 sentence HU + EN template text, cached per
    match+player in the `advice` table.
 
+## Local pilot (test the full stack before hosting)
+
+`powershell -ExecutionPolicy Bypass -File run_stack.ps1` starts Postgres+Redis
+(with `restart: unless-stopped`), the API on :8090 and the Discord bot,
+logging to `api.log` / `bot.log` next to the script (`-Stop` shuts it down).
+Point the desktop app at it with a user-level env var, then restart the app:
+
+```powershell
+setx SYLQON_META_URL http://localhost:8090
+```
+
+From then on live builds and the full sync (trigger: `POST /api/sync/full` on
+the desktop backend, port 8077) come from your own aggregation; op.gg is only
+a fallback. Containers survive reboots as long as Docker Desktop auto-starts.
+
 ## Prerequisites
 
 - Python 3.11+, `pip install -r requirements.txt`

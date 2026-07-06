@@ -587,6 +587,14 @@ def meta_report() -> dict:
     }
 
 
+@app.post("/api/sync/full")
+def sync_full() -> dict:
+    """Manually kick off the full meta sync (all champions, all roles) — the
+    same run the patch-change auto-sync fires. Source follows SYLQON_META_URL:
+    the hosted Sylqon service when configured, op.gg otherwise."""
+    return runner.start_full_sync()
+
+
 @app.post("/api/demo")
 def start_demo() -> dict:
     return runner.start_demo()
