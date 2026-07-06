@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.14.0](https://github.com/imperasus/sylqon/compare/v1.13.0...v1.14.0) (2026-07-06)
+
+
+### Features
+
+* **services:** public web pages - the S3 website MVP ([83a7255](https://github.com/imperasus/sylqon/commit/83a72558fb765ebac57f9e8ef78e27529f45b420))
+
 ## [1.13.0](https://github.com/imperasus/sylqon/compare/v1.12.0...v1.13.0) (2026-07-06)
 
 
