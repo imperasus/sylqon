@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from app import config
 from app.advice import benchmarks
-from app.models import Match, MatchParticipant, MetaBuild, Timeline
+from app.models import Match, MatchParticipant, MetaBuild, Timeline  # noqa: F401
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +40,7 @@ ROLE_MAP = {
 }
 MIN_GAMES = 8            # below this we return None → caller falls back to op.gg
 MAX_GAMES = 60           # newest N games are plenty for a build
+MIN_SITUATIONAL = 6      # the counter-pick pool the local AI chooses from
 STALE_AFTER_HOURS = 24
 _SKILL_KEYS = {1: "Q", 2: "W", 3: "E"}
 
@@ -77,6 +78,26 @@ def _skill_order_for(timeline: dict, pid: int) -> tuple[str, ...] | None:
 
 def _modal(counter: Counter):
     return counter.most_common(1)[0][0] if counter else None
+
+
+def _role_item_pool(session: Session, role: str, limit: int = 1500) -> list[int]:
+    """Most-common completed items across the role's recent participants
+    (final inventories — no timeline reads needed). Pads thin situational pools."""
+    rows = session.execute(
+        select(MatchParticipant.stats)
+        .join(Match, Match.match_id == MatchParticipant.match_id)
+        .where(MatchParticipant.team_position == role)
+        .where(Match.queue_id.in_(SR_QUEUES))
+        .order_by(Match.game_creation.desc())
+        .limit(limit)
+    )
+    counts: Counter = Counter()
+    for (stats,) in rows:
+        for slot in range(6):
+            iid = (stats or {}).get(f"item{slot}")
+            if iid in benchmarks.CORE_ITEM_IDS:
+                counts[iid] += 1
+    return [iid for iid, _ in counts.most_common(20)]
 
 
 def compute_meta_build(session: Session, champion: str, role: str) -> dict | None:
@@ -168,6 +189,26 @@ def compute_meta_build(session: Session, champion: str, role: str) -> dict | Non
     core_sorted = sorted(frequent, key=lambda iid: (median(core_positions[iid]), -core_seen[iid]))
     core_ids = core_sorted[:3]
     situational = [iid for iid in core_sorted[3:] if iid not in core_ids][:6]
+
+    # The situational pool is what the local AI counter-picks FROM (it may not
+    # invent items) — a thin pool starves it. Pad below MIN_SITUATIONAL: first
+    # with the champion's own rarer completed items, then with the role's
+    # most-common completed items across the whole dataset.
+    if len(situational) < MIN_SITUATIONAL:
+        used = set(core_ids) | set(situational)
+        for iid, _ in core_seen.most_common():
+            if len(situational) >= MIN_SITUATIONAL:
+                break
+            if iid not in used:
+                situational.append(iid)
+                used.add(iid)
+        if len(situational) < MIN_SITUATIONAL:
+            for iid in _role_item_pool(session, role):
+                if len(situational) >= MIN_SITUATIONAL:
+                    break
+                if iid not in used:
+                    situational.append(iid)
+                    used.add(iid)
 
     spell_pair = _modal(spells) or (4, 7)
     primary_style, primary_runes = _modal(primary_pages) or (0, ())

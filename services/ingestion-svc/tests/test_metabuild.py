@@ -11,6 +11,7 @@ from app.advice import benchmarks
 from app.models import Base, MetaBuild
 
 CORE = sorted(benchmarks.CORE_ITEM_IDS)[:4]
+ROLE_POOL = sorted(benchmarks.CORE_ITEM_IDS)[4:12]  # enemy-BOTTOM final items
 BOOT = sorted(benchmarks.BOOT_IDS)[0]
 STARTER = sorted(benchmarks.STARTER_IDS)[0]
 
@@ -39,6 +40,8 @@ def jinx_match(match_id, *, win=True, core=None, spells=(4, 7), keystone=8008):
             "teamPosition": ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"][i % 5],
             "win": (i < 5) == win,
         }
+        if i == 8:  # enemy BOTTOM's final inventory feeds the role item pool
+            p.update({f"item{j}": iid for j, iid in enumerate(ROLE_POOL[:6])})
         if i == 3:
             p.update({
                 "summoner1Id": spells[0], "summoner2Id": spells[1],
@@ -103,6 +106,18 @@ def test_payload_shape_and_modal_values(session_factory):
                 "secondary_rune_ids", "stat_mod_ids", "summoner_spell_ids",
                 "summoner_spell_options", "skill_order"):
         assert key in p, key
+
+
+def test_situational_pool_padded_to_minimum(session_factory):
+    # Jinx buys only her 3-core → own situational is empty; the pool must be
+    # padded to MIN_SITUATIONAL from the role's common completed items.
+    seed(session_factory, count=10, core=CORE[:3])
+    with session_factory() as s:
+        p = metabuild.compute_meta_build(s, "jinx", "BOTTOM")
+    pool = p["fourth_item_ids"] + p["fifth_item_ids"] + p["sixth_item_ids"]
+    assert len(pool) == metabuild.MIN_SITUATIONAL
+    assert set(pool).isdisjoint(set(p["core_item_ids"]))
+    assert set(pool) <= set(ROLE_POOL) | set(CORE)  # padded from role inventories
 
 
 def test_min_games_gate(session_factory):
