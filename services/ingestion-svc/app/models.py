@@ -139,6 +139,19 @@ class PlayerRank(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class MetaBuild(Base):
+    """Cached op.gg-shaped build payload per champion+role, aggregated from our
+    own matches — the data source that replaces op.gg for the local client."""
+
+    __tablename__ = "meta_builds"
+
+    champion: Mapped[str] = mapped_column(Text, primary_key=True)  # lowercase
+    role: Mapped[str] = mapped_column(Text, primary_key=True)  # TOP..UTILITY
+    payload: Mapped[dict] = mapped_column(JsonCol)
+    samples: Mapped[int] = mapped_column(Integer)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class CrawlTarget(Base):
     """PUUIDs discovered from stored matches' co-players — the seed-crawl
     frontier. last_crawled_at=None → never crawled yet."""

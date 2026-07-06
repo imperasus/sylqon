@@ -97,6 +97,23 @@ def pool_report(game_name: str, tag_line: str, refresh: bool = Query(default=Tru
     return report
 
 
+@app.get("/api/meta-build/{champion}")
+def meta_build(champion: str, role: str = Query(..., min_length=2)) -> dict:
+    """Own-data build payload in the op.gg payload shape the local client's
+    opgg_to_build converter consumes — the op.gg replacement source. 404 below
+    the sample floor so the client can fall back."""
+    from app import metabuild
+
+    with db.open_session() as session:
+        payload = metabuild.get_meta_build(session, champion, role)
+    if payload is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"not enough stored games for {champion} ({role}) yet",
+        )
+    return payload
+
+
 @app.get("/api/advice/{match_id}/{puuid}")
 def advice(match_id: str, puuid: str, lang: str = Query(default="hu")) -> dict:
     """Run the post-game heuristics on a stored match and return the top-1

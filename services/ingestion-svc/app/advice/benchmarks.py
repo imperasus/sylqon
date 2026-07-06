@@ -26,6 +26,10 @@ CORE_ITEM_NAMES: dict[int, str] = {
 }
 CORE_ITEMS_PATCH: str = _completed["source_patch"]
 
+# Boots (tier-2) and cheap starter-pool items, for the meta-build aggregator.
+BOOT_IDS: set[int] = {int(k) for k in _completed.get("boots", {})}
+STARTER_IDS: set[int] = {int(k) for k in _completed.get("starter_pool", {})}
+
 CONTROL_WARD_ITEM_ID = 2055
 
 # CS@minute medians per role (Iron–Gold blend). UTILITY is exempt from the CS

@@ -66,6 +66,8 @@ DB_PATH             (default: sylqon.db)
 SYLQON_CACHE_DIR    (writable cache dir; override for packaged builds)
 SYLQON_LOG_DIR      (writable log dir; override for packaged builds)
 MISSION_TUNING_JSON (overlay mission thresholds, e.g. '{"adc_cs_delta": 50}')
+SYLQON_META_URL     (hosted meta service base URL; when set, live builds come
+                     from our own aggregation first, op.gg only as fallback)
 ```
 
 ## Architecture

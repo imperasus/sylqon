@@ -373,5 +373,173 @@
    "name": "Bloodletter's Curse",
    "gold": 2900
   }
+ },
+ "boots": {
+  "1001": {
+   "name": "Boots",
+   "gold": 300
+  },
+  "3006": {
+   "name": "Berserker's Greaves",
+   "gold": 1100
+  },
+  "3008": {
+   "name": "Gluttonous Greaves",
+   "gold": 1000
+  },
+  "3009": {
+   "name": "Boots of Swiftness",
+   "gold": 1000
+  },
+  "3020": {
+   "name": "Sorcerer's Shoes",
+   "gold": 1100
+  },
+  "3047": {
+   "name": "Plated Steelcaps",
+   "gold": 1200
+  },
+  "3111": {
+   "name": "Mercury's Treads",
+   "gold": 1250
+  },
+  "3158": {
+   "name": "Ionian Boots of Lucidity",
+   "gold": 900
+  },
+  "3168": {
+   "name": "Immortal Path",
+   "gold": 1000
+  },
+  "3170": {
+   "name": "Swiftmarch",
+   "gold": 1000
+  },
+  "3171": {
+   "name": "Crimson Lucidity",
+   "gold": 900
+  },
+  "3173": {
+   "name": "Chainlaced Crushers",
+   "gold": 1250
+  },
+  "3174": {
+   "name": "Armored Advance",
+   "gold": 1200
+  },
+  "3175": {
+   "name": "Spellslinger's Shoes",
+   "gold": 1100
+  }
+ },
+ "starter_pool": {
+  "1001": {
+   "name": "Boots",
+   "gold": 300
+  },
+  "1004": {
+   "name": "Faerie Charm",
+   "gold": 200
+  },
+  "1006": {
+   "name": "Rejuvenation Bead",
+   "gold": 300
+  },
+  "1027": {
+   "name": "Sapphire Crystal",
+   "gold": 300
+  },
+  "1028": {
+   "name": "Ruby Crystal",
+   "gold": 400
+  },
+  "1029": {
+   "name": "Cloth Armor",
+   "gold": 300
+  },
+  "1033": {
+   "name": "Null-Magic Mantle",
+   "gold": 400
+  },
+  "1036": {
+   "name": "Long Sword",
+   "gold": 350
+  },
+  "1042": {
+   "name": "Dagger",
+   "gold": 250
+  },
+  "1052": {
+   "name": "Amplifying Tome",
+   "gold": 400
+  },
+  "1054": {
+   "name": "Doran's Shield",
+   "gold": 450
+  },
+  "1055": {
+   "name": "Doran's Blade",
+   "gold": 450
+  },
+  "1056": {
+   "name": "Doran's Ring",
+   "gold": 400
+  },
+  "1082": {
+   "name": "Dark Seal",
+   "gold": 350
+  },
+  "1083": {
+   "name": "Cull",
+   "gold": 450
+  },
+  "1086": {
+   "name": "Doran's Bow",
+   "gold": 400
+  },
+  "1107": {
+   "name": "Scorchclaw Pup",
+   "gold": 450
+  },
+  "1106": {
+   "name": "Gustwalker Hatchling",
+   "gold": 450
+  },
+  "1105": {
+   "name": "Mosstomper Seedling",
+   "gold": 450
+  },
+  "1120": {
+   "name": "Doran's Helm",
+   "gold": 450
+  },
+  "2022": {
+   "name": "Glowing Mote",
+   "gold": 250
+  },
+  "3865": {
+   "name": "World Atlas",
+   "gold": 400
+  },
+  "3869": {
+   "name": "Celestial Opposition",
+   "gold": 400
+  },
+  "3870": {
+   "name": "Dream Maker",
+   "gold": 400
+  },
+  "3871": {
+   "name": "Zaz'Zak's Realmspike",
+   "gold": 400
+  },
+  "3876": {
+   "name": "Solstice Sleigh",
+   "gold": 400
+  },
+  "3877": {
+   "name": "Bloodsong",
+   "gold": 400
+  }
  }
 }

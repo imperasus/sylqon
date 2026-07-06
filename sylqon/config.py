@@ -57,6 +57,14 @@ OLLAMA_OPTIONS = {
     "repeat_penalty": 1.0,
 }
 
+# --- Sylqon hosted meta service (op.gg replacement) --------------------------
+# When set (e.g. http://localhost:8090), live-build fetches try the hosted
+# Sylqon service's own Match-V5 aggregation FIRST and only fall back to op.gg
+# on miss/failure. Empty (the default) keeps the local product's behaviour
+# completely unchanged.
+SYLQON_META_URL = os.getenv("SYLQON_META_URL", "")
+SYLQON_META_TIMEOUT = int(os.getenv("SYLQON_META_TIMEOUT", 6))
+
 # --- OP.GG live fetch -------------------------------------------------------
 # Region for the undocumented op.gg champion API used when a picked champion has
 # no cached build. The meta build is essentially region-agnostic; "na" is fine.

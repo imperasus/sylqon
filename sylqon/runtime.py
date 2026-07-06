@@ -1832,24 +1832,31 @@ class PipelineRunner:
 
     def _fetch_live_build(self, champion: str, champion_id: int,
                           role: str) -> dict | None:
-        """On a cache miss, fetch the current op.gg ranked build, convert it via
-        the standard opgg_to_build pipeline, and cache it (with raw_payload so it
-        survives re-conversion). Returns the build dict, or None to fall back."""
+        """On a cache miss, fetch a current build — from the hosted Sylqon
+        service's own aggregation when configured (SYLQON_META_URL), falling
+        back to op.gg — convert it via the standard opgg_to_build pipeline, and
+        cache it (with raw_payload so it survives re-conversion). Returns the
+        build dict, or None to fall back to the seed."""
         from sylqon.cache.opgg import opgg_to_build
         from sylqon.cache.opgg_fetch import fetch_opgg_payload
+        from sylqon.cache.svc_fetch import fetch_sylqon_payload
 
-        log.info("No cached build for %s %s — fetching live from op.gg",
-                 champion, role)
-        payload = fetch_opgg_payload(champion_id, role)
+        log.info("No cached build for %s %s — fetching live", champion, role)
+        payload = fetch_sylqon_payload(champion, role)
+        source = "sylqon-svc"
+        if not payload:
+            payload = fetch_opgg_payload(champion_id, role)
+            source = "opgg"
         if not payload:
             return None
         build = opgg_to_build(payload, self.catalog)
         if not build:
-            log.warning("op.gg live build for %s %s failed to convert", champion, role)
+            log.warning("%s live build for %s %s failed to convert",
+                        source, champion, role)
             return None
-        self.store.put_build(champion, role, build, "opgg",
+        self.store.put_build(champion, role, build, source,
                              self.catalog.patch, raw_payload=payload)
-        log.info("Live op.gg build cached for %s %s", champion, role)
+        log.info("Live %s build cached for %s %s", source, champion, role)
         return build
 
     def _refresh_build_async(self, champion: str, champion_id: int,
