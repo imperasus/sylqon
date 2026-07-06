@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.12.0](https://github.com/imperasus/sylqon/compare/v1.11.1...v1.12.0) (2026-07-06)
+
+
+### Features
+
+* **services:** champion-pool coverage analysis (Phase 2 / S3 core) ([dbd1b11](https://github.com/imperasus/sylqon/commit/dbd1b116ec224e837099cd2d996e6e7eb2bd9bcf))
+
 ### [1.11.1](https://github.com/imperasus/sylqon/compare/v1.11.0...v1.11.1) (2026-07-05)
 
 ## [1.11.0](https://github.com/imperasus/sylqon/compare/v1.10.2...v1.11.0) (2026-07-05)
