@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.17.0](https://github.com/imperasus/sylqon/compare/v1.16.0...v1.17.0) (2026-07-06)
+
+
+### Features
+
+* local pilot tooling - manual sync endpoint + one-command stack ([42faa5d](https://github.com/imperasus/sylqon/commit/42faa5de258b32d98cfcc7b42621010b18d6cc52))
+
 ## [1.16.0](https://github.com/imperasus/sylqon/compare/v1.15.0...v1.16.0) (2026-07-06)
 
 
