@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.15.0](https://github.com/imperasus/sylqon/compare/v1.14.0...v1.15.0) (2026-07-06)
+
+
+### Features
+
+* own-data meta builds - the op.gg replacement path (roadmap 3.3) ([ade2fb9](https://github.com/imperasus/sylqon/commit/ade2fb9b080e20c10dcee8cc7fd76d6160457f23))
+
 ## [1.14.0](https://github.com/imperasus/sylqon/compare/v1.13.0...v1.14.0) (2026-07-06)
 
 
