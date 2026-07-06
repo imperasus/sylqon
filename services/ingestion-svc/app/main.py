@@ -67,6 +67,32 @@ def ingest(
     return asdict(result)
 
 
+@app.get("/api/pool/{game_name}/{tag_line}")
+def pool_report(game_name: str, tag_line: str, refresh: bool = Query(default=True)) -> dict:
+    """Champion-pool coverage report (Phase 2 / S3 core): ingest the player's
+    recent matches (optional), then score their per-role pool on performance,
+    blind-pick safety and counter coverage from our own aggregation."""
+    from app import pool as pool_mod
+
+    assert _ingest_service is not None
+    try:
+        result = _ingest_service.ingest(game_name, tag_line) if refresh else None
+    except AccountNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    puuid = result.puuid if result else None
+    with db.open_session() as session:
+        if puuid is None:
+            account = _ingest_service._riot.get_account_by_riot_id(game_name, tag_line)
+            if not account or not account.get("puuid"):
+                raise HTTPException(status_code=404, detail="Riot ID not found")
+            puuid = account["puuid"]
+        report = pool_mod.analyze_pool(session, puuid)
+    if report is None:
+        raise HTTPException(status_code=404, detail="no stored matches for this player yet")
+    report["riot_id"] = f"{game_name}#{tag_line}"
+    return report
+
+
 @app.get("/api/advice/{match_id}/{puuid}")
 def advice(match_id: str, puuid: str, lang: str = Query(default="hu")) -> dict:
     """Run the post-game heuristics on a stored match and return the top-1

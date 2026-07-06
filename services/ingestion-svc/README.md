@@ -67,6 +67,7 @@ Dedupe lives in the `deliveries` table; failed sends are retried next cycle.
 |---|---|
 | `POST /api/ingest?game_name=X&tag_line=Y&count=20` | Fetch + persist matches and timelines; returns insert/skip/fail counts |
 | `GET /api/advice/{match_id}/{puuid}?lang=hu` | Top-1 post-game lesson (HU/EN), generated on first call, cached after |
+| `GET /api/pool/{game_name}/{tag_line}` | Champion-pool coverage report (Phase 2 / S3 core): per-role performance + blind-pick safety + counter coverage from own aggregation, with a suggested 3-champion pool; `?refresh=false` skips the ingest. CLI: `python -m app.cli pool "Name#TAG"` |
 | `GET /healthz` | Liveness |
 
 ## Configuration (env)
@@ -98,6 +99,10 @@ python -m app.cli ingest "Name#TAG" --count 20   # → skipped_existing: 20, ins
 ```
 
 ## Notes
+
+- **ToS framing rule (S3):** pool numbers measure *pool coverage* (blind-pick
+  safety, counter coverage, own performance) — never player skill. No MMR/ELO
+  vocabulary in UI copy or API field names.
 
 - `app/advice/data/completed_items.json` is generated from the repo's
   `cache/ddragon_catalog.json` (core-item detection for the item-timing

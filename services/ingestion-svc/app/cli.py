@@ -72,6 +72,32 @@ def _cmd_crawl(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_pool(args: argparse.Namespace) -> int:
+    from app import config, pool
+
+    game_name, _, tag_line = args.riot_id.partition("#")
+    engine = db.init_db()
+    with db.open_session() as session:
+        if game_name and tag_line:
+            service = IngestService(
+                RiotClient(rate_limiter=build_rate_limiter()), db.get_session_factory(engine)
+            )
+            try:
+                result = service.ingest(game_name, tag_line)
+            except AccountNotFound as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            puuid = result.puuid
+        else:
+            puuid = config._env("RIOT_SELF_PUUID", "")
+        report = pool.analyze_pool(session, puuid)
+    if report is None:
+        print("no stored matches for this player yet", file=sys.stderr)
+        return 1
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 0
+
+
 def _cmd_ranks(args: argparse.Namespace) -> int:
     from app import seedcrawl
 
@@ -187,6 +213,10 @@ def main(argv: list[str] | None = None) -> int:
     p_crawl = sub.add_parser("crawl", help="run co-player seed-crawl cycles")
     p_crawl.add_argument("--cycles", type=int, default=1)
     p_crawl.set_defaults(func=_cmd_crawl)
+
+    p_pool = sub.add_parser("pool", help="champion-pool coverage report")
+    p_pool.add_argument("riot_id", nargs="?", default="", help='"Name#TAG" (omit → RIOT_SELF_PUUID)')
+    p_pool.set_defaults(func=_cmd_pool)
 
     p_ranks = sub.add_parser("ranks", help="backfill solo-queue ranks for stored players")
     p_ranks.add_argument("--limit", type=int, default=None)
