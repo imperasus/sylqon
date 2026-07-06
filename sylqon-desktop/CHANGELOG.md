@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.16.0](https://github.com/imperasus/sylqon/compare/v1.15.0...v1.16.0) (2026-07-06)
+
+
+### Features
+
+* complete op.gg replaceability - bulk meta-sync from own data ([6f274f9](https://github.com/imperasus/sylqon/commit/6f274f93d87528422951521e5765993ce8cc7930))
+
 ## [1.15.0](https://github.com/imperasus/sylqon/compare/v1.14.0...v1.15.0) (2026-07-06)
 
 
