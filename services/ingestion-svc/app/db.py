@@ -40,6 +40,30 @@ def _migrate_computed_benchmarks(engine: Engine) -> None:
     if "band" not in columns:
         with engine.begin() as conn:
             conn.execute(text("DROP TABLE computed_benchmarks"))
+    _ensure_columns(
+        engine,
+        "guild_configs",
+        {
+            "reports_channel_id": "BIGINT",
+            "last_weekly_at": "TIMESTAMP WITH TIME ZONE"
+            if engine.dialect.name == "postgresql" else "TIMESTAMP",
+        },
+    )
+
+
+def _ensure_columns(engine: Engine, table: str, coldefs: dict[str, str]) -> None:
+    """Additive column migration: ALTER TABLE ADD COLUMN for anything missing
+    (create_all never alters existing tables)."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if table not in inspector.get_table_names():
+        return  # create_all will build it with the full schema
+    existing = {c["name"] for c in inspector.get_columns(table)}
+    with engine.begin() as conn:
+        for name, ddl in coldefs.items():
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
 
 
 def get_session_factory(engine: Engine | None = None) -> sessionmaker:

@@ -37,12 +37,14 @@ python -m app.cli advise EUN1_1234567890 <puuid> --lang hu
 Set `DISCORD_BOT_TOKEN`, then `python -m app.bot`. Commands: `/link Név#TAG`
 (account linking + backfill; linked users are auto-watched), `/utolsomeccs`
 (latest match's lesson with 👍/👎 buttons → `advice_feedback`), `/riport`
-(weekly summary), `/build <champion>` and `/matchup <a> <b>` (own-data
-aggregation — honest "not enough data yet" below the sample floor),
-`/beallitas` (advice channel + guild language, needs Manage Server). The
-match watcher runs inside the bot process and posts advice embeds to the
-configured channel, mentioning the linked user; without a configured channel
-it falls back to the webhook below.
+(weekly summary on demand), `/pool` (pool-coverage report for the linked
+account), `/build <champion>` and `/matchup <a> <b>` (own-data aggregation —
+honest "not enough data yet" below the sample floor), `/beallitas` (advice +
+reports channel and guild language, needs Manage Server). The match watcher
+runs inside the bot process and posts advice embeds to the configured channel,
+mentioning the linked user; without a configured channel it falls back to the
+webhook below. When a reports channel is configured, the weekly summary for
+every linked account is posted there automatically once per 7 days.
 
 ## Discord delivery (webhook MVP)
 

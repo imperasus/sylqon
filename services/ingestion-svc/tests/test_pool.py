@@ -101,8 +101,8 @@ def test_analyze_pool_full_report(session_factory):
     assert "Draven" in bot["uncovered"]
     comps = bot["components"]
     assert comps["counter_coverage"] == 50  # 2 judged threats, 1 covered
-    # Jinx's worst matchup (0% vs Draven) drags blind safety down
-    assert comps["blind_safety"] == 0
+    # Jinx's worst matchup (0/2 vs Draven, shrunk → 25%) drags blind safety down
+    assert comps["blind_safety"] == 25
     assert 0 <= bot["coverage_score"] <= 100
     # Suggestion should reach for Caitlyn (beats Draven 3/3 in dataset)
     suggested = [c["champion"] for c in bot["suggested"]]

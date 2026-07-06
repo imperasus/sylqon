@@ -172,6 +172,8 @@ class GuildConfig(Base):
 
     guild_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     advice_channel_id: Mapped[int | None] = mapped_column(BigInteger)
+    reports_channel_id: Mapped[int | None] = mapped_column(BigInteger)
+    last_weekly_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     lang: Mapped[str] = mapped_column(Text, default="hu")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

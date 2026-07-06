@@ -32,9 +32,11 @@ log = logging.getLogger(__name__)
 SR_QUEUES = {420, 440, 400, 430}
 ROLES = ("TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY")
 
-MIN_MATCHUP_GAMES = 2   # a lane pairing below this many games is ignored
-MIN_POPULAR_GAMES = 3   # a champ below this presence isn't a "threat" yet
-TOP_THREATS = 8         # how many popular enemies counter-coverage checks
+MIN_MATCHUP_GAMES = 2    # a lane pairing below this many games is ignored
+MIN_POPULAR_GAMES = 3    # a champ below this presence isn't a "threat" yet
+MIN_SUGGEST_GAMES = 5    # dataset presence needed to be *suggested* (unless played)
+MIN_BLIND_OPPONENTS = 2  # distinct opponents needed before "blind-safe" is claimed
+TOP_THREATS = 8          # how many popular enemies counter-coverage checks
 POOL_SIZE = 3
 
 
@@ -112,24 +114,32 @@ def performance_score(pool_stats: dict[str, list[int]]) -> tuple[int, bool]:
     return round(weighted), total < 5
 
 
+def _matchup_evidence(
+    champ: str, matchups: dict[tuple[str, str], list[int]]
+) -> list[tuple[str, int, float]]:
+    """Qualifying (opponent, games, shrunk_wr) samples for a champion. WRs are
+    sample-shrunk so a 0/2 lane reads as 25%, not an absolute 0%."""
+    out = []
+    for (a, b), (games, wins) in matchups.items():
+        if a == champ and games >= MIN_MATCHUP_GAMES:
+            out.append((b, games, _shrunk_wr(games, wins, prior_games=2)))
+    return out
+
+
 def blind_safety_score(
     pool: list[str], matchups: dict[tuple[str, str], list[int]]
 ) -> tuple[int, bool]:
-    """Best champ's worst-matchup WR: can you first-pick *something* safely?"""
+    """Best champ's worst-matchup WR: can you first-pick *something* safely?
+    A champion only counts once it has evidence against MIN_BLIND_OPPONENTS
+    distinct opponents — "no bad matchup found" is not the same as safe."""
     best = None
-    any_data = False
     for champ in pool:
-        worst = None
-        for (a, b), (games, wins) in matchups.items():
-            if a != champ or games < MIN_MATCHUP_GAMES:
-                continue
-            wr = wins / games * 100
-            worst = wr if worst is None else min(worst, wr)
-        if worst is None:
-            continue  # no matchup evidence for this champ
-        any_data = True
+        evidence = _matchup_evidence(champ, matchups)
+        if len(evidence) < MIN_BLIND_OPPONENTS:
+            continue
+        worst = min(wr for _, _, wr in evidence)
         best = worst if best is None else max(best, worst)
-    if not any_data:
+    if best is None:
         return 50, True
     return round(best), False
 
@@ -154,7 +164,7 @@ def counter_coverage_score(
         for champ in pool:
             games, wins = matchups.get((champ, threat), (0, 0))
             if games >= MIN_MATCHUP_GAMES:
-                verdicts.append(wins / games * 100)
+                verdicts.append(_shrunk_wr(games, wins, prior_games=2))
         if not verdicts:
             continue  # no evidence either way — don't count against the pool
         judged += 1
@@ -184,7 +194,7 @@ def _candidate_score(
     dg, dw = champs.get(champ, (0, 0))
     dataset_wr = _shrunk_wr(dg, dw, prior_games=5) if dg else 50.0
     safety, safety_low = blind_safety_score([champ], matchups)
-    if not safety_low and safety >= 45:
+    if not safety_low and safety >= 50:
         reasons.append("blind-safe")
     score = 0.45 * comfort + 0.30 * dataset_wr + 0.25 * safety
     return score, reasons
@@ -195,8 +205,10 @@ def suggest_pool(
     champs: dict[str, list[int]],
     matchups: dict[tuple[str, str], list[int]],
 ) -> list[dict]:
+    # Champions the player already plays are always candidates; unplayed ones
+    # need real dataset presence before we'd recommend learning them.
     candidates = set(personal) | {
-        name for name, (g, _) in champs.items() if g >= MIN_POPULAR_GAMES
+        name for name, (g, _) in champs.items() if g >= MIN_SUGGEST_GAMES
     }
     if not candidates:
         return []
@@ -204,7 +216,25 @@ def suggest_pool(
         champ: _candidate_score(champ, personal, champs, matchups)
         for champ in candidates
     }
+
     picked: list[dict] = []
+
+    # Comfort anchor: the player's most-played champ with a winning record
+    # leads the suggestion — the pool is built around it, not instead of it.
+    anchor = max(
+        (c for c, (g, w) in personal.items() if g >= 3 and w / g >= 0.5),
+        key=lambda c: personal[c][0],
+        default=None,
+    )
+    if anchor is not None and anchor in scored:
+        _, reasons = scored.pop(anchor)
+        if "comfort" not in reasons:
+            reasons = ["comfort", *reasons]
+        g, w = personal[anchor]
+        picked.append(
+            {"champion": anchor, "reasons": reasons, "personal": {"games": g, "wins": w}}
+        )
+
     while len(picked) < POOL_SIZE and scored:
         pool_now = [p["champion"] for p in picked]
         best_name, best_val, best_reasons = None, -1.0, []

@@ -41,8 +41,16 @@ _T = {
         "no_build_data": "Még nincs elég saját adat **{champion}** buildjéhez (min. {n} meccs kell). "
                          "Ahogy nő az adatbázis, ez magától élesedik.",
         "no_matchup_data": "Még nincs elég lane-találkozás **{a} vs {b}** párosból (min. {n}).",
-        "config_saved": "✅ Beállítva. Tanács-csatorna: {channel}, nyelv: {lang}.",
+        "config_saved": "✅ Beállítva. Tanács-csatorna: {channel}, riport-csatorna: {reports}, nyelv: {lang}.",
         "config_denied": "Ehhez `Szerver kezelése` jogosultság kell.",
+        "pool_title": "Pool-lefedettség — {riot_id}",
+        "pool_role": "{role} · {games} meccs · lefedettség: **{score}**",
+        "pool_components": "teljesítmény {performance} · blind-pick {blind_safety} · counter-lefedettség {counter_coverage}",
+        "pool_suggested": "Javasolt pool",
+        "pool_uncovered": "Fedetlen threat-ek",
+        "pool_low_data": "⚠️ kevés adat — az értékek óvatosan kezelendők",
+        "pool_reason": {"comfort": "komfort", "blind-safe": "blind-safe",
+                        "covers-gaps": "rést fed", "meta-presence": "gyakori pick"},
         "vote_thanks": "Köszi a visszajelzést! 🙏",
         "vote_dupe": "Erre a tanácsra már szavaztál.",
         "build_title": "{champion} — saját meta ({games} meccs, {winrate_pct}% WR, {role})",
@@ -59,8 +67,16 @@ _T = {
         "no_build_data": "Not enough own data for **{champion}** yet (needs {n}+ games). "
                          "This sharpens automatically as the dataset grows.",
         "no_matchup_data": "Not enough lane meetings for **{a} vs {b}** yet (needs {n}+).",
-        "config_saved": "✅ Saved. Advice channel: {channel}, language: {lang}.",
+        "config_saved": "✅ Saved. Advice channel: {channel}, reports channel: {reports}, language: {lang}.",
         "config_denied": "You need the `Manage Server` permission for this.",
+        "pool_title": "Pool coverage — {riot_id}",
+        "pool_role": "{role} · {games} games · coverage: **{score}**",
+        "pool_components": "performance {performance} · blind-pick {blind_safety} · counter coverage {counter_coverage}",
+        "pool_suggested": "Suggested pool",
+        "pool_uncovered": "Uncovered threats",
+        "pool_low_data": "⚠️ thin data — treat the numbers with care",
+        "pool_reason": {"comfort": "comfort", "blind-safe": "blind-safe",
+                        "covers-gaps": "covers gaps", "meta-presence": "common pick"},
         "vote_thanks": "Thanks for the feedback! 🙏",
         "vote_dupe": "You already voted on this advice.",
         "build_title": "{champion} — own meta ({games} games, {winrate_pct}% WR, {role})",
@@ -68,6 +84,31 @@ _T = {
                         "(**{pct}%**) — own data, not a global stat.",
     },
 }
+
+
+def build_pool_embed_text(report: dict, lang: str, max_roles: int = 3) -> str:
+    """Pure presentation: the /pool report as embed description text."""
+    t = _T[lang]
+    lines: list[str] = []
+    for role, data in list(report["roles"].items())[:max_roles]:
+        lines.append(t["pool_role"].format(role=role, games=data["games"],
+                                           score=data["coverage_score"]))
+        lines.append(t["pool_components"].format(**data["components"]))
+        if data["suggested"]:
+            picks = " · ".join(
+                "**{c}** ({r})".format(
+                    c=s["champion"],
+                    r=", ".join(t["pool_reason"].get(x, x) for x in s["reasons"]),
+                )
+                for s in data["suggested"]
+            )
+            lines.append(f'{t["pool_suggested"]}: {picks}')
+        if data["uncovered"]:
+            lines.append(f'{t["pool_uncovered"]}: {", ".join(data["uncovered"][:5])}')
+        if data["low_data"]:
+            lines.append(t["pool_low_data"])
+        lines.append("")
+    return "\n".join(lines).strip()
 
 
 def _feedback_view(match_id: str, puuid: str) -> discord.ui.View:
@@ -121,7 +162,69 @@ class SylqonBot(discord.Client):
                     log.info("watcher delivered %d advice message(s)", delivered)
             except Exception:
                 log.exception("watcher cycle failed")
+            try:
+                await self._maybe_weekly_reports()
+            except Exception:
+                log.exception("weekly report cycle failed")
             await asyncio.sleep(config.WATCH_POLL_SECONDS)
+
+    async def _maybe_weekly_reports(self) -> None:
+        """Post the weekly summary for every linked account into each guild's
+        reports channel, once per 7 days (first activation posts immediately)."""
+        import datetime as _dt
+
+        from app import report as report_mod
+
+        def _due():
+            now = _dt.datetime.now(_dt.timezone.utc)
+            out = []
+            with self.session_factory() as session:
+                for cfg in session.execute(select(GuildConfig)).scalars():
+                    if not cfg.reports_channel_id:
+                        continue
+                    if cfg.last_weekly_at is not None:
+                        last = cfg.last_weekly_at
+                        if last.tzinfo is None:
+                            last = last.replace(tzinfo=_dt.timezone.utc)
+                        if now - last < _dt.timedelta(days=7):
+                            continue
+                    payloads = []
+                    for acc in session.execute(select(LinkedAccount)).scalars():
+                        data = report_mod.build_report(session, acc.puuid, days=7)
+                        if data:
+                            payloads.append(
+                                (acc.discord_user_id,
+                                 f"{acc.game_name}#{acc.tag_line}",
+                                 report_mod.build_report_payload(data, cfg.lang or "hu"))
+                            )
+                    if payloads:
+                        out.append((cfg.guild_id, cfg.reports_channel_id, payloads))
+            return out
+
+        due = await asyncio.to_thread(_due)
+        for guild_id, channel_id, payloads in due:
+            channel = self.get_channel(channel_id)
+            if channel is None:
+                continue
+            sent = False
+            for user_id, riot_id, payload in payloads:
+                embed = discord.Embed.from_dict(payload["embeds"][0])
+                embed.title = f"{embed.title} — {riot_id}"
+                try:
+                    await channel.send(content=f"<@{user_id}>", embed=embed)
+                    sent = True
+                except discord.DiscordException:
+                    log.exception("weekly report post failed in %s", channel_id)
+            if sent:
+                def _stamp():
+                    with self.session_factory() as session:
+                        cfg = session.get(GuildConfig, guild_id)
+                        if cfg:
+                            cfg.last_weekly_at = _dt.datetime.now(_dt.timezone.utc)
+                            session.commit()
+
+                await asyncio.to_thread(_stamp)
+                log.info("weekly report(s) posted to guild %s", guild_id)
 
     # -- delivery targets ----------------------------------------------------
 
@@ -392,8 +495,38 @@ def register_commands(bot: SylqonBot) -> None:
             )
         )
 
-    @tree.command(name="beallitas", description="Bot-beállítások (tanács-csatorna, nyelv)")
+    @tree.command(name="pool", description="Pool-lefedettségi riport a championjaidról")
+    async def pool_cmd(interaction: discord.Interaction):
+        from app import pool as pool_mod
+
+        lang = _guild_lang(bot, interaction)
+        linked = _linked(bot, interaction.user.id)
+        if linked is None:
+            await interaction.response.send_message(_T[lang]["not_linked"], ephemeral=True)
+            return
+        await interaction.response.defer()
+        await asyncio.to_thread(bot.ingest.ingest_by_puuid, linked.puuid, 5)
+
+        def _analyze():
+            with bot.session_factory() as session:
+                return pool_mod.analyze_pool(session, linked.puuid)
+
+        report = await asyncio.to_thread(_analyze)
+        if report is None:
+            await interaction.followup.send(_T[lang]["no_recent"])
+            return
+        embed = discord.Embed(
+            title=_T[lang]["pool_title"].format(
+                riot_id=f"{linked.game_name}#{linked.tag_line}"
+            ),
+            description=build_pool_embed_text(report, lang),
+            color=0x5865F2,
+        )
+        await interaction.followup.send(embed=embed)
+
+    @tree.command(name="beallitas", description="Bot-beállítások (tanács-/riport-csatorna, nyelv)")
     @app_commands.describe(csatorna="Ide posztolja a bot a meccs utáni tanácsokat",
+                           riport_csatorna="Ide jön a heti összefoglaló",
                            nyelv="hu vagy en")
     @app_commands.choices(nyelv=[
         app_commands.Choice(name="magyar", value="hu"),
@@ -402,6 +535,7 @@ def register_commands(bot: SylqonBot) -> None:
     async def beallitas(
         interaction: discord.Interaction,
         csatorna: discord.TextChannel | None = None,
+        riport_csatorna: discord.TextChannel | None = None,
         nyelv: app_commands.Choice[str] | None = None,
     ):
         lang = _guild_lang(bot, interaction)
@@ -416,6 +550,8 @@ def register_commands(bot: SylqonBot) -> None:
                 )
                 if csatorna is not None:
                     cfg.advice_channel_id = csatorna.id
+                if riport_csatorna is not None:
+                    cfg.reports_channel_id = riport_csatorna.id
                 if nyelv is not None:
                     cfg.lang = nyelv.value
                 session.merge(cfg)
@@ -425,8 +561,11 @@ def register_commands(bot: SylqonBot) -> None:
         cfg = await asyncio.to_thread(_save)
         new_lang = cfg.lang or lang
         channel_str = f"<#{cfg.advice_channel_id}>" if cfg.advice_channel_id else "—"
+        reports_str = f"<#{cfg.reports_channel_id}>" if cfg.reports_channel_id else "—"
         await interaction.response.send_message(
-            _T[new_lang]["config_saved"].format(channel=channel_str, lang=new_lang),
+            _T[new_lang]["config_saved"].format(
+                channel=channel_str, reports=reports_str, lang=new_lang
+            ),
             ephemeral=True,
         )
 
