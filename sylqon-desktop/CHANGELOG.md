@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.17.2](https://github.com/imperasus/sylqon/compare/v1.17.1...v1.17.2) (2026-07-06)
+
+
+### Bug Fixes
+
+* **services:** pad thin situational pools to a 6-item minimum ([c98fb77](https://github.com/imperasus/sylqon/commit/c98fb77213cc2c1931681691c8b603c651547467))
+
 ### [1.17.1](https://github.com/imperasus/sylqon/compare/v1.17.0...v1.17.1) (2026-07-06)
 
 
