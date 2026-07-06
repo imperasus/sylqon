@@ -1,5 +1,5 @@
-# Local pilot launcher: Postgres + Redis (Docker), the FastAPI service and the
-# Discord bot — everything the hosted stack will run, on this machine.
+﻿# Local pilot launcher: Postgres + Redis (Docker), the FastAPI service and the
+# Discord bot - everything the hosted stack will run, on this machine.
 # Usage:  powershell -ExecutionPolicy Bypass -File run_stack.ps1 [-Stop]
 param([switch]$Stop)
 
@@ -27,7 +27,7 @@ Start-Process python -WorkingDirectory $svc -WindowStyle Minimized `
 Start-Sleep -Seconds 6
 try {
     $h = Invoke-RestMethod "http://localhost:8090/healthz" -TimeoutSec 10
-    Write-Host "API: OK ($($h.status)) — http://localhost:8090"
-} catch { Write-Host "API: not responding yet — check api.err.log" }
+    Write-Host "API: OK ($($h.status)) - http://localhost:8090"
+} catch { Write-Host "API: not responding yet - check api.err.log" }
 Write-Host "Bot: log at bot.log / bot.err.log"
 Write-Host "Desktop app uses this stack when SYLQON_META_URL=http://localhost:8090 is set."
