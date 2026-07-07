@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import {
-  ChevronLeft, ChevronRight, Crown, History, Plus, Search, Sparkles, Star, TrendingUp, X,
+  ChevronLeft, ChevronRight, History, Plus, Search, Sparkles, Star, TrendingUp, X,
 } from "lucide-react";
 import {
   fetchChampionsByRole, fetchRecentMatches, useChampionStats, usePool, useScout, useStaticData,
@@ -9,23 +9,54 @@ import {
 import { useFitCount, useMediaQuery } from "../hooks/useFitCount.js";
 import { pct, ROLE_LABELS, ROLE_ORDER, TIER_STYLE } from "../assets.js";
 import {
-  Button, ChampPortrait, ChampionRow, Chip, EmptyState, IconButton, Panel, StatBadge, WLPill,
+  Button, ChampPortrait, ChampionRow, Chip, EmptyState, IconButton, Panel, SectionTitle,
+  StatBadge, Tabs, WLPill,
 } from "./shared.jsx";
 import ChampionDetailModal from "./ChampionDetailModal.jsx";
 import MatchAnalysisModal from "./MatchAnalysisModal.jsx";
 import MacroCoach from "./MacroCoach.jsx";
 
-function RoleTabs({ role, onRole }) {
+/* ------------------------------------------------------------------ hero */
+function KPI({ label, tone = "text-white/90", title, children }) {
   return (
-    <div className="flex gap-1">
-      {ROLE_ORDER.map((r) => (
-        <button key={r} onClick={() => onRole(r)}
-          className={`cursor-pointer rounded px-2.5 py-1 text-sm font-bold tracking-widest transition-colors
-            ${role === r ? "bg-accent/15 text-accent-bright" : "text-white/40 hover:bg-white/5 hover:text-white/70"}`}>
-          {ROLE_LABELS[r]}
-        </button>
-      ))}
+    <div className="flex min-w-0 flex-col justify-center gap-1 px-4" title={title}>
+      <span className="t-label">{label}</span>
+      <span className={`font-mono text-lg leading-none font-semibold tabular-nums ${tone}`}>{children}</span>
     </div>
+  );
+}
+
+/* One flat strip of headline numbers — the "analytics dashboard" signature.
+   The role selector lives here too: it drives the pool, meta and scout below. */
+function HeroStrip({ role, onRole, poolCount, recentWr, builds, patch }) {
+  const roleItems = ROLE_ORDER.map((r) => ({ key: r, label: ROLE_LABELS[r] }));
+  return (
+    <div className="frost flex shrink-0 items-stretch divide-x divide-line px-1 py-2">
+      <div className="flex flex-col justify-center gap-1 px-3">
+        <span className="t-label">Role</span>
+        <Tabs items={roleItems} active={role} onSelect={onRole} />
+      </div>
+      <KPI label="Pool" title="Bajnokok a szerep-poolodban">{poolCount}</KPI>
+      <KPI label="Recent WR"
+           tone={recentWr == null ? "text-white/30" : recentWr >= 0.5 ? "text-good" : "text-bad"}
+           title="Win rate az utolsó lekért meccseken">
+        {recentWr == null ? "—" : pct(recentWr)}
+      </KPI>
+      <KPI label="Builds" title="Cache-elt buildek">{builds}</KPI>
+      <KPI label="Patch">{patch}</KPI>
+    </div>
+  );
+}
+
+/* A titled sub-section inside a shared flat surface (hairline-divided). */
+function Section({ title, icon, accent = "accent", right, className = "", children }) {
+  return (
+    <section className={`flex min-h-0 flex-col gap-2 p-2.5 ${className}`}>
+      <div className="-mx-2.5 border-b border-line/70 px-2.5 pb-1.5">
+        <SectionTitle accent={accent} icon={icon} right={right}>{title}</SectionTitle>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -45,7 +76,7 @@ function PoolCard({ name, slug, patch, stat, onRemove }) {
         ? <StatBadge label="WR" value={pct(wr)} tone={wr >= 0.5 ? "good" : "warn"} tip="Your win rate on this champion" />
         : <span className="text-xs text-white/20">—</span>}
       <button onClick={() => onRemove(name)}
-        className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-transparent text-white/25 opacity-0 transition-all hover:border-bad/50 hover:text-bad group-hover:opacity-100"
+        className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-md border border-transparent text-white/25 opacity-0 transition-all hover:border-bad/50 hover:text-bad group-hover:opacity-100"
         title="Remove from pool">
         <X className="h-3.5 w-3.5" />
       </button>
@@ -53,7 +84,7 @@ function PoolCard({ name, slug, patch, stat, onRemove }) {
   );
 }
 
-function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
+function PoolSection({ role, pool, champions, patch, stats, scout, save, className = "" }) {
   const [query, setQuery] = useState("");
   const slugOf = useMemo(() => {
     const m = {};
@@ -77,7 +108,7 @@ function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
   const [listRef, fit] = useFitCount({ rowRem: 3.0, gapRem: 0.25, min: 1, max: current.length || 1 });
 
   return (
-    <Panel title="YOUR POOL" icon={Star} right={<Chip tone="muted">{ROLE_LABELS[role]}</Chip>} className="gap-2.5 min-w-0">
+    <Section title="YOUR POOL" icon={Star} right={<Chip tone="muted">{ROLE_LABELS[role]}</Chip>} className={className}>
       <div ref={listRef} className="-mr-1 flex min-h-0 flex-1 flex-col gap-1 overflow-hidden pr-1">
         {current.length === 0
           ? <span className="px-1 text-sm text-white/30">No champions for {ROLE_LABELS[role]} — search below.</span>
@@ -96,9 +127,9 @@ function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
           <Search className="absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2 text-white/30" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search champion…"
             onKeyDown={(e) => { if (e.key === "Enter" && top) add(top.name); }}
-            className="w-full rounded-md border border-white/10 bg-black/30 py-1.5 pr-2 pl-7 text-base text-white/80 outline-none placeholder:text-white/25 focus:border-accent/40" />
+            className="w-full rounded-md border border-line bg-black/30 py-1.5 pr-2 pl-7 text-base text-white/80 outline-none placeholder:text-white/25 focus:border-accent/40" />
           {matches.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-accent/30 bg-bg-2/98 shadow-xl">
+            <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-line-strong bg-bg-2/98 shadow-xl">
               {matches.map((c) => (
                 <button key={c.slug} onClick={() => add(c.name)}
                   className="flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left hover:bg-accent/10">
@@ -114,7 +145,7 @@ function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
       </div>
 
       {scout?.pick && (
-        <div className="mt-auto border-t border-white/8 pt-2.5">
+        <div className="border-t border-line/70 pt-2">
           <div className="flex items-center gap-1.5">
             <Sparkles className="h-4 w-4 text-accent" />
             <span className="t-label text-accent/70">Meta Scout</span>
@@ -129,7 +160,7 @@ function PoolPanel({ role, pool, champions, patch, stats, scout, save }) {
           </div>
         </div>
       )}
-    </Panel>
+    </Section>
   );
 }
 
@@ -175,7 +206,7 @@ function MetaTable({ role, patch, pool, save, onOpen }) {
           {/* sticky header — one labelled group per body column so the WR/PR/Tier
               headers sit above BOTH columns on a wide (2-up) layout, not just the
               right one. Mirrors the body grid (same gap + columnGap). */}
-          <div className="border-b border-white/10"
+          <div className="border-b border-line"
                style={cols > 1 ? {
                  display: "grid", columnGap: "1.25rem",
                  gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
@@ -224,7 +255,7 @@ function MetaTable({ role, patch, pool, save, onOpen }) {
             })}
           </div>
           {pages > 1 && (
-            <div className="mt-1 flex shrink-0 items-center justify-center gap-3 border-t border-white/8 pt-1.5">
+            <div className="mt-1 flex shrink-0 items-center justify-center gap-3 border-t border-line/70 pt-1.5">
               <button onClick={() => setPage(Math.max(0, curPage - 1))} disabled={curPage === 0}
                 className="grid h-6 w-6 cursor-pointer place-items-center rounded border border-white/12 text-white/50 transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-default disabled:opacity-30">
                 <ChevronLeft className="h-4 w-4" />
@@ -245,29 +276,17 @@ function MetaTable({ role, patch, pool, save, onOpen }) {
 }
 
 /* -------------------------------------------------------------- matches */
-function MatchesPanel({ patch }) {
-  const [matches, setMatches] = useState([]);
-  const [matchesLoading, setMatchesLoading] = useState(true);
+function MatchesSection({ patch, matches, loading, className = "" }) {
   const [selected, setSelected] = useState(null);
   const [listRef, fit] = useFitCount({ rowRem: 2.9, gapRem: 0.125, min: 3, max: 10 });
-  useEffect(() => {
-    let cancelled = false;
-    const load = () => fetchRecentMatches(10)
-      .then((r) => { if (!cancelled) setMatches(r.matches || []); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setMatchesLoading(false); });
-    load();
-    const t = setInterval(load, 30000);
-    return () => { cancelled = true; clearInterval(t); };
-  }, []);
 
   return (
-    <Panel title="RECENT GAMES" icon={History} accent="white"
-           right={<Chip tone="muted">click for AI review</Chip>} className="gap-1 min-w-0">
-      {matchesLoading ? (
+    <Section title="RECENT GAMES" icon={History} accent="white"
+             right={<Chip tone="muted">click for AI review</Chip>} className={className}>
+      {loading ? (
         <div className="flex flex-col gap-2 px-1 py-2">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-10 rounded-md bg-white/5 animate-pulse" />
+            <div key={i} className="h-10 animate-pulse rounded-md bg-white/5" />
           ))}
         </div>
       ) : matches.length === 0 ? (
@@ -304,7 +323,7 @@ function MatchesPanel({ patch }) {
           <MatchAnalysisModal match={selected} patch={patch} onClose={() => setSelected(null)} />
         )}
       </AnimatePresence>
-    </Panel>
+    </Section>
   );
 }
 
@@ -317,22 +336,38 @@ export default function HomeCockpit({ state }) {
   const patch = state?.cache?.patch || "16.12.1";
   const [detail, setDetail] = useState(null);
 
+  // Matches are fetched here (not in the section) so the hero strip can show the
+  // recent win rate headline from the same payload.
+  const [matches, setMatches] = useState([]);
+  const [matchesLoading, setMatchesLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => fetchRecentMatches(10)
+      .then((r) => { if (!cancelled) setMatches(r.matches || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setMatchesLoading(false); });
+    load();
+    const t = setInterval(load, 30000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+  const recentWr = matches.length
+    ? matches.filter((m) => m.result === "Win").length / matches.length
+    : null;
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="frost flex items-center gap-3 px-3 py-1.5">
-        <span className="t-label">Role</span>
-        <RoleTabs role={role} onRole={setRole} />
-        <span className="ml-auto flex items-center gap-1.5 text-xs tracking-widest text-white/35">
-          <Crown className="h-4 w-4 text-accent/60" /> {state?.cache?.builds ?? 0} BUILDS
-        </span>
-      </div>
+      <HeroStrip role={role} onRole={setRole} poolCount={(pool[role] || []).length}
+                 recentWr={recentWr} builds={state?.cache?.builds ?? 0} patch={patch} />
 
       <MacroCoach />
 
-      <div className="grid min-h-0 flex-1 grid-cols-[1.1fr_2fr_1.1fr] gap-4">
-        <PoolPanel role={role} pool={pool} champions={champions} patch={patch} stats={stats} scout={scout} save={save} />
+      <div className="grid min-h-0 flex-1 grid-cols-[1.6fr_1fr] gap-3">
         <MetaTable role={role} patch={patch} pool={pool} save={save} onOpen={setDetail} />
-        <MatchesPanel patch={patch} />
+        <div className="frost flex min-h-0 flex-col divide-y divide-line">
+          <PoolSection role={role} pool={pool} champions={champions} patch={patch}
+                       stats={stats} scout={scout} save={save} className="flex-[1.15]" />
+          <MatchesSection patch={patch} matches={matches} loading={matchesLoading} className="flex-1" />
+        </div>
       </div>
 
       <AnimatePresence>
