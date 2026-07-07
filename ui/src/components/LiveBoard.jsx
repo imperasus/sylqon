@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import {
-  Crosshair, Flame, Radar, Skull, Swords, TrendingUp, Users, UsersRound,
+  Crosshair, Flame, Radar, Skull, Swords, TrendingUp, UsersRound,
 } from "lucide-react";
 import { useStaticData } from "../api.js";
 import { ROLE_LABELS, ROLE_ORDER, itemUrl, spellUrl, pct } from "../assets.js";
 import { ChampPortrait, Chip, EmptyState, Panel } from "./shared.jsx";
-import { useElementRem } from "../hooks/useFitCount.js";
+import { NumCell, RankCell, RoleCell, TeamRow, TeamTable } from "./TeamTable.jsx";
 
 /* Per-role CS/min targets — a glanceable "keeping up?" gauge, not a hard rule.
    Mirrors livegame/state._CS_TARGETS (support farms by design → low bar). */
@@ -78,138 +78,106 @@ function Build({ p, patch }) {
   );
 }
 
-/* detail: 2 = full (all rows) · 1 = drop the scout row · 0 = identity + stats only.
-   The column picks the level that lets all players fit without scrolling. */
-function PlayerCard({ p, patch, gameTime = 0, detail = 2 }) {
+/* Hover depth for the player cell: recent pool + history averages. */
+function rowTip(p) {
+  const bits = [];
+  const pool = (p.champion_pool || []).slice(0, 4);
+  if (pool.length) bits.push("pool: " + pool.map((c) =>
+    `${c.champion || ""} ${c.games || 0}g${c.win_rate != null ? ` ${pct(c.win_rate)}` : ""}`).join(" · "));
+  const kda = p.avg_kda || {};
+  if (kda.ratio != null) bits.push(`recent avg ${kda.ratio.toFixed(1)} KDA · ${p.avg_cs_per_min ?? 0} cs/m · ${Math.round(p.avg_vision_score ?? 0)} vis`);
+  const cc = p.current_champ || {};
+  if (cc.mastery_points != null) bits.push(`mastery M${cc.mastery_level || "?"} ${(cc.mastery_points / 1000).toFixed(0)}k`);
+  return bits.join("\n");
+}
+
+/* One live player as a table row: identity, rank, recent form, live K/D/A + CS
+   pace, flags, and the live build strip. */
+function LiveRow({ p, patch, gameTime = 0 }) {
   const acc = p.account || {};
   const solo = acc.solo;
   const cc = p.current_champ || {};
   const form = p.recent_form || {};
-  const kda = p.avg_kda || {};
-  const tags = (p.playstyle_tags || []).slice(0, 3);
-  const pool = (p.champion_pool || []).slice(0, 3);
+  const tags = (p.playstyle_tags || []).slice(0, 2);
   const hasGroup = p.premade_group != null;
   const partners = p.premade_partners || [];
-  const sideAccent = p.isSelf ? "accent" : p.side === "enemy" ? "enemy" : "ally";
 
-  const liveKda = ((p.kills + p.assists) / Math.max(1, p.deaths)).toFixed(1);
   const csTarget = ROLE_CS_TARGET[p.role] ?? 7;
-  const csRate = (p.cs_per_min || 0).toFixed(1);
-  // Benchmark coloring only once laning is underway (~3 min). Before that everyone
-  // is at 0 CS and a red "behind" read would just be alarming noise. Support CS
-  // isn't a meaningful gauge, so it stays neutral too.
   const benchmark = gameTime >= 180 && p.role !== "utility";
-  const csTone = !benchmark ? "text-white/40"
+  const csTone = !benchmark ? "text-white/35"
     : p.cs_per_min - csTarget >= 0.3 ? "text-good"
-    : p.cs_per_min - csTarget <= -0.3 ? "text-bad" : "text-white/40";
+    : p.cs_per_min - csTarget <= -0.3 ? "text-bad" : "text-white/35";
 
-  const seasonWR = solo?.win_rate != null
-    ? `${pct(solo.win_rate)} · ${solo.games}g`
-    : (p.games_analyzed ? `${p.games_analyzed}g history` : "");
-
-  // Recent-form chip: ≥3 streak reads hot / tilt, else a small signed marker.
   const streak = form.streak || 0;
   const formChip = streak >= 3 && (form.win_rate || 0) >= 0.55
-    ? { tone: "good", icon: TrendingUp, label: `${streak}W hot` }
-    : streak <= -3
-      ? { tone: "bad", icon: Flame, label: `${Math.abs(streak)}L tilt` }
-      : form.games ? { tone: "muted", label: `${streak > 0 ? "+" : ""}${streak}` } : null;
+    ? { tone: "good", icon: TrendingUp, label: `${streak}W` }
+    : streak <= -3 ? { tone: "bad", icon: Flame, label: `${Math.abs(streak)}L` } : null;
 
   return (
-    <div className={`frost relative flex flex-col gap-1 py-1.5 pr-2 pl-2.5
-                     ${p.isSelf ? "frost-accent" : ""} ${p.is_dead ? "opacity-75" : ""}`}>
-      {hasGroup && (
-        <span className="absolute inset-y-0 left-0 w-[0.1875rem] rounded-l-lg"
-              style={{ background: premadeColor(p.premade_group) }} />
-      )}
+    <TeamRow premade={hasGroup ? premadeColor(p.premade_group) : null} self={p.isSelf}
+             dim={p.is_dead} title={rowTip(p)}>
+      <RoleCell role={ROLE_LABELS[p.role]} />
 
-      {/* Row 1 — portrait + level, identity, premade / dead */}
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1.5">
         <div className="relative shrink-0">
           <div className={p.is_dead ? "grayscale" : ""}>
-            <ChampPortrait slug={p.slug} patch={patch} size="h-8 w-8" accent={sideAccent} title={p.champion} />
+            <ChampPortrait slug={p.slug} patch={patch} size="h-7 w-7"
+                           accent={p.isSelf ? "accent" : p.side === "enemy" ? "enemy" : "ally"} title={p.champion} />
           </div>
-          <span className="absolute -right-1.5 -bottom-1.5 grid h-4 min-w-[1rem] place-items-center
+          <span className="absolute -right-1 -bottom-1 grid h-3.5 min-w-[0.875rem] place-items-center
                            rounded-full border border-line bg-bg-2 px-0.5 text-3xs font-bold text-white/85">
             {p.level || "?"}
           </span>
         </div>
-        <div className="min-w-0 flex-1 leading-tight">
+        <div className="min-w-0 leading-tight">
           <div className="flex items-center gap-1">
-            <span className="truncate text-sm font-bold text-white/90">{p.name}</span>
+            <span className="truncate text-xs font-bold text-white/90">{p.name}</span>
             {p.isSelf && <span className="text-3xs font-bold tracking-widest text-accent">YOU</span>}
-            {solo?.hot_streak && <Flame className="h-3 w-3 text-bad" title="on a hot streak" />}
             {solo?.fresh_blood && (
-              <span className="rounded border border-ally/40 px-1 text-3xs font-bold tracking-wide text-ally"
+              <span className="rounded border border-ally/40 px-1 text-3xs font-bold text-ally"
                     title="new to this rank — possible smurf / fresh account">SMURF?</span>
             )}
+            {hasGroup && (
+              <span className="shrink-0 rounded px-1 text-3xs font-bold"
+                    title={partners.length ? `premade with ${partners.join(", ")}` : "premade"}
+                    style={{ color: "#0e0e0f", background: premadeColor(p.premade_group) }}>
+                {premadeLabel(partners.length + 1)} {premadeLetter(p.premade_group)}
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-1.5 text-3xs font-bold tracking-wide">
-            <span className="tracking-widest text-white/45">{ROLE_LABELS[p.role] || "—"}</span>
-            {p.rank
-              ? <span className="text-amber/85">{p.rank}</span>
-              : <span className="text-white/30">Unranked</span>}
-            {acc.flex?.label && <span className="rounded border border-ally/30 px-1 text-3xs text-ally/90"
-                                      title="Ranked Flex">{acc.flex.label}</span>}
-            {seasonWR && <span className="text-white/35">· {seasonWR}</span>}
+          <div className="truncate text-3xs text-white/45">
+            {p.champion}
+            {cc.games != null && <> · {cc.games}g <span className={cc.win_rate >= 0.5 ? "text-good" : "text-bad"}>{pct(cc.win_rate)}</span></>}
           </div>
         </div>
-        {p.is_dead
-          ? <Chip tone="bad"><Skull className="mr-0.5 inline h-2.5 w-2.5" />dead {Math.ceil(p.respawn_timer || 0)}s</Chip>
-          : hasGroup && (
-            <span className="shrink-0 rounded px-1.5 py-px text-3xs font-bold"
-                  title={partners.length ? `premade with ${partners.join(", ")}` : "premade"}
-                  style={{ color: "#0e0e0f", background: premadeColor(p.premade_group) }}>
-              {premadeLabel(partners.length + 1)} {premadeLetter(p.premade_group)}
-            </span>
-          )}
       </div>
 
-      {/* Row 2 — live K/D/A · CS · cs/m Δ · current champ games/WR/mastery */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/8 pt-1 font-mono text-2xs">
-        <span className="font-bold text-white/80">{p.kills}/{p.deaths}/{p.assists}</span>
-        <span className="text-white/35">{p.cs} CS</span>
-        <span className={csTone} title={`CS/min (role target ${csTarget})`}>
-          {csRate} cs/m
-        </span>
-        <span className="mx-0.5 h-3 w-px bg-white/12" />
-        <span className="text-white/45" title="games · win-rate · mastery on the champ they're on now">
-          <span className="text-white/60">{p.champion}</span>
-          {cc.games != null && <> · {cc.games}g <span className={cc.win_rate >= 0.5 ? "text-good" : "text-bad"}>{pct(cc.win_rate)}</span></>}
-          {cc.mastery_points != null && (
-            <> · <span className="text-white/35">M{cc.mastery_level || "?"} {(cc.mastery_points / 1000).toFixed(0)}k</span></>
-          )}
-        </span>
-      </div>
+      <RankCell rank={p.rank}
+                sub={solo?.win_rate != null ? `${pct(solo.win_rate)} · ${solo.games}g`
+                  : p.games_analyzed ? `${p.games_analyzed}g history` : null} />
 
-      {/* Row 3 — live build (spells · keystone · items) */}
-      {detail >= 1 && <Build p={p} patch={patch} />}
+      <NumCell value={form.games ? pct(form.win_rate) : null}
+               tone={form.games ? (form.win_rate >= 0.5 ? "text-good" : "text-bad") : "text-white/35"}
+               sub={streak !== 0 && form.games ? `${streak > 0 ? "+" : ""}${streak}` : null}
+               title="recent form win rate · streak" />
 
-      {/* Row 4 — recent form, playstyle, pool, history averages */}
-      {detail >= 2 && (
-      <div className="flex flex-wrap items-center gap-1 text-3xs text-white/45">
-        {formChip && (
+      <NumCell value={`${p.kills ?? 0}/${p.deaths ?? 0}/${p.assists ?? 0}`} tone="text-white/80"
+               sub={`${(p.cs_per_min || 0).toFixed(1)} cs/m`} subTone={csTone}
+               title={`live score · CS/min (role target ${csTarget})`} />
+
+      <div className="flex min-w-0 flex-wrap items-center gap-0.5">
+        {p.is_dead && <Chip tone="bad"><Skull className="mr-0.5 inline h-2.5 w-2.5" />{Math.ceil(p.respawn_timer || 0)}s</Chip>}
+        {solo?.hot_streak && <Flame className="h-3 w-3 shrink-0 text-bad" title="on a hot streak" />}
+        {formChip && !p.is_dead && (
           <Chip tone={formChip.tone}>
             {formChip.icon && <formChip.icon className="mr-0.5 inline h-2.5 w-2.5" />}{formChip.label}
           </Chip>
         )}
-        {tags.map((t) => <Chip key={t} tone={TAG_TONE[t] || "muted"}>{t}</Chip>)}
-        {pool.length > 0 && (
-          <span className="ml-0.5 flex items-center gap-0.5" title="recent champion pool">
-            {pool.map((c) => (
-              <ChampPortrait key={c.champion_id} slug={c.slug} patch={patch} size="h-4 w-4" round
-                             title={`${c.champion || ""} · ${c.games || 0}g ${c.win_rate != null ? pct(c.win_rate) : ""}`} />
-            ))}
-          </span>
-        )}
-        {kda.ratio != null && (
-          <span className="ml-auto font-mono text-white/40" title="recent averages (KDA · CS/min · vision)">
-            {kda.ratio.toFixed(1)} KDA · {p.avg_cs_per_min ?? 0} cs · {Math.round(p.avg_vision_score ?? 0)} vis
-          </span>
-        )}
+        {tags.slice(0, 1).map((t) => <Chip key={t} tone={TAG_TONE[t] || "muted"}>{t}</Chip>)}
       </div>
-      )}
-    </div>
+
+      <Build p={p} patch={patch} />
+    </TeamRow>
   );
 }
 
@@ -291,25 +259,6 @@ function Callouts({ enemies, groups }) {
   );
 }
 
-/* A team's player cards. Always shows every player; when the column is short it
-   drops per-card detail (scout row, then build row) instead of scrolling. */
-function PlayerColumn({ label, labelCls, players, patch, gameTime, keyPrefix }) {
-  const [boxRef, boxRem] = useElementRem();
-  // boxRem includes the ~1.7rem label header; the rest is split across the cards.
-  const perCard = players.length ? (boxRem - 1.7) / players.length : 0;
-  const detail = perCard >= 7.2 ? 2 : perCard >= 5.6 ? 1 : 0;
-  return (
-    <div ref={boxRef} className="flex min-h-0 flex-col gap-1.5 overflow-hidden pr-0.5">
-      <div className={`t-label flex items-center gap-1 ${labelCls}`}>
-        <Users className="h-3.5 w-3.5" /> {label}
-      </div>
-      {players.map((p) => (
-        <PlayerCard key={`${keyPrefix}-${p.name}`} p={p} patch={patch} gameTime={gameTime} detail={detail} />
-      ))}
-    </div>
-  );
-}
-
 export default function LiveBoard({ scout, live, patch }) {
   const { champions } = useStaticData();
 
@@ -383,9 +332,19 @@ export default function LiveBoard({ scout, live, patch }) {
         </span>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[1fr_0.85fr_1fr] gap-2">
-        <PlayerColumn label="YOUR TEAM" labelCls="text-ally/70" players={ordered("ally")}
-                      patch={patch} gameTime={live?.game_time} keyPrefix="a" />
+      <div className="grid min-h-0 flex-1 grid-cols-[1.6fr_1fr] gap-2">
+        <div className="flex min-h-0 flex-col gap-2">
+          <TeamTable title="YOUR TEAM" side="ally" lastCol="Build" className="flex-1">
+            {ordered("ally").map((p) => (
+              <LiveRow key={`a-${p.name}`} p={p} patch={patch} gameTime={live?.game_time} />
+            ))}
+          </TeamTable>
+          <TeamTable title="ENEMY TEAM" side="enemy" lastCol="Build" className="flex-1">
+            {ordered("enemy").map((p) => (
+              <LiveRow key={`e-${p.name}`} p={p} patch={patch} gameTime={live?.game_time} />
+            ))}
+          </TeamTable>
+        </div>
 
         <div className="scroll-thin flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
           <Callouts enemies={enemies} groups={groups} />
@@ -407,9 +366,6 @@ export default function LiveBoard({ scout, live, patch }) {
             </Panel>
           )}
         </div>
-
-        <PlayerColumn label="ENEMY TEAM" labelCls="text-enemy/70" players={ordered("enemy")}
-                      patch={patch} gameTime={live?.game_time} keyPrefix="e" />
       </div>
     </div>
   );
