@@ -237,7 +237,7 @@ export default function ChampionDetailModal({ champion, role, patch, onClose }) 
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 8 }}
         onClick={(e) => e.stopPropagation()}
-        className="glass glow-gold relative flex max-h-[92svh] w-[min(95vw,62rem)] flex-col gap-4 overflow-hidden rounded-2xl border border-gold/30 p-5"
+        className="glass relative flex max-h-[92svh] w-[min(95vw,62rem)] flex-col gap-4 overflow-hidden rounded-2xl p-5"
       >
         <button onClick={onClose}
                 className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-md border border-white/15 text-white/50 hover:border-gold/40 hover:text-gold-bright">

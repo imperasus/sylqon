@@ -20,19 +20,19 @@ const fmtAdv = (v) => `${v > 0 ? "+" : ""}${v}`;
 function Banner({ injection }) {
   const status = injection?.status || "idle";
   const map = {
-    ok: { icon: CheckCircle2, cls: "border-good/45 bg-good/10 text-good", title: "IMPORTED",
+    ok: { icon: CheckCircle2, cls: "border-good bg-good/8 text-good", title: "IMPORTED",
           sub: injection?.detail || "Runes, spells and items are live in the client." },
-    partial: { icon: Loader2, spin: true, cls: "border-amber/45 bg-amber/10 text-amber", title: "IMPORTING…",
+    partial: { icon: Loader2, spin: true, cls: "border-amber bg-amber/8 text-amber", title: "IMPORTING…",
                sub: injection?.detail || "Spells need an active champ select." },
-    idle: { icon: Lock, cls: "border-white/15 bg-white/5 text-white/55", title: "READY",
+    idle: { icon: Lock, cls: "border-white/25 bg-white/4 text-white/55", title: "READY",
             sub: "Imports automatically once the lobby is fully locked." },
   };
   const s = map[status] || map.idle;
   return (
-    <div className={`frost flex items-center gap-2.5 border px-3 py-1.5 ${s.cls}`}>
+    <div className={`flex items-center gap-2.5 border-l-2 px-3 py-1.5 ${s.cls}`}>
       <s.icon className={`h-4 w-4 ${s.spin ? "animate-spin" : ""}`} />
       <div className="leading-tight">
-        <div className="font-display text-base font-bold tracking-[0.18em]">{s.title}</div>
+        <div className="font-mono text-sm font-bold tracking-wide">{s.title}</div>
         <div className="text-xs tracking-wide text-white/55">{s.sub}</div>
       </div>
     </div>
@@ -67,21 +67,21 @@ function VariantTabs({ variants, activeIndex, importVariant, importing, patch })
 
 /* ----------------------------------------------------------------- scorecard */
 
-/* SVG strength ring (no gradient — flat stroke), used for the overall score. */
+/* SVG strength gauge — thin flat arc on a hairline track, big mono number. */
 function ScoreRing({ value, label }) {
   const v = Math.round(value ?? 0);
-  const r = 22, c = 2 * Math.PI * r;
+  const r = 24, c = 2 * Math.PI * r;
   const stroke = v >= 75 ? "var(--color-good)" : v >= 55 ? "var(--color-accent)" : "var(--color-amber)";
   return (
     <div className="relative grid shrink-0 place-items-center">
       <svg width="56" height="56" className="-rotate-90">
-        <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
-        <circle cx="28" cy="28" r={r} fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round"
+        <circle cx="28" cy="28" r={r} fill="none" stroke="var(--color-line)" strokeWidth="2.5" />
+        <circle cx="28" cy="28" r={r} fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round"
                 strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)} />
       </svg>
       <div className="absolute flex flex-col items-center leading-none">
-        <span className="font-display text-lg font-extrabold" style={{ color: stroke }}>{v}</span>
-        <span className="mt-0.5 text-3xs tracking-[0.15em] text-white/40">{label}</span>
+        <span className="font-mono text-lg font-bold tabular-nums" style={{ color: stroke }}>{v}</span>
+        <span className="mt-0.5 text-3xs tracking-[0.08em] text-white/40">{label}</span>
       </div>
     </div>
   );
