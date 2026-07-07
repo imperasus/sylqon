@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Package, Swords, Users } from "lucide-react";
 import { useSylqon, debugEnabled } from "./api.js";
-import StatusBar from "./components/StatusBar.jsx";
+import NavRail from "./components/NavRail.jsx";
+import StatusStrip from "./components/StatusStrip.jsx";
 import HomeCockpit from "./components/HomeCockpit.jsx";
 import DraftCockpit from "./components/DraftCockpit.jsx";
 import PostlockCockpit from "./components/PostlockCockpit.jsx";
@@ -11,9 +12,9 @@ import MatchAnalysisModal from "./components/MatchAnalysisModal.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import { EmptyState } from "./components/shared.jsx";
 
-/* The live phase still drives a "natural" view, but a global nav (StatusBar)
+/* The live phase still drives a "natural" view, but a global nav (NavRail)
    now lets the user jump to any page at any time. `deriveMode` feeds the phase
-   badge; `naturalView` maps the phase onto the four nav tabs for smart-follow. */
+   badge; `naturalView` maps the phase onto the four nav items for smart-follow. */
 function deriveMode(state) {
   // A live game forces the in-game cockpit even if we never saw champ select
   // (e.g. the backend was started mid-game, or the lobby was cleared).
@@ -42,7 +43,7 @@ export default function App() {
   const demoActive = !!state?.demo;
 
   // Currently displayed page. Driven by smart-follow below, overridable from the
-  // global nav (StatusBar → onView).
+  // global nav (NavRail → onView).
   const [view, setView] = useState("home");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -161,14 +162,16 @@ export default function App() {
   };
 
   return (
-    <div className="app-shell relative h-screen w-screen overflow-hidden">
-      <div className="flex h-full w-full flex-col gap-3 p-4">
-        <StatusBar
-          state={state} mode={mode} act={act} api={api} demoActive={demoActive}
-          view={view} onView={setView} onOpenSettings={() => setSettingsOpen(true)}
-        />
-
-        <main className="relative min-h-0 flex-1">
+    <div className="app-shell relative flex h-screen w-screen overflow-hidden">
+      <NavRail
+        view={view} onView={setView} scout={state?.scout} live={state?.live}
+        demoActive={demoActive}
+        onToggleDemo={() => act?.(() => (demoActive ? api.stopDemo() : api.startDemo()))}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <StatusStrip state={state} mode={mode} api={api} />
+        <main className="relative min-h-0 flex-1 p-3">
           {renderView()}
         </main>
       </div>
