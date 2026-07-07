@@ -109,7 +109,7 @@ function createMainWindow(): void {
     minHeight: 640,
     resizable: true,
     maximizable: true,
-    backgroundColor: "#060a14", // matches the app bg; guarantees a painted surface
+    backgroundColor: "#0e0e0f", // matches the app bg; guarantees a painted surface
     show: false, // shown on ready-to-show to avoid a white flash
     frame: true, // normal OS frame (title bar + controls)
     alwaysOnTop: false, // the MAIN window is a normal window
