@@ -4,6 +4,7 @@ import { ROLE_LABELS } from "../../assets.js";
 import { useOverlayState } from "../../hooks/useOverlayState.js";
 import { useCoachSpeech } from "../../hooks/useCoachSpeech.js";
 import { speechSupported } from "./speech.js";
+import BrandMark from "../BrandMark.jsx";
 import MissionCard from "./MissionCard.jsx";
 
 const VOICE_KEY = "sylqon.coach.voice";
@@ -26,7 +27,7 @@ function Benchmark({ game }) {
   const spike = game.item_spike || {};
   const hasSpike = !!spike.status;
   return (
-    <div className={`grid ${hasSpike ? "grid-cols-4" : "grid-cols-3"} gap-1.5 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 text-xs backdrop-blur-sm`}>
+    <div className={`grid ${hasSpike ? "grid-cols-4" : "grid-cols-3"} gap-1.5 rounded-lg border border-white/10 bg-black/60 px-2.5 py-1.5 text-xs`}>
       <div className="flex flex-col">
         <span className="text-3xs tracking-widest text-white/35">CS/MIN</span>
         <span className={CS_TONE[b.status] || "text-white/70"}>
@@ -68,7 +69,7 @@ function SoulBanner({ soul }) {
   const s = SOUL[soul?.status];
   if (!s) return null;
   return (
-    <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-2xs font-bold tracking-wide backdrop-blur-sm ${s.cls}`}>
+    <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-2xs font-bold tracking-wide ${s.cls}`}>
       <Flame className="h-3.5 w-3.5 shrink-0" />
       <span>{s.text}</span>
     </div>
@@ -81,15 +82,15 @@ function Objectives({ timers }) {
   if (dragon == null && baron == null) return null;
   return (
     <div className="flex gap-1.5">
-      <div className="flex flex-1 items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 backdrop-blur-sm">
+      <div className="flex flex-1 items-center gap-2 rounded-lg border border-white/10 bg-black/60 px-2.5 py-1.5">
         <Flame className="h-4 w-4 shrink-0 text-mana" />
         <div className="leading-tight">
           <div className="text-3xs tracking-widest text-white/35">DRAGON</div>
           <div className={`font-mono text-sm font-bold ${dragon <= 0 ? "text-good" : "text-white/85"}`}>{fmtTimer(dragon)}</div>
         </div>
       </div>
-      <div className="flex flex-1 items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 backdrop-blur-sm">
-        <Crown className="h-4 w-4 shrink-0 text-violet-300" />
+      <div className="flex flex-1 items-center gap-2 rounded-lg border border-white/10 bg-black/60 px-2.5 py-1.5">
+        <Crown className="h-4 w-4 shrink-0 text-arcane" />
         <div className="leading-tight">
           <div className="text-3xs tracking-widest text-white/35">BARON</div>
           <div className={`font-mono text-sm font-bold ${baron <= 0 ? "text-good" : "text-white/85"}`}>{fmtTimer(baron)}</div>
@@ -121,8 +122,8 @@ export default function OverlayView() {
   return (
     <div className="w-[300px] select-none p-2 font-tech">
       <div className="mb-1.5 flex items-center gap-1.5 px-1">
-        <Zap className="h-3.5 w-3.5 text-accent" />
-        <span className="font-display text-xs font-bold tracking-[0.25em] text-white/70">
+        <BrandMark className="h-3.5 w-3.5" />
+        <span className="font-display text-xs font-bold tracking-[0.1em] text-white/70">
           SYLQON COACH
         </span>
         <div className="ml-auto flex items-center gap-1.5">
@@ -145,7 +146,7 @@ export default function OverlayView() {
       </div>
 
       {!active && missions.length === 0 ? (
-        <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-3 text-center text-sm text-white/40 backdrop-blur-sm">
+        <div className="rounded-lg border border-white/10 bg-black/55 px-3 py-3 text-center text-sm text-white/40">
           Waiting for a game…
         </div>
       ) : (
@@ -158,7 +159,7 @@ export default function OverlayView() {
       )}
 
       {championProgress?.champion && (
-        <div className="mt-2 rounded-lg border border-accent/20 bg-black/45 px-3 py-1.5 text-xs backdrop-blur-sm">
+        <div className="mt-2 rounded-lg border border-accent/20 bg-black/60 px-3 py-1.5 text-xs">
           <div className="flex items-center gap-2 font-bold text-white/85">
             <span className="truncate">{championProgress.champion}</span>
             <span className="ml-auto flex items-center gap-1 text-accent">
@@ -174,7 +175,7 @@ export default function OverlayView() {
       )}
 
       {profile && (
-        <div className="mt-2 flex items-center gap-3 rounded-lg border border-white/10 bg-black/45 px-3 py-1.5 text-xs backdrop-blur-sm">
+        <div className="mt-2 flex items-center gap-3 rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-xs">
           <span className="flex items-center gap-1 font-bold text-white/80">
             <Trophy className="h-3.5 w-3.5 text-amber" /> Lv {profile.level}
           </span>
