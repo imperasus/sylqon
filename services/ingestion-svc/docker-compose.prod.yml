@@ -1,0 +1,60 @@
+# Production stack for the VPS: Postgres + Redis + the FastAPI service + the
+# Discord bot, all containerized on one internal network. No host DB ports are
+# exposed; the API is published on :8090 (put a reverse proxy / TLS in front).
+#   docker compose -f docker-compose.prod.yml up -d --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sylqon-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sylqon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sylqon}
+      POSTGRES_DB: sylqon
+    volumes:
+      - sylqon_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sylqon -d sylqon"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: sylqon-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    container_name: sylqon-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://sylqon:${POSTGRES_PASSWORD:-sylqon}@postgres:5432/sylqon
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8090:8090"
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  bot:
+    build: .
+    container_name: sylqon-bot
+    restart: unless-stopped
+    command: ["python", "-m", "app.bot"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://sylqon:${POSTGRES_PASSWORD:-sylqon}@postgres:5432/sylqon
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+volumes:
+  sylqon_pg_data:
