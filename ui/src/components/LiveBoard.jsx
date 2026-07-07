@@ -11,8 +11,9 @@ import { useElementRem } from "../hooks/useFitCount.js";
    Mirrors livegame/state._CS_TARGETS (support farms by design → low bar). */
 const ROLE_CS_TARGET = { top: 7.5, jungle: 5.5, middle: 8.0, bottom: 8.5, utility: 1.5 };
 
-/* Premade groups are colored independently of team; same color = same party. */
-const PREMADE_PALETTE = ["#b6a4ff", "#ffc46b", "#ff8fae", "#5fd0ff", "#8ef0a8"];
+/* Premade groups are colored independently of team; same color = same party.
+   Pastel categorical set — light enough for the dark badge text. */
+const PREMADE_PALETTE = ["#c4b5fd", "#fcd34d", "#fda4af", "#7dd3fc", "#86efac"];
 const premadeColor = (g) => PREMADE_PALETTE[g % PREMADE_PALETTE.length];
 const premadeLetter = (g) => String.fromCharCode(65 + (g % 26));
 /* Party size → pill label. Groups can be any size from a duo to a full 5-stack. */
@@ -21,8 +22,8 @@ const premadeLabel = (size) => PREMADE_LABEL[size] || "PARTY";
 
 /* Rune tree → accent color for the keystone chip (matches the in-app palette). */
 const TREE_COLOR = {
-  Precision: "#ffc46b", Domination: "#ff6f8b", Sorcery: "#b6a4ff",
-  Resolve: "#43e0a8", Inspiration: "#5fd0ff",
+  Precision: "#fbbf24", Domination: "#fb7185", Sorcery: "#a78bfa",
+  Resolve: "#34d399", Inspiration: "#38bdf8",
 };
 const KEYSTONE_ABBR = {
   "Press the Attack": "PtA", "Lethal Tempo": "Tempo", "Fleet Footwork": "Fleet",
@@ -51,7 +52,7 @@ function Build({ p, patch }) {
   const spells = p.spells || [];
   const items = (p.items || []).slice(0, 6);
   const ks = p.runes?.keystone;
-  const tree = TREE_COLOR[p.runes?.primary] || "#7aa";
+  const tree = TREE_COLOR[p.runes?.primary] || "#9a9b9e";
   return (
     <div className="flex items-center gap-1">
       {spells.map((s, i) => (
@@ -118,7 +119,7 @@ function PlayerCard({ p, patch, gameTime = 0, detail = 2 }) {
     <div className={`frost relative flex flex-col gap-1 py-1.5 pr-2 pl-2.5
                      ${p.isSelf ? "frost-accent" : ""} ${p.is_dead ? "opacity-75" : ""}`}>
       {hasGroup && (
-        <span className="absolute inset-y-0 left-0 w-[0.1875rem] rounded-l-[0.625rem]"
+        <span className="absolute inset-y-0 left-0 w-[0.1875rem] rounded-l-lg"
               style={{ background: premadeColor(p.premade_group) }} />
       )}
 
@@ -158,7 +159,7 @@ function PlayerCard({ p, patch, gameTime = 0, detail = 2 }) {
           : hasGroup && (
             <span className="shrink-0 rounded px-1.5 py-px text-3xs font-bold"
                   title={partners.length ? `premade with ${partners.join(", ")}` : "premade"}
-                  style={{ color: "#0c1020", background: premadeColor(p.premade_group) }}>
+                  style={{ color: "#0e0e0f", background: premadeColor(p.premade_group) }}>
               {premadeLabel(partners.length + 1)} {premadeLetter(p.premade_group)}
             </span>
           )}
@@ -268,13 +269,13 @@ function Callouts({ enemies, groups }) {
   for (const e of enemies) {
     const s = e.recent_form?.streak || 0;
     if ((s >= 4 || e.account?.solo?.hot_streak) && (e.playstyle_tags || []).includes("carry-threat")) {
-      flags.push({ icon: Flame, color: "#ff6b78",
+      flags.push({ icon: Flame, color: "var(--color-bad)",
         text: `${e.name} (${ROLE_LABELS[e.role] || "?"}) is hot on ${e.champion} — deny early.` });
     }
   }
   for (const e of enemies) {
     const s = e.recent_form?.streak || 0;
-    if (s <= -3) flags.push({ icon: Crosshair, color: "#ffc46b",
+    if (s <= -3) flags.push({ icon: Crosshair, color: "var(--color-amber)",
       text: `${e.name} (${ROLE_LABELS[e.role] || "?"}) is on a ${Math.abs(s)}-loss streak — punish.` });
   }
   if (!flags.length) return null;
