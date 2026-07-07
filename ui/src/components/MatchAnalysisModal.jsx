@@ -49,7 +49,7 @@ export default function MatchAnalysisModal({ match, patch, onClose }) {
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
         transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
-        className="glass relative flex max-h-[90svh] w-[min(92vw,48rem)] flex-col gap-4 overflow-hidden rounded-2xl p-5"
+        className="surface-modal relative flex max-h-[90svh] w-[min(92vw,48rem)] flex-col gap-4 overflow-hidden rounded-2xl p-5"
       >
         <button onClick={onClose}
                 className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-md border border-white/15 text-white/50 hover:border-accent/40 hover:text-accent-bright">

@@ -48,7 +48,7 @@ function DraftProgress({ allyCount, enemyCount, phase, clock }) {
     waiting: "Draft in progress",
   }[phase] || "Draft in progress";
   return (
-    <div className="frost flex items-center gap-3 px-3 py-1.5">
+    <div className="surface flex items-center gap-3 px-3 py-1.5">
       <span className="t-label shrink-0">Draft</span>
       <div className="flex flex-1 gap-1">
         {Array.from({ length: total }).map((_, i) => {
@@ -190,7 +190,7 @@ function PlayerRow({ pick, patch, side, isMe, isActiveTurn, pulseClass = "pulse-
   const ringCls = isActiveTurn ? `ring-2 ${RING_TONE[ringTone] || RING_TONE.accent} ${pulseClass}` : "";
   if (!pick) {
     return (
-      <div className={`frost flex min-h-[2.75rem] items-center gap-2 px-2.5 ${ringCls || "opacity-35"}`}>
+      <div className={`surface flex min-h-[2.75rem] items-center gap-2 px-2.5 ${ringCls || "opacity-35"}`}>
         <div className="h-9 w-9 rounded border border-dashed border-white/15" />
         <span className="text-xs tracking-widest text-white/30">
           {isActiveTurn ? "ON THE CLOCK" : "AWAITING"}
@@ -201,7 +201,7 @@ function PlayerRow({ pick, patch, side, isMe, isActiveTurn, pulseClass = "pulse-
   const accent = isMe ? "accent" : side;
   const hovering = !pick.locked;
   return (
-    <div className={`frost ${isMe ? "frost-accent" : ""} flex min-h-[2.75rem] items-center gap-2.5 px-2.5 py-1.5 ${ringCls}`}>
+    <div className={`surface ${isMe ? "surface-accent" : ""} flex min-h-[2.75rem] items-center gap-2.5 px-2.5 py-1.5 ${ringCls}`}>
       <motion.div initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ scale: hovering ? 0.92 : 1, opacity: hovering ? 0.6 : 1 }}
                   transition={{ duration: 0.25 }}>
@@ -355,7 +355,7 @@ function BansRow({ bans, patch }) {
   const enemy = bans?.enemy || [];
   if (ally.length === 0 && enemy.length === 0) return null;
   return (
-    <div className="frost flex items-center gap-3 px-3 py-1.5">
+    <div className="surface flex items-center gap-3 px-3 py-1.5">
       <BanGroup label="YOUR BANS" tone="ally" slots={ally} patch={patch} align="start" />
       <div className="flex-1" />
       <BanGroup label="ENEMY BANS" tone="enemy" slots={enemy} patch={patch} align="end" />
@@ -459,7 +459,7 @@ function ReasoningBlock({ text, lines = 3 }) {
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-4" onClick={() => setOpen(false)}>
           <div onClick={(e) => e.stopPropagation()}
-               className="frost frost-accent relative flex max-w-lg flex-col gap-2 p-4">
+               className="surface surface-accent relative flex max-w-lg flex-col gap-2 p-4">
             <button onClick={() => setOpen(false)}
                     className="absolute right-2 top-2 grid h-7 w-7 cursor-pointer place-items-center rounded-md border border-white/15 text-white/50 hover:border-accent/40 hover:text-accent-bright">
               <X className="h-4 w-4" />
@@ -480,7 +480,7 @@ function RecoCard({ reco, role, slugOf, patch }) {
   // Legacy/fallback path: no universe scoring → simple single headline.
   if (!optimal && reco?.pick) {
     return (
-      <div className="frost frost-accent edge-accent flex items-center gap-3 p-3">
+      <div className="surface surface-accent edge-accent flex items-center gap-3 p-3">
         <ChampPortrait slug={slugOf[reco.pick]} patch={patch} size="h-16 w-16" accent="accent" title={reco.pick} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -497,7 +497,7 @@ function RecoCard({ reco, role, slugOf, patch }) {
   }
   if (!optimal) {
     return (
-      <div className="frost flex flex-col items-center justify-center gap-2 py-5">
+      <div className="surface flex flex-col items-center justify-center gap-2 py-5">
         <div className="relative grid h-12 w-12 place-items-center">
           <div className="sweep absolute inset-0 rounded-full" />
           <Radar className="h-6 w-6 text-accent/70" />
@@ -513,7 +513,7 @@ function RecoCard({ reco, role, slugOf, patch }) {
   const delta = poolPick ? Math.round((optimal.total - poolPick.total) * 10) / 10 : 0;
 
   return (
-    <div className="frost frost-accent edge-accent flex flex-col gap-2 p-3">
+    <div className="surface surface-accent edge-accent flex flex-col gap-2 p-3">
       <div className="flex items-center gap-1.5">
         <Sparkles className="h-4 w-4 text-accent" />
         <span className="t-label text-accent/70">AI Pick</span>
@@ -635,7 +635,7 @@ export default function DraftCockpit({ state }) {
 
   if (!lobby) {
     return (
-      <div className="frost flex h-full flex-col items-center justify-center gap-2">
+      <div className="surface flex h-full flex-col items-center justify-center gap-2">
         <Radar className="h-8 w-8 text-ally/70" />
         <span className="font-display text-base tracking-[0.3em] text-ally/70">AWAITING CHAMPION SELECT</span>
       </div>
@@ -671,7 +671,7 @@ export default function DraftCockpit({ state }) {
         <BansRow bans={lobby.bans} patch={patch} />
       </div>
 
-      <div className="frost grid min-h-0 grid-cols-[1fr_1.15fr_1fr] divide-x divide-line overflow-hidden">
+      <div className="surface grid min-h-0 grid-cols-[1fr_1.15fr_1fr] divide-x divide-line overflow-hidden">
         <TeamColumn title="YOUR TEAM" icon={Sparkles} side="ally" picks={allyPicks}
                     patch={patch} comp={allyComp} scoutByRole={scoutByRole}
                     activeIndex={allyActiveIndex} urgency={clock.urgency} />
@@ -691,7 +691,7 @@ export default function DraftCockpit({ state }) {
       </div>
 
       {/* bottom intel strip */}
-      <div className="frost grid grid-cols-[1fr_0.65fr_1.75fr] items-center gap-3 px-3 py-1.5">
+      <div className="surface grid grid-cols-[1fr_0.65fr_1.75fr] items-center gap-3 px-3 py-1.5">
         <div className="flex items-center gap-2 overflow-hidden">
           <span className="flex items-center gap-1 text-xs font-bold tracking-widest text-enemy/80"
                 title="Suggested champions to ban (not actual bans)">

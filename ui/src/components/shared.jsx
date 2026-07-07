@@ -23,7 +23,6 @@ export function SpellPips({ spells, patch, size = "h-6 w-6" }) {
 const RING = {
   white: "border-white/15",
   accent: "border-accent/55",
-  gold: "border-accent/55",
   ally: "border-ally/55",
   enemy: "border-enemy/55",
 };
@@ -68,7 +67,6 @@ export function ThreatBadge({ threat }) {
 
 const TITLE_COLOR = {
   accent: "text-accent/85",
-  gold: "text-gold-bright/85",
   ally: "text-ally/85",
   enemy: "text-enemy/85",
   white: "text-white/50",
@@ -125,7 +123,7 @@ export function Panel({ title, icon, accent = "accent", right, edge, className =
   const edgeCls = edge === "ally" ? "edge-ally" : edge === "enemy" ? "edge-enemy"
     : edge === "accent" ? "edge-accent" : "";
   return (
-    <div className={`frost ${edgeCls} flex min-h-0 flex-col gap-2 p-2.5 ${className}`}>
+    <div className={`surface ${edgeCls} flex min-h-0 flex-col gap-2 p-2.5 ${className}`}>
       {title && (
         <div className="-mx-2.5 border-b border-line/70 px-2.5 pb-1.5">
           <SectionTitle accent={accent} icon={icon} right={right}>{title}</SectionTitle>

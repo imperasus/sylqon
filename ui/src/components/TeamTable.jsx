@@ -13,7 +13,7 @@ export function TeamTable({ title, side = "ally", lastCol = "BUILD", right, clas
   const edge = side === "enemy" ? "edge-enemy" : "edge-ally";
   const tone = side === "enemy" ? "enemy" : "ally";
   return (
-    <div className={`frost ${edge} flex min-h-0 flex-col ${className}`}>
+    <div className={`surface ${edge} flex min-h-0 flex-col ${className}`}>
       <div className="border-b border-line/70 px-2.5 py-1.5">
         <SectionTitle accent={tone} icon={Users} right={right}>{title}</SectionTitle>
       </div>

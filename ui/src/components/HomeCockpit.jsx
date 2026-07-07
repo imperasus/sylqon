@@ -31,7 +31,7 @@ function KPI({ label, tone = "text-white/90", title, children }) {
 function HeroStrip({ role, onRole, poolCount, recentWr, builds, patch }) {
   const roleItems = ROLE_ORDER.map((r) => ({ key: r, label: ROLE_LABELS[r] }));
   return (
-    <div className="frost flex shrink-0 items-stretch divide-x divide-line px-1 py-2">
+    <div className="surface flex shrink-0 items-stretch divide-x divide-line px-1 py-2">
       <div className="flex flex-col justify-center gap-1 px-3">
         <span className="t-label">Role</span>
         <Tabs items={roleItems} active={role} onSelect={onRole} />
@@ -363,7 +363,7 @@ export default function HomeCockpit({ state }) {
 
       <div className="grid min-h-0 flex-1 grid-cols-[1.6fr_1fr] gap-3">
         <MetaTable role={role} patch={patch} pool={pool} save={save} onOpen={setDetail} />
-        <div className="frost flex min-h-0 flex-col divide-y divide-line">
+        <div className="surface flex min-h-0 flex-col divide-y divide-line">
           <PoolSection role={role} pool={pool} champions={champions} patch={patch}
                        stats={stats} scout={scout} save={save} className="flex-[1.15]" />
           <MatchesSection patch={patch} matches={matches} loading={matchesLoading} className="flex-1" />

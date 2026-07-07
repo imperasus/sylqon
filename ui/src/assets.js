@@ -49,12 +49,12 @@ export const THREAT_LABELS = {
 
 export const DAMAGE_COLORS = {
   AD: "text-amber border-amber/40",
-  AP: "text-accent-2 border-accent-2/40",
-  Mixed: "text-violet-300 border-violet-300/40",
+  AP: "text-mana border-mana/40",
+  Mixed: "text-arcane border-arcane/40",
 };
 
-/* op.gg meta tiers — 0/1 are S/S+, fade down to 5. Flat chips on the Frost
-   Cobalt palette (no neon glow); the elite tiers just carry a stronger accent. */
+/* op.gg meta tiers — 0/1 are S/S+, fade down to 5. Flat chips on the Graphite
+   Volt palette (no neon glow); the elite tiers just carry a stronger accent. */
 export const TIER_STYLE = {
   0: { label: "S+", cls: "bg-tier1/20 text-tier1 border-tier1/55", glow: "" },
   1: { label: "S", cls: "bg-tier1/14 text-tier1 border-tier1/40", glow: "" },

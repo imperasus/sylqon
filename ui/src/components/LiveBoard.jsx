@@ -304,7 +304,7 @@ export default function LiveBoard({ scout, live, patch }) {
 
   if (merged.length === 0) {
     return (
-      <div className="frost h-full">
+      <div className="surface h-full">
         <EmptyState icon={Radar} label="WAITING FOR LIVE GAME"
                     hint="The board fills the moment the game loads — all 10 players with rank, build, mastery and premade groups." />
       </div>
@@ -316,7 +316,7 @@ export default function LiveBoard({ scout, live, patch }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
-      <div className="frost flex flex-wrap items-center gap-3 px-3 py-1.5">
+      <div className="surface flex flex-wrap items-center gap-3 px-3 py-1.5">
         <span className="flex items-center gap-1.5 text-xs font-bold tracking-widest text-accent/80">
           <Radar className="h-4 w-4" /> LIVE GAME
         </span>

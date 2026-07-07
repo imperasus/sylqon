@@ -353,7 +353,7 @@ function ItemsPanel({ build, patch, enemySummary, dense = false }) {
 function Perk({ id, icons, keystone }) {
   const icon = icons[id];
   return (
-    <div className={`grid place-items-center rounded-full border bg-bg-2 ${keystone ? "glow-accent h-12 w-12 border-accent/70" : "h-8 w-8 border-mana/30"}`} title={icon?.name || id}>
+    <div className={`grid place-items-center rounded-full border bg-bg-2 ${keystone ? "ring-accent h-12 w-12 border-accent/70" : "h-8 w-8 border-mana/30"}`} title={icon?.name || id}>
       {icon ? <img src={icon.url} alt="" className={keystone ? "h-[86%] w-[86%]" : "h-[82%] w-[82%]"} draggable={false} />
             : <span className="font-mono text-2xs text-white/40">{String(id).slice(-2)}</span>}
     </div>
@@ -430,7 +430,7 @@ function Phase({ label, tone, text }) {
 
 function LanePlan({ plan }) {
   return (
-    <div className="frost frost-accent p-2.5">
+    <div className="surface surface-accent p-2.5">
       <SectionTitle accent="accent" icon={Brain}>AI LANE GAME PLAN · OLLAMA</SectionTitle>
       <div className="mt-1.5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
         <Phase label="EARLY · 1–6" tone="good" text={plan.early} />
@@ -461,7 +461,7 @@ function AIInsight({ build }) {
   const long = reasoning.length > 180;
 
   return (
-    <div className="frost frost-accent flex items-start gap-2.5 p-2.5">
+    <div className="surface surface-accent flex items-start gap-2.5 p-2.5">
       <Brain className="mt-0.5 h-4 w-4 shrink-0 text-accent-bright" />
       <div className="min-w-0 flex-1">
         <SectionTitle accent="accent">AI STRATEGY · OLLAMA</SectionTitle>
@@ -501,7 +501,7 @@ export default function PostlockCockpit({ state, api }) {
 
   if (!build || !active) {
     return (
-      <div className="frost h-full">
+      <div className="surface h-full">
         <EmptyState icon={Sword} label="NO BUILD COMPILED"
                     hint="Lock in a champion and wait for the lobby to finalize — the loadout imports automatically." />
       </div>

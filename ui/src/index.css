@@ -3,9 +3,7 @@
 /* ============================================================ design tokens
    "Graphite Volt" — neutral graphite/ink base (zero blue cast), lime primary +
    amber secondary accent. Flat hairline surfaces, no glow/glass — pro-analytics
-   look. Tuned for a compact ~1280x800 companion window. NOTE: the legacy
-   `gold*` tokens are kept but REMAPPED to the lime accent so any older
-   component that still references them stays on-theme. */
+   look. Tuned for a compact ~1280x800 companion window. */
 @theme {
   --color-bg: #0e0e0f;          /* app background (near-black graphite) */
   --color-bg-2: #151516;        /* raised surface */
@@ -18,9 +16,6 @@
   --color-accent-bright: #bef264;
   --color-accent-2: #fbbf24;    /* secondary — amber */
 
-  /* legacy aliases remapped to the new accent (compat for kept components) */
-  --color-gold: #a3e635;
-  --color-gold-bright: #bef264;
   --color-amber: #fbbf24;       /* warm — AD / warnings */
 
   --color-ally: #60a5fa;        /* own team — blue */
@@ -106,36 +101,30 @@ body {
 .row-selected { background: var(--color-elev); box-shadow: inset 2px 0 0 0 var(--color-accent); }
 .row-pool { background: rgb(163 230 53 / 0.07); box-shadow: inset 3px 0 0 0 rgb(163 230 53 / 0.65); }
 
-/* ============================================================ flat surfaces
-   NOTE: the "frost"/"glass" names are legacy — they are now flat panels
-   (opaque graphite + hairline, no gradient/blur). Renamed in the final sweep. */
-.frost {
+/* ============================================================ flat surfaces */
+.surface {
   background: var(--color-panel);
   border: 1px solid var(--color-line);
   border-radius: 6px;
 }
-.frost-accent { border-color: rgb(163 230 53 / 0.45); }
-.frost-ally { border-color: rgb(96 165 250 / 0.40); }
-.frost-enemy { border-color: rgb(251 113 133 / 0.40); }
+.surface-accent { border-color: rgb(163 230 53 / 0.45); }
+.surface-ally { border-color: rgb(96 165 250 / 0.40); }
+.surface-enemy { border-color: rgb(251 113 133 / 0.40); }
 
 /* thin top accent line for headers / active items */
 .edge-accent { box-shadow: inset 0 2px 0 -1px rgb(163 230 53 / 0.8); }
 .edge-ally { box-shadow: inset 0 2px 0 -1px rgb(96 165 250 / 0.8); }
 .edge-enemy { box-shadow: inset 0 2px 0 -1px rgb(251 113 133 / 0.8); }
 
-/* flat 1px rings (kept names; the blur/glow halo is gone) */
-.glow-accent { box-shadow: 0 0 0 1px rgb(163 230 53 / 0.40); }
-.glow-gold { box-shadow: 0 0 0 1px rgb(163 230 53 / 0.40); }
-.text-glow-accent { text-shadow: none; }
+/* flat 1px accent ring for emphasized elements (never a glow) */
+.ring-accent { box-shadow: 0 0 0 1px rgb(163 230 53 / 0.40); }
 
-/* legacy .glass kept (used by the modals) — now the elevated modal surface:
-   real shadow for depth, never a glow */
-.glass {
+/* elevated modal surface: real shadow for depth */
+.surface-modal {
   background: var(--color-bg-2);
   border: 1px solid var(--color-line-strong);
   box-shadow: 0 12px 40px rgb(0 0 0 / 0.55);
 }
-.glass-gold { border-color: var(--color-line-strong); }
 
 /* keyboard focus — cheap a11y baseline for the flat language */
 :focus-visible { outline: 1px solid var(--color-accent); outline-offset: 1px; }

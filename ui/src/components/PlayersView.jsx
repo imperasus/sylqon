@@ -339,7 +339,7 @@ export default function PlayersView({ state }) {
 
   if (!lobby && allies.length === 0 && !liveActive) {
     return (
-      <div className="frost h-full">
+      <div className="surface h-full">
         <EmptyState icon={Radar} label="NO LOBBY INTEL YET"
                     hint="Player scouting populates during champion select — teammates first, enemies once the game reveals them." />
       </div>
@@ -356,7 +356,7 @@ export default function PlayersView({ state }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2.5">
-      <div className="frost flex items-center gap-3 px-3 py-1.5">
+      <div className="surface flex items-center gap-3 px-3 py-1.5">
         <span className="flex items-center gap-1.5 text-xs font-bold tracking-widest text-accent/80">
           <Users className="h-4 w-4" /> LOBBY INTEL
         </span>
@@ -406,7 +406,7 @@ export default function PlayersView({ state }) {
                       enemyScoutByRole={enemyScoutByRole} patch={patch} />
           <TeamRead allies={allies} />
           {!inGame && (
-            <div className="frost frost-accent flex items-start gap-2.5 p-2.5">
+            <div className="surface surface-accent flex items-start gap-2.5 p-2.5">
               <Eye className="mt-0.5 h-4 w-4 shrink-0 text-accent-bright" />
               <div className="text-xs leading-snug text-white/70">
                 <div className="t-label text-accent/70">ENEMY INTEL</div>
