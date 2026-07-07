@@ -1,40 +1,50 @@
 @import "tailwindcss";
 
 /* ============================================================ design tokens
-   "Frost Cobalt" — deep cobalt-navy base, teal/cyan accent, warm coral enemy.
-   Flat + subtle glass (no heavy glow). Tuned for a compact ~1280x720 companion
-   window. NOTE: the legacy `gold*` tokens are kept but REMAPPED to the teal
-   accent so any older component that still references them stays on-theme. */
+   "Graphite Volt" — neutral graphite/ink base (zero blue cast), lime primary +
+   amber secondary accent. Flat hairline surfaces, no glow/glass — pro-analytics
+   look. Tuned for a compact ~1280x800 companion window. NOTE: the legacy
+   `gold*` tokens are kept but REMAPPED to the lime accent so any older
+   component that still references them stays on-theme. */
 @theme {
-  --color-bg: #060a14;          /* app background (deep cobalt) */
-  --color-bg-2: #0a1020;        /* raised surface */
-  --color-panel: #0d162b;       /* card body (lifted a touch for layering) */
-  --color-elev: #131f3a;        /* hover / selected rows — reads above panel */
-  --color-line: #1b2740;        /* hairline borders */
+  --color-bg: #0e0e0f;          /* app background (near-black graphite) */
+  --color-bg-2: #151516;        /* raised surface */
+  --color-panel: #19191a;       /* card body (lifted a touch for layering) */
+  --color-elev: #212123;        /* hover / selected rows — reads above panel */
+  --color-line: #2a2a2d;        /* hairline borders */
+  --color-line-strong: #3a3a3e; /* emphasized dividers, modal borders */
 
-  --color-accent: #2fd6c6;      /* primary — teal */
-  --color-accent-bright: #7ff0e4;
-  --color-accent-2: #5fd0ff;    /* secondary — cyan */
+  --color-accent: #a3e635;      /* primary — lime */
+  --color-accent-bright: #bef264;
+  --color-accent-2: #fbbf24;    /* secondary — amber */
 
   /* legacy aliases remapped to the new accent (compat for kept components) */
-  --color-gold: #2fd6c6;
-  --color-gold-bright: #7ff0e4;
-  --color-amber: #ffc46b;       /* warm — AD / warnings */
+  --color-gold: #a3e635;
+  --color-gold-bright: #bef264;
+  --color-amber: #fbbf24;       /* warm — AD / warnings */
 
-  --color-ally: #4aa8ff;        /* own team — cyan-blue */
-  --color-ally-deep: #1f6fd0;
-  --color-enemy: #ff6f8b;       /* enemy team — warm coral */
-  --color-enemy-deep: #c23f5e;
-  --color-mana: #5fd0ff;        /* cyan — info / runes */
+  --color-ally: #60a5fa;        /* own team — blue */
+  --color-ally-deep: #2563eb;
+  --color-enemy: #fb7185;       /* enemy team — rose */
+  --color-enemy-deep: #be123c;
+  --color-mana: #38bdf8;        /* sky — info / runes */
+  --color-arcane: #a78bfa;      /* violet — mixed damage, Sorcery, Baron */
 
-  --color-tier1: #5ff0dd;       /* S/S+ — teal */
-  --color-tier2: #8ef0a8;       /* A — green */
-  --color-good: #43e0a8;
-  --color-bad: #ff6b78;
+  --color-tier1: #bef264;       /* S/S+ — lime */
+  --color-tier2: #6ee7b7;       /* A — mint */
+  --color-good: #34d399;        /* emerald — cooler than the lime accent */
+  --color-bad: #f87171;
 
-  --font-display: "Rajdhani", sans-serif;
-  --font-tech: "Rajdhani", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-tech: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
+
+  /* sharper corners — px on purpose so crispness doesn't ride the fluid root */
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 10px;
 
   /* ---- fluid type scale ------------------------------------------------
      Compact, dense companion scale. Every value is rem, so it rides the
@@ -74,22 +84,19 @@ html.app-fluid-root {
 
 html,
 body {
-  background:
-    radial-gradient(1200px 700px at 80% -10%, rgb(47 214 198 / 0.06), transparent 60%),
-    radial-gradient(900px 600px at -10% 110%, rgb(95 208 255 / 0.05), transparent 55%),
-    var(--color-bg);
-  color: #d0d6e0;
+  background: var(--color-bg);
+  color: #d0d1d3;
   font-family: var(--font-tech);
   overflow: hidden;
 }
 
 /* ============================================================ typography scale
    Reusable text utilities so components stop hand-rolling text-[Npx]. */
-.t-h1 { font-size: 1.1875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.01em; color: #eef3fb; }
-.t-h2 { font-size: var(--text-md); line-height: 1.25; font-weight: 600; color: #e3eaf5; }
-.t-body { font-size: var(--text-base); line-height: 1.55; color: #d0d6e0; }
-.t-label { font-size: var(--text-xs); line-height: 1.3; font-weight: 700; letter-spacing: 0.14em;
-           text-transform: uppercase; color: rgb(208 214 224 / 0.55); }
+.t-h1 { font-size: 1.1875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.01em; color: #f0f0f1; }
+.t-h2 { font-size: var(--text-md); line-height: 1.25; font-weight: 600; color: #e4e5e7; }
+.t-body { font-size: var(--text-base); line-height: 1.55; color: #d0d1d3; }
+.t-label { font-size: var(--text-xs); line-height: 1.3; font-weight: 600; letter-spacing: 0.08em;
+           text-transform: uppercase; color: rgb(209 210 212 / 0.55); }
 .t-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* ============================================================ row states
