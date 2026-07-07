@@ -104,13 +104,20 @@ export function ScorePill({ score }) {
   );
 }
 
-/* A 0-100 strength chip, graded by value (distinct from the signed ScorePill). */
+/* A 0-100 strength read: right-aligned mono value + a 2rem micro-bar, graded by
+   value (distinct from the signed ScorePill). */
 export function Score100({ value }) {
-  const v = Math.round(value ?? 0);
-  const cls = v >= 75 ? "bg-good/15 text-good"
-    : v >= 55 ? "bg-accent/15 text-accent-bright"
-    : "bg-white/8 text-white/45";
-  return <span className={`rounded px-1 py-px font-mono text-sm font-bold tabular-nums ${cls}`}>{v}</span>;
+  const v = Math.max(0, Math.min(100, Math.round(value ?? 0)));
+  const text = v >= 75 ? "text-good" : v >= 55 ? "text-accent-bright" : "text-white/45";
+  const bar = v >= 75 ? "bg-good" : v >= 55 ? "bg-accent" : "bg-white/25";
+  return (
+    <span className="flex shrink-0 items-center gap-1.5">
+      <span className="h-1 w-8 overflow-hidden rounded-full bg-white/10">
+        <span className={`block h-full ${bar}`} style={{ width: `${v}%` }} />
+      </span>
+      <span className={`w-6 text-right font-mono text-sm font-bold tabular-nums ${text}`}>{v}</span>
+    </span>
+  );
 }
 
 /* Generic flat panel with an optional titled header (full-bleed hairline). */

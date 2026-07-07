@@ -9,7 +9,7 @@ import { useDraftClock } from "../hooks/useDraftClock.js";
 import { DAMAGE_COLORS, ROLE_LABELS, pct, squareUrl } from "../assets.js";
 import {
   Bar, ChampPortrait, ChampionRow, Chip, DraftScorecard, Panel, Score100,
-  SpellPips, ThreatBadge,
+  SectionTitle, SpellPips, ThreatBadge,
 } from "./shared.jsx";
 
 /* Urgency → tone/class lookups. Written out as static class strings (not
@@ -26,9 +26,9 @@ function DraftClock({ clock }) {
   const tone = URGENCY_TONE[clock.urgency] || "accent";
   const textCls = TONE_TEXT[tone];
   return (
-    <div className="flex shrink-0 items-center gap-1.5 border-l border-white/10 pl-2.5">
-      <Timer className={`h-3.5 w-3.5 ${textCls} ${clock.urgency === "danger" ? "pulse-urgent" : ""}`} />
-      <span className={`font-mono text-sm font-extrabold tabular-nums ${textCls}
+    <div className="flex shrink-0 items-center gap-2 border-l border-line pl-2.5">
+      <Timer className={`h-4 w-4 ${textCls} ${clock.urgency === "danger" ? "pulse-urgent" : ""}`} />
+      <span className={`font-mono text-lg leading-none font-bold tabular-nums ${textCls}
         ${clock.urgency === "danger" ? "pulse-urgent" : ""}`}>
         {clock.seconds}s
       </span>
@@ -61,7 +61,10 @@ function DraftProgress({ allyCount, enemyCount, phase, clock }) {
           );
         })}
       </div>
-      <span className="shrink-0 text-xs font-bold tracking-wide text-accent/80">{phaseLabel}</span>
+      <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold tracking-wide text-accent/80">
+        <span className="h-1.5 w-1.5 rounded-full bg-accent pulse-soft" />
+        {phaseLabel}
+      </span>
       <DraftClock clock={clock} />
     </div>
   );
@@ -280,8 +283,12 @@ function TeamColumn({ title, icon, side, picks, patch, comp, scoutByRole,
   const perCard = boxRem / 5;
   const miniMax = perCard >= 9.3 ? 3 : perCard >= 8.0 ? 2 : perCard >= 6.6 ? 1 : 0;
   const showScout = perCard >= 4.6;
+  const edgeCls = side === "enemy" ? "edge-enemy" : "edge-ally";
   return (
-    <Panel title={title} icon={icon} accent={side} edge={side} className="gap-1.5">
+    <section className={`flex min-h-0 flex-col gap-1.5 p-2.5 ${edgeCls}`}>
+      <div className="-mx-2.5 border-b border-line/70 px-2.5 pb-1.5">
+        <SectionTitle accent={side} icon={icon}>{title}</SectionTitle>
+      </div>
       {comp && comp.archetype !== "unknown" && comp.archetype !== "balanced" && (
         <div title={[comp.counter_plan, (comp.signals || []).join(", ")].filter(Boolean).join("\n\n")}
              className="flex items-center gap-1.5">
@@ -297,7 +304,7 @@ function TeamColumn({ title, icon, side, picks, patch, comp, scoutByRole,
                       isActiveTurn={i === activeIndex} pulseClass={pulseClass} />
         ))}
       </div>
-    </Panel>
+    </section>
   );
 }
 
@@ -664,12 +671,12 @@ export default function DraftCockpit({ state }) {
         <BansRow bans={lobby.bans} patch={patch} />
       </div>
 
-      <div className="grid min-h-0 grid-cols-[1fr_1.15fr_1fr] gap-2">
+      <div className="frost grid min-h-0 grid-cols-[1fr_1.15fr_1fr] divide-x divide-line overflow-hidden">
         <TeamColumn title="YOUR TEAM" icon={Sparkles} side="ally" picks={allyPicks}
                     patch={patch} comp={allyComp} scoutByRole={scoutByRole}
                     activeIndex={allyActiveIndex} urgency={clock.urgency} />
 
-        <div className="flex min-h-0 flex-col gap-2 overflow-hidden pr-0.5">
+        <div className="flex min-h-0 flex-col gap-2 overflow-hidden p-2.5">
           <BanBanner suggestion={intel?.ban_now ? intel?.ban_suggestions?.[0] : null} patch={patch} />
           <TimingBanner timing={intel?.counter_pick} />
           <DraftScorecard balance={intel?.balance} />
