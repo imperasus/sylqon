@@ -102,44 +102,48 @@ body {
 /* ============================================================ row states
    Shared list-row helpers: zebra striping, hover lift, selected, in-pool. */
 .row { position: relative; transition: background-color 120ms ease, box-shadow 120ms ease; }
-.row-hover:hover { background: rgb(19 31 58 / 0.7); box-shadow: inset 2px 0 0 0 rgb(47 214 198 / 0.55); }
-.row-selected { background: rgb(19 31 58 / 0.9); box-shadow: inset 2px 0 0 0 var(--color-accent); }
-.row-pool { background: rgb(47 214 198 / 0.06); box-shadow: inset 3px 0 0 0 rgb(47 214 198 / 0.65); }
+.row-hover:hover { background: var(--color-elev); box-shadow: inset 2px 0 0 0 rgb(163 230 53 / 0.55); }
+.row-selected { background: var(--color-elev); box-shadow: inset 2px 0 0 0 var(--color-accent); }
+.row-pool { background: rgb(163 230 53 / 0.07); box-shadow: inset 3px 0 0 0 rgb(163 230 53 / 0.65); }
 
-/* ============================================================ frost surfaces
-   Subtle, flat-ish glass: a hint of cobalt tint, light hairline, minimal blur. */
+/* ============================================================ flat surfaces
+   NOTE: the "frost"/"glass" names are legacy — they are now flat panels
+   (opaque graphite + hairline, no gradient/blur). Renamed in the final sweep. */
 .frost {
-  background: linear-gradient(165deg, rgb(95 208 255 / 0.045), rgb(12 20 38 / 0.55));
-  backdrop-filter: blur(8px);
-  border: 1px solid rgb(120 170 220 / 0.12);
-  border-radius: 12px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
 }
-.frost-accent { border-color: rgb(47 214 198 / 0.45); }
-.frost-ally { border-color: rgb(74 168 255 / 0.35); }
-.frost-enemy { border-color: rgb(255 111 139 / 0.35); }
+.frost-accent { border-color: rgb(163 230 53 / 0.45); }
+.frost-ally { border-color: rgb(96 165 250 / 0.40); }
+.frost-enemy { border-color: rgb(251 113 133 / 0.40); }
 
 /* thin top accent line for headers / active items */
-.edge-accent { box-shadow: inset 0 2px 0 -1px rgb(47 214 198 / 0.8); }
-.edge-ally { box-shadow: inset 0 2px 0 -1px rgb(74 168 255 / 0.8); }
-.edge-enemy { box-shadow: inset 0 2px 0 -1px rgb(255 111 139 / 0.8); }
+.edge-accent { box-shadow: inset 0 2px 0 -1px rgb(163 230 53 / 0.8); }
+.edge-ally { box-shadow: inset 0 2px 0 -1px rgb(96 165 250 / 0.8); }
+.edge-enemy { box-shadow: inset 0 2px 0 -1px rgb(251 113 133 / 0.8); }
 
-/* restrained accents (kept names; far softer than the old hextech glows) */
-.glow-accent { box-shadow: 0 0 0 1px rgb(47 214 198 / 0.35), 0 6px 24px rgb(47 214 198 / 0.10); }
-.glow-gold { box-shadow: 0 0 0 1px rgb(47 214 198 / 0.35), 0 6px 24px rgb(47 214 198 / 0.10); }
-.text-glow-accent { text-shadow: 0 0 12px rgb(127 240 228 / 0.45); }
+/* flat 1px rings (kept names; the blur/glow halo is gone) */
+.glow-accent { box-shadow: 0 0 0 1px rgb(163 230 53 / 0.40); }
+.glow-gold { box-shadow: 0 0 0 1px rgb(163 230 53 / 0.40); }
+.text-glow-accent { text-shadow: none; }
 
-/* legacy .glass kept (used by the champion modal) — redefined to frost */
+/* legacy .glass kept (used by the modals) — now the elevated modal surface:
+   real shadow for depth, never a glow */
 .glass {
-  background: linear-gradient(165deg, rgb(95 208 255 / 0.045), rgb(12 20 38 / 0.55));
-  backdrop-filter: blur(8px);
-  border: 1px solid rgb(120 170 220 / 0.12);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-line-strong);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.55);
 }
-.glass-gold { border-color: rgb(47 214 198 / 0.40); }
+.glass-gold { border-color: var(--color-line-strong); }
+
+/* keyboard focus — cheap a11y baseline for the flat language */
+:focus-visible { outline: 1px solid var(--color-accent); outline-offset: 1px; }
 
 /* ============================================================ scrollbars */
 .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: rgb(47 214 198 / 0.30); border-radius: 3px; }
-.scroll-thin::-webkit-scrollbar-thumb:hover { background: rgb(47 214 198 / 0.50); }
+.scroll-thin::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.14); border-radius: 3px; }
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: rgb(255 255 255 / 0.25); }
 .scroll-thin::-webkit-scrollbar-track { background: transparent; }
 
 /* ============================================================ motion (subtle) */
@@ -159,6 +163,6 @@ body {
   to { transform: rotate(360deg); }
 }
 .sweep {
-  background: conic-gradient(from 0deg, transparent 0deg, rgb(47 214 198 / 0.30) 60deg, transparent 120deg);
+  background: conic-gradient(from 0deg, transparent 0deg, rgb(163 230 53 / 0.25) 60deg, transparent 120deg);
   animation: sweep 2.8s linear infinite;
 }
