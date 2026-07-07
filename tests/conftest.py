@@ -20,3 +20,6 @@ def _hermetic_rag_flags(monkeypatch):
     from sylqon import config
     for flag in ("RAG_ITEMS_MODE", "RAG_RUNES_MODE", "RAG_KIT_MODE", "RAG_FUSION_MODE"):
         monkeypatch.setattr(config, flag, False, raising=False)
+    # The hosted meta service is the production default; pin it off so no test
+    # can reach the network. svc tests opt back in with their own monkeypatch.
+    monkeypatch.setattr(config, "SYLQON_META_URL", "", raising=False)

@@ -58,11 +58,11 @@ OLLAMA_OPTIONS = {
 }
 
 # --- Sylqon hosted meta service (op.gg replacement) --------------------------
-# When set (e.g. http://localhost:8090), live-build fetches try the hosted
-# Sylqon service's own Match-V5 aggregation FIRST and only fall back to op.gg
-# on miss/failure. Empty (the default) keeps the local product's behaviour
-# completely unchanged.
-SYLQON_META_URL = os.getenv("SYLQON_META_URL", "")
+# Meta builds, tier stats, counters and synergies come from our own hosted
+# Match-V5 aggregation by default; op.gg is only the fallback when the service
+# is unreachable or lacks data. The env var is a developer override (point it
+# at http://localhost:8090 for a local stack, or set it empty to force op.gg).
+SYLQON_META_URL = os.getenv("SYLQON_META_URL", "https://api.sylqon.com")
 SYLQON_META_TIMEOUT = int(os.getenv("SYLQON_META_TIMEOUT", 6))
 
 # --- OP.GG live fetch -------------------------------------------------------
