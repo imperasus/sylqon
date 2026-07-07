@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.18.0](https://github.com/imperasus/sylqon/compare/v1.17.2...v1.18.0) (2026-07-07)
+
+
+### Features
+
+* **services:** production compose for the VPS (api + bot + db + redis) ([d7ad19e](https://github.com/imperasus/sylqon/commit/d7ad19ea3302a234438fb3a12c535da5cb090353))
+
 ### [1.17.2](https://github.com/imperasus/sylqon/compare/v1.17.1...v1.17.2) (2026-07-06)
 
 
