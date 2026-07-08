@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-## [1.19.0](https://github.com/imperasus/sylqon/compare/v1.18.0...v1.19.0) (2026-07-08)
+## [1.20.0](https://github.com/imperasus/sylqon/compare/v1.19.0...v1.20.0) (2026-07-08)
 
 
 ### Features
@@ -18,6 +18,13 @@ All notable changes to this project will be documented in this file. See [standa
 * **ui:** LiveBoard palette sweep for Graphite Volt ([9dc8e38](https://github.com/imperasus/sylqon/commit/9dc8e387b0d71b167197f303bd18c410a6314d02))
 * **ui:** dense team tables for Players and LiveBoard ([50d95b2](https://github.com/imperasus/sylqon/commit/50d95b2951c7c2020b7d7db39a23b2e3e67f8720))
 * **ui:** overlay pass - no blur, BrandMark header, arcane Baron ([6635b4d](https://github.com/imperasus/sylqon/commit/6635b4d20a4538ec6a07dfc2bd9d041709c63e14))
+
+## [1.19.0](https://github.com/imperasus/sylqon/compare/v1.18.0...v1.19.0) (2026-07-07)
+
+
+### Features
+
+* hosted meta service is the default data source ([959f7ec](https://github.com/imperasus/sylqon/commit/959f7ec2edb71706db7af223d742feb6e26db0aa))
 
 ## [1.18.0](https://github.com/imperasus/sylqon/compare/v1.17.2...v1.18.0) (2026-07-07)
 
