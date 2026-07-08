@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.21.0](https://github.com/imperasus/sylqon/compare/v1.20.0...v1.21.0) (2026-07-08)
+
+
+### Features
+
+* **landing:** Graphite Volt repaint + Signal-S brand + favicon ([41b1973](https://github.com/imperasus/sylqon/commit/41b1973174ef3f59d7b8716758901aa3193b8ed2))
+
 ## [1.20.0](https://github.com/imperasus/sylqon/compare/v1.19.0...v1.20.0) (2026-07-08)
 
 
