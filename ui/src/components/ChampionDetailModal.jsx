@@ -125,12 +125,12 @@ function ProBuilds({ champion, role, patch }) {
   if (builds.length === 0) return null;
   return (
     <div>
-      <SectionTitle accent="gold" icon={Trophy}>PRO BUILDS</SectionTitle>
+      <SectionTitle accent="accent" icon={Trophy}>PRO BUILDS</SectionTitle>
       <div className="mt-2 space-y-2">
         {builds.slice(0, 3).map((b, i) => (
           <div key={`${b.pro_name}-${i}`} className="rounded-lg border border-white/8 bg-white/[0.015] px-3 py-2">
             <div className="flex items-center gap-2">
-              <span className="text-md font-bold text-gold-bright">{b.pro_name}</span>
+              <span className="text-md font-bold text-accent-bright">{b.pro_name}</span>
               {b.team && <span className="rounded border border-white/15 px-1.5 py-px text-xs tracking-wider text-white/55">{b.team}</span>}
               {b.result && (
                 <span className={`text-xs font-bold tracking-widest ${b.result === "Win" ? "text-good" : "text-bad"}`}>
@@ -145,7 +145,7 @@ function ProBuilds({ champion, role, patch }) {
                      className="h-9 w-9 rounded-md ring-1 ring-white/12" draggable={false} loading="lazy" />
               ))}
               {b.build?.keystone && (
-                <span className="ml-1 rounded border border-gold/30 bg-gold/10 px-1.5 py-0.5 text-xs text-gold-bright">
+                <span className="ml-1 rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-xs text-accent-bright">
                   {b.build.keystone}
                 </span>
               )}
@@ -211,7 +211,7 @@ function BuildPath({ build, patch }) {
       {build.keystone && (
         <div>
           <div className="t-label mb-1 text-white/45">RUNES</div>
-          <span className="rounded border border-gold/30 bg-gold/10 px-2 py-1 text-sm text-gold-bright">{build.keystone}</span>
+          <span className="rounded border border-accent/30 bg-accent/10 px-2 py-1 text-sm text-accent-bright">{build.keystone}</span>
         </div>
       )}
     </div>
@@ -237,16 +237,16 @@ export default function ChampionDetailModal({ champion, role, patch, onClose }) 
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 8 }}
         onClick={(e) => e.stopPropagation()}
-        className="glass glow-gold relative flex max-h-[92svh] w-[min(95vw,62rem)] flex-col gap-4 overflow-hidden rounded-2xl border border-gold/30 p-5"
+        className="surface-modal relative flex max-h-[92svh] w-[min(95vw,62rem)] flex-col gap-4 overflow-hidden rounded-2xl p-5"
       >
         <button onClick={onClose}
-                className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-md border border-white/15 text-white/50 hover:border-gold/40 hover:text-gold-bright">
+                className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-md border border-white/15 text-white/50 hover:border-accent/40 hover:text-accent-bright">
           <X className="h-4 w-4" />
         </button>
 
         {/* header */}
         <div className="flex items-center gap-3">
-          <ChampPortrait slug={champion.slug} patch={patch} size="h-14 w-14" accent="gold" round />
+          <ChampPortrait slug={champion.slug} patch={patch} size="h-14 w-14" accent="accent" round />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="truncate font-display text-xl font-bold tracking-wider text-white">{champion.name}</span>
@@ -263,7 +263,7 @@ export default function ChampionDetailModal({ champion, role, patch, onClose }) 
 
         {loading && (
           <div className="flex items-center gap-2 py-6 text-md text-white/50">
-            <Loader2 className="h-4 w-4 animate-spin text-gold" /> Loading op.gg data…
+            <Loader2 className="h-4 w-4 animate-spin text-accent" /> Loading op.gg data…
           </div>
         )}
 
@@ -279,7 +279,7 @@ export default function ChampionDetailModal({ champion, role, patch, onClose }) 
                 <p className="mt-2 t-body text-white/70">{playstyleTip(tags)}</p>
               </div>
               <div>
-                <SectionTitle accent="gold" icon={Package}>BUILD PATH</SectionTitle>
+                <SectionTitle accent="accent" icon={Package}>BUILD PATH</SectionTitle>
                 <BuildPath build={details.build} patch={patch} />
               </div>
               <MatchList title="BEST DUO PARTNERS" accent="ally" icon={Sparkles} rows={duos} patch={patch}

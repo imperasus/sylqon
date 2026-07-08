@@ -192,7 +192,7 @@ export default function SettingsModal({ onClose }) {
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
         transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
-        className="glass relative flex max-h-[90svh] w-[min(94vw,46rem)] flex-col gap-4 overflow-hidden rounded-2xl border border-accent/30 p-5"
+        className="surface-modal relative flex max-h-[90svh] w-[min(94vw,46rem)] flex-col gap-4 overflow-hidden rounded-2xl p-5"
       >
         <button onClick={onClose}
                 className="absolute right-3 top-3 grid h-8 w-8 cursor-pointer place-items-center rounded-md border border-white/15 text-white/50 hover:border-accent/40 hover:text-accent-bright">
@@ -201,7 +201,7 @@ export default function SettingsModal({ onClose }) {
 
         <div className="flex items-center gap-2">
           <SettingsIcon className="h-5 w-5 text-accent" />
-          <span className="font-display text-lg font-bold tracking-[0.18em] text-white/90">BEÁLLÍTÁSOK</span>
+          <span className="font-display text-lg font-bold tracking-[0.08em] text-white/90">BEÁLLÍTÁSOK</span>
         </div>
 
         {loading && !settings && (
@@ -214,7 +214,7 @@ export default function SettingsModal({ onClose }) {
           <div className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1">
             {GROUPS.map((g) => (
               <section key={g.key} className="flex flex-col gap-1">
-                <div className="mb-1 flex items-center gap-1.5 font-display text-sm font-bold tracking-[0.2em] text-accent/85">
+                <div className="mb-1 flex items-center gap-1.5 font-display text-sm font-bold tracking-[0.08em] text-accent/85">
                   <g.icon className="h-4 w-4" />
                   {g.label}
                 </div>

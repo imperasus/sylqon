@@ -13,7 +13,7 @@ export default function MissionCard({ mission }) {
   const tone = mission.status === "completed" ? "good"
     : mission.status === "failed" ? "enemy" : "accent";
   return (
-    <div className="rounded-lg border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-sm">
+    <div className="rounded-lg border border-white/10 bg-black/60 px-3 py-2">
       <div className="flex items-start justify-between gap-2">
         <span className="line-clamp-3 text-base font-semibold leading-snug text-white/90">{mission.text}</span>
         <span className={`mt-0.5 shrink-0 text-2xs font-bold tracking-widest ${st.cls}`}>{st.label}</span>

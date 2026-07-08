@@ -23,7 +23,6 @@ export function SpellPips({ spells, patch, size = "h-6 w-6" }) {
 const RING = {
   white: "border-white/15",
   accent: "border-accent/55",
-  gold: "border-accent/55",
   ally: "border-ally/55",
   enemy: "border-enemy/55",
 };
@@ -56,7 +55,7 @@ export function ThreatBadge({ threat }) {
   const hot = threat === "suppression" || threat === "heavy_cc";
   return (
     <span
-      className={`rounded border px-1 py-px text-2xs font-bold tracking-wider uppercase
+      className={`rounded border px-1 py-px text-2xs font-semibold tracking-wider uppercase
         ${hot
           ? "border-enemy/70 bg-enemy/15 text-enemy"
           : "border-enemy/35 bg-enemy/10 text-enemy/80"}`}
@@ -68,7 +67,6 @@ export function ThreatBadge({ threat }) {
 
 const TITLE_COLOR = {
   accent: "text-accent/85",
-  gold: "text-gold-bright/85",
   ally: "text-ally/85",
   enemy: "text-enemy/85",
   white: "text-white/50",
@@ -77,7 +75,7 @@ const TITLE_COLOR = {
 export function SectionTitle({ children, accent = "accent", icon: Icon, right }) {
   return (
     <div className="flex items-center gap-1.5">
-      <div className={`flex items-center gap-1.5 font-display text-sm font-bold tracking-[0.22em] ${TITLE_COLOR[accent] || TITLE_COLOR.white}`}>
+      <div className={`flex items-center gap-1.5 font-display text-sm font-bold tracking-[0.08em] ${TITLE_COLOR[accent] || TITLE_COLOR.white}`}>
         {Icon && <Icon className="h-4 w-4" />}
         {children}
       </div>
@@ -104,22 +102,33 @@ export function ScorePill({ score }) {
   );
 }
 
-/* A 0-100 strength chip, graded by value (distinct from the signed ScorePill). */
+/* A 0-100 strength read: right-aligned mono value + a 2rem micro-bar, graded by
+   value (distinct from the signed ScorePill). */
 export function Score100({ value }) {
-  const v = Math.round(value ?? 0);
-  const cls = v >= 75 ? "bg-good/15 text-good"
-    : v >= 55 ? "bg-accent/15 text-accent-bright"
-    : "bg-white/8 text-white/45";
-  return <span className={`rounded px-1 py-px font-mono text-sm font-bold tabular-nums ${cls}`}>{v}</span>;
+  const v = Math.max(0, Math.min(100, Math.round(value ?? 0)));
+  const text = v >= 75 ? "text-good" : v >= 55 ? "text-accent-bright" : "text-white/45";
+  const bar = v >= 75 ? "bg-good" : v >= 55 ? "bg-accent" : "bg-white/25";
+  return (
+    <span className="flex shrink-0 items-center gap-1.5">
+      <span className="h-1 w-8 overflow-hidden rounded-full bg-white/10">
+        <span className={`block h-full ${bar}`} style={{ width: `${v}%` }} />
+      </span>
+      <span className={`w-6 text-right font-mono text-sm font-bold tabular-nums ${text}`}>{v}</span>
+    </span>
+  );
 }
 
-/* Generic frost panel with an optional titled header. */
+/* Generic flat panel with an optional titled header (full-bleed hairline). */
 export function Panel({ title, icon, accent = "accent", right, edge, className = "", children }) {
   const edgeCls = edge === "ally" ? "edge-ally" : edge === "enemy" ? "edge-enemy"
     : edge === "accent" ? "edge-accent" : "";
   return (
-    <div className={`frost ${edgeCls} flex min-h-0 flex-col gap-2 p-2.5 ${className}`}>
-      {title && <SectionTitle accent={accent} icon={icon} right={right}>{title}</SectionTitle>}
+    <div className={`surface ${edgeCls} flex min-h-0 flex-col gap-2 p-2.5 ${className}`}>
+      {title && (
+        <div className="-mx-2.5 border-b border-line/70 px-2.5 pb-1.5">
+          <SectionTitle accent={accent} icon={icon} right={right}>{title}</SectionTitle>
+        </div>
+      )}
       {children}
     </div>
   );
@@ -138,7 +147,7 @@ export function Chip({ tone = "muted", children, title }) {
   };
   return (
     <span title={title}
-          className={`rounded border px-1.5 py-px text-xs font-bold tracking-wider uppercase ${tones[tone] || tones.muted}`}>
+          className={`rounded border px-1.5 py-px text-xs font-semibold tracking-wider uppercase ${tones[tone] || tones.muted}`}>
       {children}
     </span>
   );
@@ -179,12 +188,12 @@ export function DraftScorecard({ balance }) {
       <div className="flex items-center gap-3">
         <div className="flex shrink-0 flex-col items-center leading-none"
              title="Deterministic estimate from comp archetypes, damage balance, frontline and lane matchup — not a trained model.">
-          <span className={`font-display text-3xl font-extrabold tabular-nums ${reading ? "text-white/30" : t.text}`}>
+          <span className={`font-mono text-4xl font-bold tabular-nums ${reading ? "text-white/30" : t.text}`}>
             {win}<span className="text-lg">%</span>
           </span>
-          <span className="mt-0.5 text-3xs font-bold tracking-[0.2em] text-white/35">EST.</span>
+          <span className="mt-0.5 text-3xs font-semibold tracking-[0.08em] text-white/35">EST.</span>
         </div>
-        <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/8">
+        <div className="relative h-1 flex-1 overflow-hidden rounded-full bg-white/8">
           <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/25" />
           {!reading && (
             <div className={`absolute inset-y-0 ${t.bg}`}
@@ -193,11 +202,12 @@ export function DraftScorecard({ balance }) {
         </div>
       </div>
       {!reading && balance.drivers?.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-col gap-0.5">
           {balance.drivers.map((d) => (
-            <Chip key={d.text} tone={d.sign > 0 ? "good" : "bad"}>
+            <span key={d.text}
+                  className={`font-mono text-xs tabular-nums ${d.sign > 0 ? "text-good" : "text-bad"}`}>
               {d.sign > 0 ? "+" : "−"} {d.text}
-            </Chip>
+            </span>
           ))}
         </div>
       )}
@@ -209,7 +219,7 @@ export function EmptyState({ icon: Icon, label, hint }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-white/30">
       {Icon && <Icon className="h-7 w-7" />}
-      <span className="font-display text-base tracking-[0.22em]">{label}</span>
+      <span className="font-display text-base tracking-[0.1em]">{label}</span>
       {hint && <span className="max-w-[15rem] text-center text-base text-white/40">{hint}</span>}
     </div>
   );
@@ -221,7 +231,7 @@ export function Button({ variant = "secondary", icon: Icon, children, className 
                         disabled, ...rest }) {
   const variants = {
     primary: "border-transparent bg-accent text-bg font-bold hover:bg-accent-bright",
-    secondary: "border-accent/40 text-accent/85 hover:bg-accent/12 hover:text-accent-bright",
+    secondary: "border-line-strong text-white/70 hover:border-accent/50 hover:text-accent-bright",
     ghost: "border-transparent text-white/55 hover:bg-white/8 hover:text-white/85",
     danger: "border-enemy/40 text-enemy/85 hover:bg-enemy/12",
   };
@@ -229,7 +239,7 @@ export function Button({ variant = "secondary", icon: Icon, children, className 
     <button
       disabled={disabled}
       className={`inline-flex items-center justify-center gap-1.5 rounded-md border px-2.5 py-1
-        text-xs font-bold tracking-widest uppercase transition-colors
+        text-xs font-semibold tracking-wider uppercase transition-colors
         ${disabled ? "cursor-default opacity-50" : "cursor-pointer"}
         ${variants[variant] || variants.secondary} ${className}`}
       {...rest}
@@ -240,7 +250,7 @@ export function Button({ variant = "secondary", icon: Icon, children, className 
   );
 }
 
-/* Circular 32×32 icon action button (add / star / lock). */
+/* Square 32×32 icon action button (add / star / lock). */
 export function IconButton({ icon: Icon, title, active, tone = "accent", className = "", ...rest }) {
   const tones = {
     accent: active ? "border-accent/70 bg-accent/20 text-accent-bright"
@@ -251,7 +261,7 @@ export function IconButton({ icon: Icon, title, active, tone = "accent", classNa
   return (
     <button
       title={title}
-      className={`grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border
+      className={`grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md border
         transition-colors ${tones[tone] || tones.accent} ${className}`}
       {...rest}
     >
@@ -310,20 +320,20 @@ export function ChampionRow({ slug, patch, name, sub, rank, right, accent = "whi
   );
 }
 
-/* Underline-accent tab strip. items: [{ key, label, render? }] */
+/* Segmented control. items: [{ key, label, render? }] */
 export function Tabs({ items, active, onSelect, className = "" }) {
   return (
-    <div className={`flex items-stretch gap-1 border-b border-white/8 ${className}`}>
+    <div className={`inline-flex items-stretch gap-0.5 self-start rounded-md border border-line bg-bg-2 p-0.5 ${className}`}>
       {items.map((it) => {
         const on = it.key === active;
         return (
           <button
             key={it.key}
             onClick={() => onSelect?.(it.key)}
-            className={`relative -mb-px flex items-center gap-1.5 rounded-t-md border-b-2 px-2.5 py-1.5
-              text-sm font-bold tracking-wide transition-colors
-              ${on ? "border-accent bg-accent/10 text-accent-bright"
-                   : "border-transparent text-white/45 hover:bg-white/5 hover:text-white/75"}`}
+            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-sm font-semibold
+              tracking-wide transition-colors
+              ${on ? "bg-elev text-accent-bright"
+                   : "text-white/45 hover:bg-white/5 hover:text-white/75"}`}
           >
             {it.label}
           </button>

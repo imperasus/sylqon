@@ -1,40 +1,45 @@
 @import "tailwindcss";
 
 /* ============================================================ design tokens
-   "Frost Cobalt" — deep cobalt-navy base, teal/cyan accent, warm coral enemy.
-   Flat + subtle glass (no heavy glow). Tuned for a compact ~1280x720 companion
-   window. NOTE: the legacy `gold*` tokens are kept but REMAPPED to the teal
-   accent so any older component that still references them stays on-theme. */
+   "Graphite Volt" — neutral graphite/ink base (zero blue cast), lime primary +
+   amber secondary accent. Flat hairline surfaces, no glow/glass — pro-analytics
+   look. Tuned for a compact ~1280x800 companion window. */
 @theme {
-  --color-bg: #060a14;          /* app background (deep cobalt) */
-  --color-bg-2: #0a1020;        /* raised surface */
-  --color-panel: #0d162b;       /* card body (lifted a touch for layering) */
-  --color-elev: #131f3a;        /* hover / selected rows — reads above panel */
-  --color-line: #1b2740;        /* hairline borders */
+  --color-bg: #0e0e0f;          /* app background (near-black graphite) */
+  --color-bg-2: #151516;        /* raised surface */
+  --color-panel: #19191a;       /* card body (lifted a touch for layering) */
+  --color-elev: #212123;        /* hover / selected rows — reads above panel */
+  --color-line: #2a2a2d;        /* hairline borders */
+  --color-line-strong: #3a3a3e; /* emphasized dividers, modal borders */
 
-  --color-accent: #2fd6c6;      /* primary — teal */
-  --color-accent-bright: #7ff0e4;
-  --color-accent-2: #5fd0ff;    /* secondary — cyan */
+  --color-accent: #a3e635;      /* primary — lime */
+  --color-accent-bright: #bef264;
+  --color-accent-2: #fbbf24;    /* secondary — amber */
 
-  /* legacy aliases remapped to the new accent (compat for kept components) */
-  --color-gold: #2fd6c6;
-  --color-gold-bright: #7ff0e4;
-  --color-amber: #ffc46b;       /* warm — AD / warnings */
+  --color-amber: #fbbf24;       /* warm — AD / warnings */
 
-  --color-ally: #4aa8ff;        /* own team — cyan-blue */
-  --color-ally-deep: #1f6fd0;
-  --color-enemy: #ff6f8b;       /* enemy team — warm coral */
-  --color-enemy-deep: #c23f5e;
-  --color-mana: #5fd0ff;        /* cyan — info / runes */
+  --color-ally: #60a5fa;        /* own team — blue */
+  --color-ally-deep: #2563eb;
+  --color-enemy: #fb7185;       /* enemy team — rose */
+  --color-enemy-deep: #be123c;
+  --color-mana: #38bdf8;        /* sky — info / runes */
+  --color-arcane: #a78bfa;      /* violet — mixed damage, Sorcery, Baron */
 
-  --color-tier1: #5ff0dd;       /* S/S+ — teal */
-  --color-tier2: #8ef0a8;       /* A — green */
-  --color-good: #43e0a8;
-  --color-bad: #ff6b78;
+  --color-tier1: #bef264;       /* S/S+ — lime */
+  --color-tier2: #6ee7b7;       /* A — mint */
+  --color-good: #34d399;        /* emerald — cooler than the lime accent */
+  --color-bad: #f87171;
 
-  --font-display: "Rajdhani", sans-serif;
-  --font-tech: "Rajdhani", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-tech: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
+
+  /* sharper corners — px on purpose so crispness doesn't ride the fluid root */
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 10px;
 
   /* ---- fluid type scale ------------------------------------------------
      Compact, dense companion scale. Every value is rem, so it rides the
@@ -74,65 +79,60 @@ html.app-fluid-root {
 
 html,
 body {
-  background:
-    radial-gradient(1200px 700px at 80% -10%, rgb(47 214 198 / 0.06), transparent 60%),
-    radial-gradient(900px 600px at -10% 110%, rgb(95 208 255 / 0.05), transparent 55%),
-    var(--color-bg);
-  color: #d0d6e0;
+  background: var(--color-bg);
+  color: #d0d1d3;
   font-family: var(--font-tech);
   overflow: hidden;
 }
 
 /* ============================================================ typography scale
    Reusable text utilities so components stop hand-rolling text-[Npx]. */
-.t-h1 { font-size: 1.1875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.01em; color: #eef3fb; }
-.t-h2 { font-size: var(--text-md); line-height: 1.25; font-weight: 600; color: #e3eaf5; }
-.t-body { font-size: var(--text-base); line-height: 1.55; color: #d0d6e0; }
-.t-label { font-size: var(--text-xs); line-height: 1.3; font-weight: 700; letter-spacing: 0.14em;
-           text-transform: uppercase; color: rgb(208 214 224 / 0.55); }
+.t-h1 { font-size: 1.1875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.01em; color: #f0f0f1; }
+.t-h2 { font-size: var(--text-md); line-height: 1.25; font-weight: 600; color: #e4e5e7; }
+.t-body { font-size: var(--text-base); line-height: 1.55; color: #d0d1d3; }
+.t-label { font-size: var(--text-xs); line-height: 1.3; font-weight: 600; letter-spacing: 0.08em;
+           text-transform: uppercase; color: rgb(209 210 212 / 0.55); }
 .t-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* ============================================================ row states
    Shared list-row helpers: zebra striping, hover lift, selected, in-pool. */
 .row { position: relative; transition: background-color 120ms ease, box-shadow 120ms ease; }
-.row-hover:hover { background: rgb(19 31 58 / 0.7); box-shadow: inset 2px 0 0 0 rgb(47 214 198 / 0.55); }
-.row-selected { background: rgb(19 31 58 / 0.9); box-shadow: inset 2px 0 0 0 var(--color-accent); }
-.row-pool { background: rgb(47 214 198 / 0.06); box-shadow: inset 3px 0 0 0 rgb(47 214 198 / 0.65); }
+.row-hover:hover { background: var(--color-elev); box-shadow: inset 2px 0 0 0 rgb(163 230 53 / 0.55); }
+.row-selected { background: var(--color-elev); box-shadow: inset 2px 0 0 0 var(--color-accent); }
+.row-pool { background: rgb(163 230 53 / 0.07); box-shadow: inset 3px 0 0 0 rgb(163 230 53 / 0.65); }
 
-/* ============================================================ frost surfaces
-   Subtle, flat-ish glass: a hint of cobalt tint, light hairline, minimal blur. */
-.frost {
-  background: linear-gradient(165deg, rgb(95 208 255 / 0.045), rgb(12 20 38 / 0.55));
-  backdrop-filter: blur(8px);
-  border: 1px solid rgb(120 170 220 / 0.12);
-  border-radius: 12px;
+/* ============================================================ flat surfaces */
+.surface {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
 }
-.frost-accent { border-color: rgb(47 214 198 / 0.45); }
-.frost-ally { border-color: rgb(74 168 255 / 0.35); }
-.frost-enemy { border-color: rgb(255 111 139 / 0.35); }
+.surface-accent { border-color: rgb(163 230 53 / 0.45); }
+.surface-ally { border-color: rgb(96 165 250 / 0.40); }
+.surface-enemy { border-color: rgb(251 113 133 / 0.40); }
 
 /* thin top accent line for headers / active items */
-.edge-accent { box-shadow: inset 0 2px 0 -1px rgb(47 214 198 / 0.8); }
-.edge-ally { box-shadow: inset 0 2px 0 -1px rgb(74 168 255 / 0.8); }
-.edge-enemy { box-shadow: inset 0 2px 0 -1px rgb(255 111 139 / 0.8); }
+.edge-accent { box-shadow: inset 0 2px 0 -1px rgb(163 230 53 / 0.8); }
+.edge-ally { box-shadow: inset 0 2px 0 -1px rgb(96 165 250 / 0.8); }
+.edge-enemy { box-shadow: inset 0 2px 0 -1px rgb(251 113 133 / 0.8); }
 
-/* restrained accents (kept names; far softer than the old hextech glows) */
-.glow-accent { box-shadow: 0 0 0 1px rgb(47 214 198 / 0.35), 0 6px 24px rgb(47 214 198 / 0.10); }
-.glow-gold { box-shadow: 0 0 0 1px rgb(47 214 198 / 0.35), 0 6px 24px rgb(47 214 198 / 0.10); }
-.text-glow-accent { text-shadow: 0 0 12px rgb(127 240 228 / 0.45); }
+/* flat 1px accent ring for emphasized elements (never a glow) */
+.ring-accent { box-shadow: 0 0 0 1px rgb(163 230 53 / 0.40); }
 
-/* legacy .glass kept (used by the champion modal) — redefined to frost */
-.glass {
-  background: linear-gradient(165deg, rgb(95 208 255 / 0.045), rgb(12 20 38 / 0.55));
-  backdrop-filter: blur(8px);
-  border: 1px solid rgb(120 170 220 / 0.12);
+/* elevated modal surface: real shadow for depth */
+.surface-modal {
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-line-strong);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.55);
 }
-.glass-gold { border-color: rgb(47 214 198 / 0.40); }
+
+/* keyboard focus — cheap a11y baseline for the flat language */
+:focus-visible { outline: 1px solid var(--color-accent); outline-offset: 1px; }
 
 /* ============================================================ scrollbars */
 .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: rgb(47 214 198 / 0.30); border-radius: 3px; }
-.scroll-thin::-webkit-scrollbar-thumb:hover { background: rgb(47 214 198 / 0.50); }
+.scroll-thin::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.14); border-radius: 3px; }
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: rgb(255 255 255 / 0.25); }
 .scroll-thin::-webkit-scrollbar-track { background: transparent; }
 
 /* ============================================================ motion (subtle) */
@@ -152,6 +152,6 @@ body {
   to { transform: rotate(360deg); }
 }
 .sweep {
-  background: conic-gradient(from 0deg, transparent 0deg, rgb(47 214 198 / 0.30) 60deg, transparent 120deg);
+  background: conic-gradient(from 0deg, transparent 0deg, rgb(163 230 53 / 0.25) 60deg, transparent 120deg);
   animation: sweep 2.8s linear infinite;
 }
