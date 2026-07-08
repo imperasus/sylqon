@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.19.0](https://github.com/imperasus/sylqon/compare/v1.18.0...v1.19.0) (2026-07-08)
+
+
+### Features
+
+* **brand:** Signal-S mark - icon, favicon, splash pages, window bg ([b1c8519](https://github.com/imperasus/sylqon/commit/b1c8519c3ed41d2611fa2bdc20d1a13636e76f8b))
+* **ui:** Graphite Volt foundation - tokens, typography, radii ([87ac342](https://github.com/imperasus/sylqon/commit/87ac342002e39b6583cac214a747525503d31489))
+* **ui:** flat surface language - hairline panels, no glow/glass ([fb06cc8](https://github.com/imperasus/sylqon/commit/fb06cc898f3560bdbc479fbef872c3a0e42e4ec9))
+* **ui:** restyle shared primitives for the flat analytics language ([0835705](https://github.com/imperasus/sylqon/commit/0835705f231d920ad84aea11d83fa9e9b4ef8af1))
+* **ui:** left icon rail + slim status strip app frame ([9a32dcc](https://github.com/imperasus/sylqon/commit/9a32dcc825b69584f1ca369a328afa46a49650fc))
+* **ui:** Home analytics layout - hero KPI strip + merged right column ([91c9d9e](https://github.com/imperasus/sylqon/commit/91c9d9e69ddce56d5fb3882ec7d37128443efd69))
+* **ui:** Draft board as one surface with hairline-divided columns ([b1672d9](https://github.com/imperasus/sylqon/commit/b1672d9c854d27ca5d3855ea8e9427ce442b2cd7))
+* **ui:** Postlock gauge + callout banner, modals on the elevated surface ([6282f79](https://github.com/imperasus/sylqon/commit/6282f79780d958b7345ac1a00ad53ffb23a4032f))
+* **ui:** LiveBoard palette sweep for Graphite Volt ([9dc8e38](https://github.com/imperasus/sylqon/commit/9dc8e387b0d71b167197f303bd18c410a6314d02))
+* **ui:** dense team tables for Players and LiveBoard ([50d95b2](https://github.com/imperasus/sylqon/commit/50d95b2951c7c2020b7d7db39a23b2e3e67f8720))
+* **ui:** overlay pass - no blur, BrandMark header, arcane Baron ([6635b4d](https://github.com/imperasus/sylqon/commit/6635b4d20a4538ec6a07dfc2bd9d041709c63e14))
+
 ## [1.18.0](https://github.com/imperasus/sylqon/compare/v1.17.2...v1.18.0) (2026-07-07)
 
 
