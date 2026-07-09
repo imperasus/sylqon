@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.22.0](https://github.com/imperasus/sylqon/compare/v1.21.0...v1.22.0) (2026-07-09)
+
+
+### Features
+
+* **landing:** refresh product screenshots to Graphite Volt (v1.20.0) ([af2cced](https://github.com/imperasus/sylqon/commit/af2ccedfcdedbfef50e4e333d7f88b41840f32b5))
+
 ## [1.21.0](https://github.com/imperasus/sylqon/compare/v1.20.0...v1.21.0) (2026-07-08)
 
 
