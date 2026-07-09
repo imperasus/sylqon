@@ -78,13 +78,25 @@ Poll cadence `WATCH_POLL_SECONDS` (default 180), language `WATCH_LANG` (`hu`/`en
 The uvicorn app starts the watcher automatically when the webhook URL is set.
 Dedupe lives in the `deliveries` table; failed sends are retried next cycle.
 
-## Public web pages (S3 website MVP)
+## Public web pages (S3 website MVP → sylqon.com)
 
-Served by the same FastAPI app (no build step): `/` (Riot ID form),
-`/pool-report?riot_id=Name%23TAG` (server-rendered pool-coverage audit),
-`/champions` and `/champion/{name}` (SEO-friendly presence/win-rate, core
-items and lane-matchup pages from our own aggregation). All copy follows the
-pool-coverage framing — no skill-rating vocabulary (enforced by a test).
+Served by the same FastAPI app (no build step), Graphite Volt brand:
+
+- `/` — product hero (desktop app) + region-aware summoner search
+- `/search?region=euw1&riot_id=Name%23TAG` — redirects to the profile
+- `/summoner/{region}/{game}/{tag}` — profile (rank, top-champion mastery)
+- `/summoner/{region}/{game}/{tag}/matches` — recent matches (ingests first)
+- `/match/{match_id}` — two-team scoreboard from stored data
+- `/pool-report?riot_id=Name%23TAG` — pool-coverage audit
+- `/champions`, `/champion/{name}` — SEO-friendly presence/win-rate + builds
+
+`region` is a platform code (euw1, na1, kr, …) mapped to its regional cluster
+for Account-V1 / Match-V5 (`app/regions.py`). All copy follows the pool-coverage
+framing — no skill-rating vocabulary (enforced by a test).
+
+**Prod TLS:** the `caddy` service in `docker-compose.prod.yml` terminates HTTPS
+for `sylqon.com` (automatic Let's Encrypt via `Caddyfile`) and proxies to the
+API. Set `CADDY_ACME_EMAIL` in `.env` and open ports 80/443 before first start.
 
 ## API
 

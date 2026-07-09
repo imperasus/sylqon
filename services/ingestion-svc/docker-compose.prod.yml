@@ -1,8 +1,25 @@
-# Production stack for the VPS: Postgres + Redis + the FastAPI service + the
-# Discord bot, all containerized on one internal network. No host DB ports are
-# exposed; the API is published on :8090 (put a reverse proxy / TLS in front).
+# Production stack for the VPS: Caddy (TLS) + Postgres + Redis + the FastAPI
+# service + the Discord bot, all containerized on one internal network. No host
+# DB ports are exposed; Caddy terminates HTTPS for sylqon.com and proxies to the
+# API. Set CADDY_ACME_EMAIL in .env (Let's Encrypt contact) before first start.
 #   docker compose -f docker-compose.prod.yml up -d --build
 services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: sylqon-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file: .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+
   postgres:
     image: postgres:16-alpine
     container_name: sylqon-postgres
@@ -58,3 +75,5 @@ services:
 
 volumes:
   sylqon_pg_data:
+  caddy_data:
+  caddy_config:

@@ -302,10 +302,11 @@ a több-oldalas, működő weboldal pont az, amit a Riot „working site"-ként 
 2. `GET /api/summoner/{game_name}/{tag_line}` + `/summoner/...` SSR-oldal (Account-V1 + rank).
 3. Mastery-V4 portolása a `riot_client.py`-ba + `ChampionMastery` cache-tábla.
 4. Régióválasztó a keresőoldalon (platform-kód → cluster-map a backendben).
-5. **Domain + landing-merge (a §3 döntés kivitelezése):** az apex A-rekord már a VPS-re mutat →
-   a `web.py` apexen szolgálása (Caddy/nginx reverse-proxy + Let's Encrypt TLS a `sylqon.com`-ra);
-   a `landing/landing.html` hero-szekció beolvasztása a `web.py` `/` route-jába (a meglévő
-   kereső-kártya fölé).
+5. **Domain + landing-merge (a §3 döntés kivitelezése) — KÉSZ a kódoldal:** a landing hero
+   beolvadt a `web.py` `/`-jába (W1); a `sylqon.com`-hoz Caddy reverse-proxy + automatikus
+   Let's Encrypt TLS bekerült a prod compose-ba (`services/ingestion-svc/Caddyfile` +
+   `docker-compose.prod.yml` `caddy` service). **Hátralévő VPS-ops:** `CADDY_ACME_EMAIL` az
+   `.env`-be, 80/443 port nyitása, `docker compose -f docker-compose.prod.yml up -d --build`.
 6. Production-key kérelem előkészítése (a működő több-oldalas web a `FEJLESZTESI_TERV §5.3`
    „working site" feltétele).
 

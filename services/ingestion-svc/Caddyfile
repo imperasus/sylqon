@@ -1,0 +1,16 @@
+# Reverse proxy + automatic HTTPS for the public site (sylqon.com apex).
+#
+# The apex A-record already points at the VPS, so Caddy provisions a Let's
+# Encrypt cert on first start (ports 80 + 443 must be open) and proxies to the
+# FastAPI service on the internal network. www / app subdomains still resolve to
+# GitHub Pages today; add them here once their DNS is repointed to the VPS.
+#
+# Set the ACME contact once via an env var on the host: CADDY_ACME_EMAIL.
+{
+	email {$CADDY_ACME_EMAIL}
+}
+
+sylqon.com {
+	encode gzip
+	reverse_proxy api:8090
+}
