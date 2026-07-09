@@ -23,23 +23,32 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Graphite Volt tokens — 1:1 with ui/src/index.css and landing/landing.html:
+# neutral graphite, lime primary + amber grace, Space Grotesk + Inter + JetBrains
+# Mono. Flat hairline surfaces (no glow/glass) — the "pro-analytics" look.
 _CSS = """
 :root{--bg:#0e0e0f;--surface:#19191a;--surface2:#212123;--text:#f0f0f1;
---muted:#8a8b8e;--accent:#a3e635;--red:#f87171;--border:#2a2a2d}
-*{box-sizing:border-box}body{margin:0;font:16px/1.6 system-ui,Segoe UI,sans-serif;
+--muted:#8a8b8e;--accent:#a3e635;--accent-2:#fbbf24;--red:#f87171;--border:#2a2a2d;
+--font-display:"Space Grotesk",system-ui,sans-serif;
+--font-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+--font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,monospace}
+*{box-sizing:border-box}body{margin:0;font:16px/1.6 var(--font-body);
 background:var(--bg);color:var(--text)}a{color:var(--accent);text-decoration:none}
 .wrap{max-width:1000px;margin:0 auto;padding:0 1.2rem}
 header{border-bottom:1px solid var(--border);background:rgba(14,14,15,.9)}
 header .wrap{display:flex;align-items:center;justify-content:space-between;min-height:60px}
-.brand{font-weight:700;letter-spacing:.04em;color:var(--text);font-size:1.15rem}
+.brand{display:inline-flex;align-items:center;gap:.55rem;font-family:var(--font-display);
+font-weight:700;letter-spacing:.04em;color:var(--text);font-size:1.15rem}
+.brand svg{width:22px;height:22px;flex:none}
 .brand span{color:var(--accent)}
 nav a{margin-left:1.2rem;color:var(--muted);font-size:.9rem}nav a:hover{color:var(--text)}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;letter-spacing:-.01em}
 h1{font-size:1.7rem;margin:2rem 0 .4rem}h2{font-size:1.15rem;margin:1.6rem 0 .6rem}
 .muted{color:var(--muted)}.small{font-size:.85rem}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
 padding:1.1rem 1.3rem;margin:1rem 0}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.8rem}
-.score{font-size:2.2rem;font-weight:700;color:var(--accent)}
+.score{font-family:var(--font-mono);font-size:2.2rem;font-weight:700;color:var(--accent)}
 .bar{height:8px;border-radius:4px;background:var(--surface2);overflow:hidden;margin:.25rem 0 .6rem}
 .bar i{display:block;height:100%;background:var(--accent)}
 table{width:100%;border-collapse:collapse;font-size:.92rem}
@@ -49,11 +58,59 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 border-radius:999px;border:1px solid var(--border);color:var(--accent);margin-right:.3rem}
 .tag.warn{color:var(--red)}
 input[type=text]{background:var(--surface2);border:1px solid var(--border);color:var(--text);
-padding:.65rem .9rem;border-radius:8px;font-size:1rem;width:280px;max-width:60vw}
+padding:.65rem .9rem;border-radius:8px;font-size:1rem;width:280px;max-width:60vw;font-family:inherit}
 button{background:var(--accent);color:#0e0e0f;border:0;padding:.68rem 1.2rem;border-radius:8px;
-font-weight:700;font-size:.95rem;cursor:pointer}button:hover{filter:brightness(1.08)}
+font-family:var(--font-display);font-weight:700;font-size:.95rem;cursor:pointer}
+button:hover{filter:brightness(1.08)}
+section{scroll-margin-top:80px}
+.hero{padding:2.6rem 0 .6rem;max-width:64ch}
+.eyebrow{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.14em;
+font-size:.74rem;font-weight:600;color:var(--accent);margin:0 0 .6rem}
+.hero h1{font-size:clamp(2rem,4.5vw,2.9rem);line-height:1.08;margin:0 0 .8rem}
+.hl{color:var(--accent)}
+.lead{color:var(--muted);font-size:1.08rem;line-height:1.55;margin:0 0 1.4rem;max-width:58ch}
+.cta-row{display:flex;flex-wrap:wrap;gap:.7rem;margin-bottom:.9rem}
+a.btn{display:inline-flex;align-items:center;background:var(--accent);color:#0e0e0f;
+padding:.7rem 1.25rem;border-radius:8px;font-family:var(--font-display);font-weight:700;font-size:.95rem}
+a.btn:hover{filter:brightness(1.08)}
+a.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+a.btn.ghost:hover{border-color:var(--muted);filter:none}
+.trust{margin:.2rem 0 0}
+.profile-head{display:flex;align-items:center;gap:1rem;margin-top:1.4rem}
+.pfp{border-radius:12px;border:1px solid var(--border)}
+.lvl{color:var(--muted);font-size:.9rem}
+.rank .rank-tier{font-family:var(--font-display);font-size:1.3rem;font-weight:600;
+color:var(--accent);margin:.15rem 0}
+.champ-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.7rem}
+.champ{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+padding:.7rem;text-align:center}
+.champ img{border-radius:8px;margin-bottom:.4rem}
+.champ-name{font-family:var(--font-display);font-weight:600;font-size:.92rem}
 footer{border-top:1px solid var(--border);margin-top:3rem;padding:1.4rem 0;color:var(--muted);font-size:.78rem}
 """
+
+# Google Fonts — served pages, so an external stylesheet link is fine (unlike
+# CSP-locked artifacts). Matches the weights landing/landing.html loads.
+_FONTS = (
+    '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
+    "family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&"
+    'family=JetBrains+Mono:wght@500;700&display=swap">'
+)
+
+# "Signal S" mark — three offset equalizer bars + one amber data-point dot.
+# Same geometry as ui/src/components/BrandMark.jsx (vars remapped to web.py's).
+_MARK = (
+    '<svg viewBox="0 0 24 24" role="img" aria-label="Sylqon"><title>Sylqon</title>'
+    '<rect x="7" y="3" width="14" height="4" rx="1" fill="var(--accent)"/>'
+    '<rect x="3" y="10" width="18" height="4" rx="1" fill="var(--accent)"/>'
+    '<rect x="3" y="17" width="14" height="4" rx="1" fill="var(--accent)"/>'
+    '<circle cx="19.5" cy="19" r="2" fill="var(--accent-2)"/></svg>'
+)
+
+# Desktop app release page (GitHub Pages); same target the footer/nav point to.
+_DOWNLOAD_URL = "https://imperasus.github.io/sylqon/"
 
 
 def _page(title: str, body: str, description: str = "") -> HTMLResponse:
@@ -64,11 +121,12 @@ def _page(title: str, body: str, description: str = "") -> HTMLResponse:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)} · Sylqon</title>
 <meta name="description" content="{desc}">
+{_FONTS}
 <style>{_CSS}</style></head><body>
 <header><div class="wrap">
-<a class="brand" href="/">SYL<span>QON</span> <span class="muted small">pool coverage</span></a>
+<a class="brand" href="/">{_MARK}SYL<span>QON</span> <span class="muted small">pool coverage</span></a>
 <nav><a href="/">Pool audit</a><a href="/champions">Champions</a>
-<a href="https://imperasus.github.io/sylqon/">Desktop app</a></nav>
+<a href="{_DOWNLOAD_URL}">Desktop app</a></nav>
 </div></header>
 <main class="wrap">{body}</main>
 <footer><div class="wrap">Sylqon is an unofficial fan-made tool. Not endorsed by Riot Games.
@@ -83,8 +141,25 @@ def _bar(value: int) -> str:
 
 @router.get("/", response_class=HTMLResponse)
 def home() -> HTMLResponse:
-    body = """
-<h1>Does your champion pool cover the meta?</h1>
+    # sylqon.com homepage: product hero (the desktop counter-draft app) up top,
+    # the web's own pool-coverage audit as the section below it.
+    body = f"""
+<section class="hero">
+<p class="eyebrow">Counter-draft AI · League of Legends</p>
+<h1>Counter the enemy team <span class="hl">before you lock in.</span></h1>
+<p class="lead">Sylqon reads your live Champion Select, names the strongest pick from your own
+pool, then builds the items, runes and summoner spells that beat those specific five enemies —
+and writes the whole loadout into your client automatically.</p>
+<div class="cta-row">
+<a class="btn" href="{_DOWNLOAD_URL}">Download for Windows</a>
+<a class="btn ghost" href="#pool-audit">Audit your champion pool</a>
+</div>
+<p class="trust small muted">100% local — your credentials never leave your PC ·
+Powered by a local Ollama LLM</p>
+</section>
+
+<section id="pool-audit">
+<h2>Does your champion pool cover the meta?</h2>
 <p class="muted" style="max-width:56ch">Enter a Riot ID and get a per-role pool-coverage
 audit: your performance on your champions, how safely they can be blind-picked, and which
 common opponents your pool has no answer to — computed from our own aggregation of official
@@ -103,8 +178,12 @@ blending performance, blind-pick safety and counter coverage.</p></div>
 your comfort pick, filled to cover the gaps your current pool leaves open.</p></div>
 <div class="card"><strong>Uncovered threats</strong><p class="muted small">The common picks in
 your role that none of your champions hold an even lane record against.</p></div>
-</div>"""
-    return _page("Champion pool audit", body)
+</div>
+</section>"""
+    return _page("Sylqon — counter-draft AI for League of Legends", body,
+                 "Sylqon reads your live Champion Select, picks the strongest answer from your "
+                 "pool, and builds the counter-loadout automatically. Plus a free champion-pool "
+                 "coverage audit from official Riot match data.")
 
 
 @router.get("/pool-report", response_class=HTMLResponse)
@@ -180,6 +259,66 @@ def pool_report_page(riot_id: str = Query(..., min_length=3)) -> HTMLResponse:
             f'Riot match data.</p>{"".join(sections)}')
     return _page(f"{riot_id} pool audit", body,
                  f"Champion-pool coverage audit for {riot_id}.")
+
+
+@router.get("/summoner/{game_name}/{tag_line}", response_class=HTMLResponse)
+def summoner_page(game_name: str, tag_line: str) -> HTMLResponse:
+    riot_id = f"{game_name}#{tag_line}"
+    from app.main import _ingest_service  # resolved lazily; may be None in tests
+
+    if _ingest_service is None:
+        return _page("Summoner", '<h1>Service unavailable</h1>'
+                     '<p class="muted">Try again in a moment.</p>')
+    from app import profile as profile_mod
+
+    data = profile_mod.build_profile(_ingest_service._riot, game_name.strip(), tag_line.strip())
+    if data is None:
+        return _page("Player not found", f'<h1>Player not found</h1><p class="muted">'
+                     f'No account found for <strong>{html.escape(riot_id)}</strong> — '
+                     f'check the spelling (Name#TAG).</p>')
+
+    icon = (f'<img class="pfp" src="{html.escape(data["profile_icon_url"])}" alt="" '
+            f'width="72" height="72">' if data.get("profile_icon_url") else "")
+    level = (f'<span class="lvl">Level {data["summoner_level"]}</span>'
+             if data.get("summoner_level") else "")
+
+    if data["ranked"]:
+        rank_cards = "".join(
+            f'<div class="card rank"><div class="muted small">{html.escape(r["label"])}</div>'
+            f'<div class="rank-tier">{html.escape((r["tier"] or "").title())} '
+            f'{html.escape(r["division"] or "")}</div>'
+            f'<div class="muted small">{r["lp"]} LP · {r["wins"]}W/{r["losses"]}L'
+            + (f' · {r["winrate"]}% WR' if r["winrate"] is not None else "")
+            + "</div></div>"
+            for r in data["ranked"]
+        )
+    else:
+        rank_cards = '<div class="card rank"><div class="muted">Unranked</div></div>'
+
+    champ_cells = "".join(
+        '<div class="champ">'
+        + (f'<img src="{html.escape(c["square_url"])}" alt="{html.escape(c["name"])}" '
+           f'width="56" height="56" loading="lazy">' if c["square_url"] else "")
+        + f'<div class="champ-name">{html.escape(c["name"])}</div>'
+        + f'<div class="muted small">{(c["mastery_points"] or 0):,} pts'
+        + (f' · M{c["mastery_level"]}' if c["mastery_level"] else "")
+        + "</div></div>"
+        for c in data["top_champions"]
+    ) or '<div class="muted">No mastery data.</div>'
+
+    body = f"""
+<div class="profile-head">{icon}<div>
+<h1 style="margin:.2rem 0">{html.escape(data["riot_id"])}</h1>{level}</div></div>
+<div class="cta-row" style="margin:.6rem 0 1.2rem">
+<a class="btn" href="/pool-report?riot_id={quote(riot_id)}">Audit this champion pool</a>
+<a class="btn ghost" href="/">Home</a></div>
+<h2>Ranked</h2><div class="grid">{rank_cards}</div>
+<h2>Top champions <span class="muted small">· mastery</span></h2>
+<div class="champ-grid">{champ_cells}</div>
+<p class="muted small" style="margin-top:1.2rem">Official Riot data (Account, Summoner,
+League &amp; Champion Mastery) — profile display only.</p>"""
+    return _page(f"{data['riot_id']} — profile", body,
+                 f"Summoner profile for {data['riot_id']}: level, rank and top champion mastery.")
 
 
 @router.get("/champions", response_class=HTMLResponse)

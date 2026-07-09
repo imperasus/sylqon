@@ -97,6 +97,21 @@ def pool_report(game_name: str, tag_line: str, refresh: bool = Query(default=Tru
     return report
 
 
+@app.get("/api/summoner/{game_name}/{tag_line}")
+def summoner_profile(game_name: str, tag_line: str) -> dict:
+    """Summoner profile DTO: Account-V1 + Summoner-V4 level + League-V4 rank +
+    Mastery-V4 top champions in one response. 404 if the Riot ID resolves to no
+    account. Descriptive display of the player's own official Riot data — no
+    skill/MMR estimate (S3 framing)."""
+    from app import profile as profile_mod
+
+    assert _ingest_service is not None
+    result = profile_mod.build_profile(_ingest_service._riot, game_name, tag_line)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Riot ID not found")
+    return result
+
+
 @app.get("/api/meta-sync/full")
 def meta_sync_full(min_games: int = Query(default=8, ge=3)) -> dict:
     """Everything the local app's full sync needs in one response (meta stats,

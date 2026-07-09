@@ -103,3 +103,18 @@ class RiotClient:
         return self._get(
             platform or self.platform_region, f"/lol/league/v4/entries/by-puuid/{puuid}"
         )
+
+    def get_summoner_by_puuid(self, puuid: str, platform: str | None = None) -> dict | None:
+        """SUMMONER-V4: {summonerLevel, profileIconId, ...} for a puuid (platform route)."""
+        return self._get(
+            platform or self.platform_region, f"/lol/summoner/v4/summoners/by-puuid/{puuid}"
+        )
+
+    def get_top_mastery(self, puuid: str, count: int = 6,
+                        platform: str | None = None) -> list | None:
+        """CHAMPION-MASTERY-V4: top N champions by mastery points (platform route)."""
+        return self._get(
+            platform or self.platform_region,
+            f"/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top",
+            {"count": count},
+        )

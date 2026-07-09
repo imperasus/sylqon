@@ -68,6 +68,54 @@ def test_pool_report_invalid_riot_id(client):
     assert "Invalid Riot ID" in r.text
 
 
+def test_summoner_page_renders_profile(client, monkeypatch):
+    import app.main as main_mod
+
+    class StubRiot:
+        def get_account_by_riot_id(self, g, t):
+            return {"puuid": "P1", "gameName": g, "tagLine": t}
+
+        def get_summoner_by_puuid(self, p):
+            return {"summonerLevel": 321, "profileIconId": 7}
+
+        def get_ranked_stats(self, p):
+            return [{"queueType": "RANKED_SOLO_5x5", "tier": "GOLD", "rank": "II",
+                     "leaguePoints": 44, "wins": 60, "losses": 40}]
+
+        def get_top_mastery(self, p, count=6):
+            return [{"championId": 266, "championPoints": 123456, "championLevel": 7}]
+
+    class StubIngest:
+        _riot = StubRiot()
+
+    monkeypatch.setattr(main_mod, "_ingest_service", StubIngest())
+    r = client.get("/summoner/Faker/KR1")
+    assert r.status_code == 200
+    assert "Faker#KR1" in r.text
+    assert "Level 321" in r.text
+    assert "Gold II" in r.text  # tier title-cased, division raw
+    assert "60% WR" in r.text
+    assert "Aatrox" in r.text and "123,456 pts" in r.text
+    low = r.text.lower()
+    assert "mmr" not in low and "elo" not in low  # framing holds on the profile too
+
+
+def test_summoner_page_not_found(client, monkeypatch):
+    import app.main as main_mod
+
+    class StubRiot:
+        def get_account_by_riot_id(self, g, t):
+            return None
+
+    class StubIngest:
+        _riot = StubRiot()
+
+    monkeypatch.setattr(main_mod, "_ingest_service", StubIngest())
+    r = client.get("/summoner/Ghost/NONE")
+    assert r.status_code == 200
+    assert "Player not found" in r.text
+
+
 def test_champions_index_and_detail(client):
     r = client.get("/champions")
     assert r.status_code == 200
@@ -85,6 +133,17 @@ def test_champions_index_and_detail(client):
 
 def test_no_skill_rating_vocabulary(client):
     # ToS framing: the public pages never talk about MMR/ELO/skill ratings.
+    # ("never player skill" in the footer is the allowed, deliberate phrasing.)
+    forbidden = ("mmr", "elo", "skill rating", "skill score", "matchmaking rating")
     for path in ("/", "/champions", "/champion/Jinx"):
         text = client.get(path).text.lower()
-        assert "mmr" not in text and "elo" not in text
+        for word in forbidden:
+            assert word not in text, f"{word!r} leaked into {path}"
+
+
+def test_brand_refresh_assets(client):
+    # Graphite Volt brand fidelity: fonts loaded, Signal-S mark and amber token present.
+    text = client.get("/").text
+    assert "Space+Grotesk" in text  # font stylesheet link
+    assert 'aria-label="Sylqon"' in text  # Signal-S mark rendered in the header
+    assert "--accent-2" in text  # amber secondary token in the palette
