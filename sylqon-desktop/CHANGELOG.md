@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.23.0](https://github.com/imperasus/sylqon/compare/v1.22.0...v1.23.0) (2026-07-09)
+
+
+### Features
+
+* **brand:** extend Graphite Volt to remaining surfaces ([18dc990](https://github.com/imperasus/sylqon/commit/18dc990e3178c9ec4579dbbc65c2b6d3568fa833))
+
 ## [1.22.0](https://github.com/imperasus/sylqon/compare/v1.21.0...v1.22.0) (2026-07-09)
 
 
