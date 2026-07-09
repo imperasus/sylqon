@@ -29,10 +29,10 @@ const DEVTOOLS_ENABLED =
 // (e.g. the Sylqon backend isn't running yet). Data URL so it can never itself
 // trigger did-fail-load.
 function fallbackPage(url: string, detail: string): string {
-  const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;font-family:system-ui,sans-serif;background:#0b0f1acc;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center">
+  const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;font-family:system-ui,sans-serif;background:#141416f2;color:#f0f0f1;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center">
   <div style="padding:20px">
     <div style="font-weight:700;letter-spacing:.15em;color:#f87171;margin-bottom:8px">OVERLAY OFFLINE</div>
-    <div style="font-size:13px;color:#94a3b8;line-height:1.5">Nem sikerült betölteni:<br><code style="color:#7dd3fc">${url}</code><br><br>Fut a Sylqon backend?<br><span style="color:#64748b">${detail}</span></div>
+    <div style="font-size:13px;color:#8a8b8e;line-height:1.5">Nem sikerült betölteni:<br><code style="color:#a3e635">${url}</code><br><br>Fut a Sylqon backend?<br><span style="color:#77787c">${detail}</span></div>
   </div></body>`;
   return "data:text/html;charset=utf-8," + encodeURIComponent(html);
 }

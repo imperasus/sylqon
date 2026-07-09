@@ -3,7 +3,7 @@
 Server-rendered HTML straight from the service (no build step, no JS
 framework): a Riot-ID → pool-audit report page plus SEO-friendly champion
 pages computed from our own Match-V5 aggregation. Visual language follows
-the landing page (dark HUD, teal accent).
+the landing page ("Graphite Volt" — neutral graphite, lime accent).
 
 ToS framing rule: every number on these pages measures *pool coverage* or
 champion presence in our dataset — never player skill. No MMR/ELO anywhere.
@@ -24,12 +24,12 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 _CSS = """
-:root{--bg:#0b1220;--surface:#111a2c;--surface2:#16213a;--text:#e8edf6;
---muted:#93a0b5;--accent:#4fd7c9;--red:#ef6a6a;--border:#26324a}
+:root{--bg:#0e0e0f;--surface:#19191a;--surface2:#212123;--text:#f0f0f1;
+--muted:#8a8b8e;--accent:#a3e635;--red:#f87171;--border:#2a2a2d}
 *{box-sizing:border-box}body{margin:0;font:16px/1.6 system-ui,Segoe UI,sans-serif;
 background:var(--bg);color:var(--text)}a{color:var(--accent);text-decoration:none}
 .wrap{max-width:1000px;margin:0 auto;padding:0 1.2rem}
-header{border-bottom:1px solid var(--border);background:rgba(11,18,32,.9)}
+header{border-bottom:1px solid var(--border);background:rgba(14,14,15,.9)}
 header .wrap{display:flex;align-items:center;justify-content:space-between;min-height:60px}
 .brand{font-weight:700;letter-spacing:.04em;color:var(--text);font-size:1.15rem}
 .brand span{color:var(--accent)}
@@ -50,7 +50,7 @@ border-radius:999px;border:1px solid var(--border);color:var(--accent);margin-ri
 .tag.warn{color:var(--red)}
 input[type=text]{background:var(--surface2);border:1px solid var(--border);color:var(--text);
 padding:.65rem .9rem;border-radius:8px;font-size:1rem;width:280px;max-width:60vw}
-button{background:var(--accent);color:#06251f;border:0;padding:.68rem 1.2rem;border-radius:8px;
+button{background:var(--accent);color:#0e0e0f;border:0;padding:.68rem 1.2rem;border-radius:8px;
 font-weight:700;font-size:.95rem;cursor:pointer}button:hover{filter:brightness(1.08)}
 footer{border-top:1px solid var(--border);margin-top:3rem;padding:1.4rem 0;color:var(--muted);font-size:.78rem}
 """
