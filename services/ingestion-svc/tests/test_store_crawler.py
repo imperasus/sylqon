@@ -70,8 +70,8 @@ def make_riot(match_ids, matches=None, timelines=None, account=None):
     riot.get_match_ids.return_value = match_ids
     matches = matches or {m: make_match(m) for m in match_ids}
     timelines = timelines or {m: make_timeline(m) for m in match_ids}
-    riot.get_match.side_effect = lambda mid: matches.get(mid)
-    riot.get_timeline.side_effect = lambda mid: timelines.get(mid)
+    riot.get_match.side_effect = lambda mid, region=None: matches.get(mid)
+    riot.get_timeline.side_effect = lambda mid, region=None: timelines.get(mid)
     return riot
 
 

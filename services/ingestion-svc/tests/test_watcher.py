@@ -106,8 +106,8 @@ def test_new_match_after_baseline_is_delivered_once(session_factory):
 
     new_ids = ["EUN1_2", "EUN1_1"]
     riot.get_match_ids.return_value = new_ids
-    riot.get_match.side_effect = lambda mid: make_match(mid)
-    riot.get_timeline.side_effect = lambda mid: make_timeline(mid)
+    riot.get_match.side_effect = lambda mid, region=None: make_match(mid)
+    riot.get_timeline.side_effect = lambda mid, region=None: make_timeline(mid)
 
     assert watcher.run_once() == 1  # only the new match
     notifier.send.assert_called_once()
@@ -122,8 +122,8 @@ def test_failed_delivery_is_retried_next_cycle(session_factory):
     watcher.run_once()  # baseline
 
     riot.get_match_ids.return_value = ["EUN1_2", "EUN1_1"]
-    riot.get_match.side_effect = lambda mid: make_match(mid)
-    riot.get_timeline.side_effect = lambda mid: make_timeline(mid)
+    riot.get_match.side_effect = lambda mid, region=None: make_match(mid)
+    riot.get_timeline.side_effect = lambda mid, region=None: make_timeline(mid)
 
     notifier.send.return_value = False  # Discord down
     assert watcher.run_once() == 0

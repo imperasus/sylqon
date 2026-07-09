@@ -3,22 +3,28 @@ from app import profile
 
 
 class FakeRiot:
-    """Minimal RiotClient surface build_profile depends on; any slice can be None."""
+    """Minimal RiotClient surface build_profile depends on; any slice can be None.
+    Records the region/platform each call was routed with."""
 
     def __init__(self, account=None, summoner=None, ranked=None, mastery=None):
         self._account, self._summoner = account, summoner
         self._ranked, self._mastery = ranked, mastery
+        self.calls = {}
 
-    def get_account_by_riot_id(self, game_name, tag_line):
+    def get_account_by_riot_id(self, game_name, tag_line, region=None):
+        self.calls["account_region"] = region
         return self._account
 
-    def get_summoner_by_puuid(self, puuid):
+    def get_summoner_by_puuid(self, puuid, platform=None):
+        self.calls["summoner_platform"] = platform
         return self._summoner
 
-    def get_ranked_stats(self, puuid):
+    def get_ranked_stats(self, puuid, platform=None):
+        self.calls["ranked_platform"] = platform
         return self._ranked
 
-    def get_top_mastery(self, puuid, count=6):
+    def get_top_mastery(self, puuid, count=6, platform=None):
+        self.calls["mastery_platform"] = platform
         return self._mastery
 
 
@@ -48,6 +54,15 @@ def test_build_profile_composes_all_sources():
     assert [c["name"] for c in p["top_champions"]] == ["Aatrox", "Wukong"]
     assert p["top_champions"][0]["square_url"].endswith("/img/champion/Aatrox.png")
     assert p["top_champions"][1]["square_url"].endswith("/img/champion/MonkeyKing.png")
+
+
+def test_build_profile_routes_by_region():
+    riot = FakeRiot(account={"puuid": "P1", "gameName": "A", "tagLine": "B"})
+    profile.build_profile(riot, "A", "B", platform="na1")
+    assert riot.calls["account_region"] == "americas"  # platform → cluster for Account-V1
+    assert riot.calls["summoner_platform"] == "na1"
+    assert riot.calls["ranked_platform"] == "na1"
+    assert riot.calls["mastery_platform"] == "na1"
 
 
 def test_build_profile_none_when_account_missing():

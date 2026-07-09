@@ -7,7 +7,7 @@ from dataclasses import asdict
 
 from fastapi import FastAPI, HTTPException, Query
 
-from app import config, db
+from app import config, db, regions
 from app.crawler import AccountNotFound, IngestService
 from app.notifier import DiscordWebhookNotifier
 from app.ratelimit import build_rate_limiter
@@ -98,15 +98,20 @@ def pool_report(game_name: str, tag_line: str, refresh: bool = Query(default=Tru
 
 
 @app.get("/api/summoner/{game_name}/{tag_line}")
-def summoner_profile(game_name: str, tag_line: str) -> dict:
+def summoner_profile(
+    game_name: str, tag_line: str, region: str = Query(default=regions.DEFAULT_PLATFORM)
+) -> dict:
     """Summoner profile DTO: Account-V1 + Summoner-V4 level + League-V4 rank +
-    Mastery-V4 top champions in one response. 404 if the Riot ID resolves to no
-    account. Descriptive display of the player's own official Riot data — no
-    skill/MMR estimate (S3 framing)."""
+    Mastery-V4 top champions in one response. ``region`` is a platform code
+    (euw1, na1, …). 404 if the Riot ID resolves to no account. Descriptive
+    display of the player's own official Riot data (S3 framing)."""
     from app import profile as profile_mod
 
     assert _ingest_service is not None
-    result = profile_mod.build_profile(_ingest_service._riot, game_name, tag_line)
+    platform = regions.normalize(region)
+    result = profile_mod.build_profile(
+        _ingest_service._riot, game_name, tag_line, platform=platform
+    )
     if result is None:
         raise HTTPException(status_code=404, detail="Riot ID not found")
     return result
@@ -118,21 +123,26 @@ def summoner_matches(
     tag_line: str,
     count: int = Query(default=20, ge=1, le=50),
     refresh: bool = Query(default=True),
+    region: str = Query(default=regions.DEFAULT_PLATFORM),
 ) -> dict:
-    """The player's recent matches as summary rows. ``refresh`` ingests newest
-    matches first (default); ``refresh=false`` reads only what's already stored."""
+    """The player's recent matches as summary rows. ``region`` is a platform code
+    (euw1, na1, …). ``refresh`` ingests newest matches first (default);
+    ``refresh=false`` reads only what's already stored."""
     from app import matches as matches_mod
 
     assert _ingest_service is not None
+    platform = regions.normalize(region)
+    cluster = regions.cluster_for(platform)
     puuid = None
     try:
-        result = _ingest_service.ingest(game_name, tag_line) if refresh else None
+        result = _ingest_service.ingest(game_name, tag_line, platform=platform) if refresh else None
         puuid = result.puuid if result else None
     except AccountNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     with db.open_session() as session:
         if puuid is None:
-            account = _ingest_service._riot.get_account_by_riot_id(game_name, tag_line)
+            account = _ingest_service._riot.get_account_by_riot_id(
+                game_name, tag_line, region=cluster)
             if not account or not account.get("puuid"):
                 raise HTTPException(status_code=404, detail="Riot ID not found")
             puuid = account["puuid"]

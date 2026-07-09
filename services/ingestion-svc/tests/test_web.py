@@ -39,8 +39,22 @@ def client(monkeypatch):
 def test_home_renders_form(client):
     r = client.get("/")
     assert r.status_code == 200
-    assert 'action="/pool-report"' in r.text
+    assert 'action="/search"' in r.text
+    assert 'value="euw1"' in r.text  # region selector rendered
     assert "pool coverage" in r.text.lower()
+
+
+def test_search_redirects_to_profile(client):
+    r = client.get("/search", params={"region": "na1", "riot_id": "Faker#KR1"},
+                   follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/summoner/na1/Faker/KR1"
+
+
+def test_search_invalid_riot_id(client):
+    r = client.get("/search", params={"region": "euw1", "riot_id": "no-tag"})
+    assert r.status_code == 200
+    assert "Invalid Riot ID" in r.text
 
 
 def test_pool_report_uses_stored_data(client, monkeypatch):
@@ -72,24 +86,24 @@ def test_summoner_page_renders_profile(client, monkeypatch):
     import app.main as main_mod
 
     class StubRiot:
-        def get_account_by_riot_id(self, g, t):
+        def get_account_by_riot_id(self, g, t, region=None):
             return {"puuid": "P1", "gameName": g, "tagLine": t}
 
-        def get_summoner_by_puuid(self, p):
+        def get_summoner_by_puuid(self, p, platform=None):
             return {"summonerLevel": 321, "profileIconId": 7}
 
-        def get_ranked_stats(self, p):
+        def get_ranked_stats(self, p, platform=None):
             return [{"queueType": "RANKED_SOLO_5x5", "tier": "GOLD", "rank": "II",
                      "leaguePoints": 44, "wins": 60, "losses": 40}]
 
-        def get_top_mastery(self, p, count=6):
+        def get_top_mastery(self, p, count=6, platform=None):
             return [{"championId": 266, "championPoints": 123456, "championLevel": 7}]
 
     class StubIngest:
         _riot = StubRiot()
 
     monkeypatch.setattr(main_mod, "_ingest_service", StubIngest())
-    r = client.get("/summoner/Faker/KR1")
+    r = client.get("/summoner/euw1/Faker/KR1")
     assert r.status_code == 200
     assert "Faker#KR1" in r.text
     assert "Level 321" in r.text
@@ -104,14 +118,14 @@ def test_summoner_page_not_found(client, monkeypatch):
     import app.main as main_mod
 
     class StubRiot:
-        def get_account_by_riot_id(self, g, t):
+        def get_account_by_riot_id(self, g, t, region=None):
             return None
 
     class StubIngest:
         _riot = StubRiot()
 
     monkeypatch.setattr(main_mod, "_ingest_service", StubIngest())
-    r = client.get("/summoner/Ghost/NONE")
+    r = client.get("/summoner/euw1/Ghost/NONE")
     assert r.status_code == 200
     assert "Player not found" in r.text
 
@@ -120,19 +134,19 @@ def test_matches_page_lists_stored_games(client, monkeypatch):
     import app.main as main_mod
 
     class StubRiot:
-        def get_account_by_riot_id(self, g, t):
+        def get_account_by_riot_id(self, g, t, region=None):
             return {"puuid": ME, "gameName": g, "tagLine": t}
 
     class StubIngest:
         _riot = StubRiot()
 
-        def ingest(self, g, t):
+        def ingest(self, g, t, platform=None):
             class R:
                 puuid = ME
             return R()
 
     monkeypatch.setattr(main_mod, "_ingest_service", StubIngest())
-    r = client.get("/summoner/Me/TAG/matches")
+    r = client.get("/summoner/euw1/Me/TAG/matches")
     assert r.status_code == 200
     assert "mrow" in r.text  # at least one match row rendered
     assert "Jinx" in r.text

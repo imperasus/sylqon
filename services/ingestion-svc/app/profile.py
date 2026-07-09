@@ -12,7 +12,7 @@ ToS framing: this is descriptive display of the player's own official Riot data
 """
 from __future__ import annotations
 
-from app import champions
+from app import champions, regions
 
 # League-V4 queueType → human label, in display order.
 _QUEUE_LABELS = {
@@ -63,21 +63,24 @@ def _top_champions(masteries: list | None) -> list[dict]:
     return out
 
 
-def build_profile(riot, game_name: str, tag_line: str, mastery_count: int = 6) -> dict | None:
+def build_profile(riot, game_name: str, tag_line: str, platform: str | None = None,
+                  mastery_count: int = 6) -> dict | None:
     """Assemble the profile DTO, or None if the Riot ID resolves to no account.
 
-    ``riot`` is any object exposing the RiotClient surface (get_account_by_riot_id,
-    get_summoner_by_puuid, get_ranked_stats, get_top_mastery) — the real client in
-    production, a stub in tests.
+    ``platform`` (euw1, na1, …) routes Account-V1 to its cluster and the
+    Summoner/League/Mastery calls to that platform; defaults to the client's
+    configured region. ``riot`` is any object exposing the RiotClient surface —
+    the real client in production, a stub in tests.
     """
-    account = riot.get_account_by_riot_id(game_name, tag_line)
+    cluster = regions.cluster_for(platform) if platform else None
+    account = riot.get_account_by_riot_id(game_name, tag_line, region=cluster)
     if not account or not account.get("puuid"):
         return None
     puuid = account["puuid"]
 
-    summoner = riot.get_summoner_by_puuid(puuid) or {}
-    ranked = _ranked(riot.get_ranked_stats(puuid))
-    top = _top_champions(riot.get_top_mastery(puuid, count=mastery_count))
+    summoner = riot.get_summoner_by_puuid(puuid, platform=platform) or {}
+    ranked = _ranked(riot.get_ranked_stats(puuid, platform=platform))
+    top = _top_champions(riot.get_top_mastery(puuid, count=mastery_count, platform=platform))
 
     return {
         "riot_id": f"{account.get('gameName', game_name)}#{account.get('tagLine', tag_line)}",

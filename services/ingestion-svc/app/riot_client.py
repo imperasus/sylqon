@@ -69,34 +69,38 @@ class RiotClient:
 
     # -- endpoints (all Phase 0 calls route to the mass-region cluster) -----
 
-    def get_account_by_riot_id(self, game_name: str, tag_line: str) -> dict | None:
-        """ACCOUNT-V1: Riot ID → {puuid, gameName, tagLine}."""
+    def get_account_by_riot_id(self, game_name: str, tag_line: str,
+                               region: str | None = None) -> dict | None:
+        """ACCOUNT-V1: Riot ID → {puuid, gameName, tagLine}. ``region`` is the
+        regional cluster (default the client's mass region)."""
         if not game_name or not tag_line:
             return None
         return self._get(
-            self.mass_region,
+            region or self.mass_region,
             "/riot/account/v1/accounts/by-riot-id/"
             f"{quote(game_name, safe='')}/{quote(tag_line, safe='')}",
         )
 
     def get_match_ids(self, puuid: str, count: int | None = None,
-                      queue: int | None = None) -> list[str]:
-        """MATCH-V5: newest match IDs for a puuid."""
+                      queue: int | None = None, region: str | None = None) -> list[str]:
+        """MATCH-V5: newest match IDs for a puuid (regional cluster route)."""
         params: dict = {"count": count or config.RIOT_MATCH_COUNT}
         if queue is not None:
             params["queue"] = queue
         result = self._get(
-            self.mass_region, f"/lol/match/v5/matches/by-puuid/{puuid}/ids", params
+            region or self.mass_region, f"/lol/match/v5/matches/by-puuid/{puuid}/ids", params
         )
         return result if isinstance(result, list) else []
 
-    def get_match(self, match_id: str) -> dict | None:
-        """MATCH-V5: full match object."""
-        return self._get(self.mass_region, f"/lol/match/v5/matches/{match_id}")
+    def get_match(self, match_id: str, region: str | None = None) -> dict | None:
+        """MATCH-V5: full match object (regional cluster route)."""
+        return self._get(region or self.mass_region, f"/lol/match/v5/matches/{match_id}")
 
-    def get_timeline(self, match_id: str) -> dict | None:
-        """MATCH-V5: per-minute frame/event timeline for a match."""
-        return self._get(self.mass_region, f"/lol/match/v5/matches/{match_id}/timeline")
+    def get_timeline(self, match_id: str, region: str | None = None) -> dict | None:
+        """MATCH-V5: per-minute frame/event timeline for a match (regional cluster)."""
+        return self._get(
+            region or self.mass_region, f"/lol/match/v5/matches/{match_id}/timeline"
+        )
 
     def get_ranked_stats(self, puuid: str, platform: str | None = None) -> list | None:
         """LEAGUE-V4: ranked entries for a puuid (platform route, e.g. eun1)."""

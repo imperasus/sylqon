@@ -16,9 +16,9 @@ import time
 from urllib.parse import quote
 
 from fastapi import APIRouter, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app import builds, db, pool
+from app import builds, db, pool, regions
 
 log = logging.getLogger(__name__)
 
@@ -58,8 +58,11 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .tag{display:inline-block;font-size:.72rem;font-weight:600;padding:.15rem .55rem;
 border-radius:999px;border:1px solid var(--border);color:var(--accent);margin-right:.3rem}
 .tag.warn{color:var(--red)}
-input[type=text]{background:var(--surface2);border:1px solid var(--border);color:var(--text);
-padding:.65rem .9rem;border-radius:8px;font-size:1rem;width:280px;max-width:60vw;font-family:inherit}
+input[type=text],select{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+padding:.65rem .9rem;border-radius:8px;font-size:1rem;font-family:inherit}
+input[type=text]{width:280px;max-width:60vw}
+select{cursor:pointer}
+.searchbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
 button{background:var(--accent);color:#0e0e0f;border:0;padding:.68rem 1.2rem;border-radius:8px;
 font-family:var(--font-display);font-weight:700;font-size:.95rem;cursor:pointer}
 button:hover{filter:brightness(1.08)}
@@ -181,6 +184,13 @@ def _fmt_ago(created_ms: int | None) -> str:
     return f"{int(delta // 86400)}d ago"
 
 
+def _region_options(selected: str = regions.DEFAULT_PLATFORM) -> str:
+    return "".join(
+        f'<option value="{code}"{" selected" if code == selected else ""}>{label}</option>'
+        for code, label in regions.PLATFORM_CHOICES
+    )
+
+
 @router.get("/", response_class=HTMLResponse)
 def home() -> HTMLResponse:
     # sylqon.com homepage: product hero (the desktop counter-draft app) up top,
@@ -194,24 +204,23 @@ pool, then builds the items, runes and summoner spells that beat those specific 
 and writes the whole loadout into your client automatically.</p>
 <div class="cta-row">
 <a class="btn" href="{_DOWNLOAD_URL}">Download for Windows</a>
-<a class="btn ghost" href="#pool-audit">Audit your champion pool</a>
+<a class="btn ghost" href="#search">Look up a summoner</a>
 </div>
 <p class="trust small muted">100% local — your credentials never leave your PC ·
 Powered by a local Ollama LLM</p>
 </section>
 
-<section id="pool-audit">
-<h2>Does your champion pool cover the meta?</h2>
-<p class="muted" style="max-width:56ch">Enter a Riot ID and get a per-role pool-coverage
-audit: your performance on your champions, how safely they can be blind-picked, and which
-common opponents your pool has no answer to — computed from our own aggregation of official
-Riot match data.</p>
-<div class="card"><form action="/pool-report" method="get">
+<section id="search">
+<h2>Look up any summoner</h2>
+<p class="muted" style="max-width:56ch">Search a Riot ID to see the profile — rank, top-champion
+mastery and recent matches — then audit how well that champion pool covers the meta, from our
+own aggregation of official Riot match data.</p>
+<div class="card"><form action="/search" method="get" class="searchbar">
+<select name="region" aria-label="Region">{_region_options()}</select>
 <input type="text" name="riot_id" placeholder="Name#TAG" required>
-<button type="submit">Audit my pool</button>
-<div class="muted small" style="margin-top:.5rem">Only public match data is used.
-Analysis measures pool coverage, not player skill.</div>
-</form></div>
+<button type="submit">Search</button></form>
+<div class="muted small" style="margin-top:.5rem">Official Riot data only. Pool analysis
+measures coverage, not player skill.</div></div>
 <h2>What you get</h2>
 <div class="grid">
 <div class="card"><strong>Coverage score</strong><p class="muted small">One number per role,
@@ -303,17 +312,32 @@ def pool_report_page(riot_id: str = Query(..., min_length=3)) -> HTMLResponse:
                  f"Champion-pool coverage audit for {riot_id}.")
 
 
-@router.get("/summoner/{game_name}/{tag_line}", response_class=HTMLResponse)
-def summoner_page(game_name: str, tag_line: str) -> HTMLResponse:
+@router.get("/search", response_class=HTMLResponse)
+def search_redirect(region: str = "euw1", riot_id: str = "") -> HTMLResponse:
+    """Region + Name#TAG search form target → redirect to the profile page."""
+    platform = regions.normalize(region)
+    game_name, _, tag_line = riot_id.partition("#")
+    if not game_name.strip() or not tag_line.strip():
+        return _page("Search", '<h1>Invalid Riot ID</h1><p class="muted">Use the '
+                     "<code>Name#TAG</code> form.</p>")
+    url = (f"/summoner/{platform}/{quote(game_name.strip(), safe='')}/"
+           f"{quote(tag_line.strip(), safe='')}")
+    return RedirectResponse(url, status_code=303)
+
+
+@router.get("/summoner/{region}/{game_name}/{tag_line}", response_class=HTMLResponse)
+def summoner_page(region: str, game_name: str, tag_line: str) -> HTMLResponse:
     riot_id = f"{game_name}#{tag_line}"
+    platform = regions.normalize(region)
     from app.main import _ingest_service  # resolved lazily; may be None in tests
 
     if _ingest_service is None:
-        return _page("Summoner", '<h1>Service unavailable</h1>'
+        return _page("Summoner", "<h1>Service unavailable</h1>"
                      '<p class="muted">Try again in a moment.</p>')
     from app import profile as profile_mod
 
-    data = profile_mod.build_profile(_ingest_service._riot, game_name.strip(), tag_line.strip())
+    data = profile_mod.build_profile(
+        _ingest_service._riot, game_name.strip(), tag_line.strip(), platform=platform)
     if data is None:
         return _page("Player not found", f'<h1>Player not found</h1><p class="muted">'
                      f'No account found for <strong>{html.escape(riot_id)}</strong> — '
@@ -352,7 +376,7 @@ def summoner_page(game_name: str, tag_line: str) -> HTMLResponse:
 <div class="profile-head">{icon}<div>
 <h1 style="margin:.2rem 0">{html.escape(data["riot_id"])}</h1>{level}</div></div>
 <div class="cta-row" style="margin:.6rem 0 1.2rem">
-<a class="btn" href="/summoner/{quote(data["game_name"], safe="")}/{quote(data["tag_line"], safe="")}/matches">Match history</a>
+<a class="btn" href="/summoner/{platform}/{quote(data["game_name"], safe="")}/{quote(data["tag_line"], safe="")}/matches">Match history</a>
 <a class="btn ghost" href="/pool-report?riot_id={quote(riot_id)}">Audit champion pool</a>
 <a class="btn ghost" href="/">Home</a></div>
 <h2>Ranked</h2><div class="grid">{rank_cards}</div>
@@ -364,9 +388,11 @@ League &amp; Champion Mastery) — profile display only.</p>"""
                  f"Summoner profile for {data['riot_id']}: level, rank and top champion mastery.")
 
 
-@router.get("/summoner/{game_name}/{tag_line}/matches", response_class=HTMLResponse)
-def matches_page(game_name: str, tag_line: str) -> HTMLResponse:
+@router.get("/summoner/{region}/{game_name}/{tag_line}/matches", response_class=HTMLResponse)
+def matches_page(region: str, game_name: str, tag_line: str) -> HTMLResponse:
     riot_id = f"{game_name}#{tag_line}"
+    platform = regions.normalize(region)
+    cluster = regions.cluster_for(platform)
     from app.main import _ingest_service  # resolved lazily; may be None in tests
 
     if _ingest_service is None:
@@ -380,14 +406,15 @@ def matches_page(game_name: str, tag_line: str) -> HTMLResponse:
 
     puuid = None
     try:
-        puuid = _ingest_service.ingest(game_name.strip(), tag_line.strip()).puuid
+        puuid = _ingest_service.ingest(
+            game_name.strip(), tag_line.strip(), platform=platform).puuid
     except AccountNotFound:
         return _page("Player not found", not_found)
     except Exception as exc:  # transient — fall back to a direct resolve + stored data
         log.info("matches-page ingest failed for %s: %s", riot_id, exc)
     if puuid is None:
         account = _ingest_service._riot.get_account_by_riot_id(
-            game_name.strip(), tag_line.strip())
+            game_name.strip(), tag_line.strip(), region=cluster)
         puuid = account.get("puuid") if account else None
     if puuid is None:
         return _page("Player not found", not_found)
@@ -395,7 +422,7 @@ def matches_page(game_name: str, tag_line: str) -> HTMLResponse:
     with db.open_session() as session:
         rows = matches_mod.list_for_puuid(session, puuid, limit=20)
 
-    prof = f'/summoner/{quote(game_name, safe="")}/{quote(tag_line, safe="")}'
+    prof = f'/summoner/{platform}/{quote(game_name, safe="")}/{quote(tag_line, safe="")}'
     if not rows:
         body = (f'<h1>{html.escape(riot_id)} <span class="muted small">· matches</span></h1>'
                 '<p class="muted">No matches stored yet — check back in a minute while we '

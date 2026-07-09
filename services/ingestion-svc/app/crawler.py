@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import sessionmaker
 
-from app import config, store
+from app import config, regions, store
 from app.riot_client import RiotClient
 
 log = logging.getLogger(__name__)
@@ -38,17 +38,23 @@ class IngestService:
         self._riot = riot
         self._session_factory = session_factory
 
-    def ingest(self, game_name: str, tag_line: str, count: int | None = None) -> IngestResult:
-        account = self._riot.get_account_by_riot_id(game_name, tag_line)
+    def ingest(self, game_name: str, tag_line: str, count: int | None = None,
+               platform: str | None = None) -> IngestResult:
+        """Ingest by Riot ID. ``platform`` (euw1, na1, …) selects the regional
+        cluster for Account-V1 + Match-V5; defaults to the client's mass region."""
+        cluster = regions.cluster_for(platform) if platform else self._riot.mass_region
+        account = self._riot.get_account_by_riot_id(game_name, tag_line, region=cluster)
         if not account or not account.get("puuid"):
             raise AccountNotFound(f"Riot ID not found: {game_name}#{tag_line}")
-        return self.ingest_by_puuid(account["puuid"], count)
+        return self.ingest_by_puuid(account["puuid"], count, cluster=cluster)
 
-    def ingest_by_puuid(self, puuid: str, count: int | None = None) -> IngestResult:
+    def ingest_by_puuid(self, puuid: str, count: int | None = None,
+                        cluster: str | None = None) -> IngestResult:
         count = count or config.RIOT_MATCH_COUNT
+        cluster = cluster or self._riot.mass_region
         result = IngestResult(puuid=puuid, requested_count=count)
 
-        match_ids = self._riot.get_match_ids(puuid, count=count)
+        match_ids = self._riot.get_match_ids(puuid, count=count, region=cluster)
         result.match_ids_found = len(match_ids)
 
         with self._session_factory() as session:
@@ -57,8 +63,8 @@ class IngestService:
                     result.skipped_existing += 1
                     continue
 
-                match = self._riot.get_match(match_id)
-                timeline = self._riot.get_timeline(match_id)
+                match = self._riot.get_match(match_id, region=cluster)
+                timeline = self._riot.get_timeline(match_id, region=cluster)
                 if not match or not timeline:
                     log.warning("skipping %s: match=%s timeline=%s",
                                 match_id, bool(match), bool(timeline))
@@ -67,7 +73,7 @@ class IngestService:
 
                 try:
                     if store.insert_match_bundle(
-                        session, match, timeline, region=self._riot.mass_region
+                        session, match, timeline, region=cluster
                     ):
                         result.inserted += 1
                         result.inserted_timelines += 1
