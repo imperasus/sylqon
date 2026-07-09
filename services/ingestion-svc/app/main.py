@@ -112,6 +112,47 @@ def summoner_profile(game_name: str, tag_line: str) -> dict:
     return result
 
 
+@app.get("/api/summoner/{game_name}/{tag_line}/matches")
+def summoner_matches(
+    game_name: str,
+    tag_line: str,
+    count: int = Query(default=20, ge=1, le=50),
+    refresh: bool = Query(default=True),
+) -> dict:
+    """The player's recent matches as summary rows. ``refresh`` ingests newest
+    matches first (default); ``refresh=false`` reads only what's already stored."""
+    from app import matches as matches_mod
+
+    assert _ingest_service is not None
+    puuid = None
+    try:
+        result = _ingest_service.ingest(game_name, tag_line) if refresh else None
+        puuid = result.puuid if result else None
+    except AccountNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    with db.open_session() as session:
+        if puuid is None:
+            account = _ingest_service._riot.get_account_by_riot_id(game_name, tag_line)
+            if not account or not account.get("puuid"):
+                raise HTTPException(status_code=404, detail="Riot ID not found")
+            puuid = account["puuid"]
+        rows = matches_mod.list_for_puuid(session, puuid, limit=count)
+    return {"riot_id": f"{game_name}#{tag_line}", "matches": rows}
+
+
+@app.get("/api/match/{match_id}")
+def match_detail(match_id: str) -> dict:
+    """One stored match's two-team scoreboard. 404 if the match isn't stored yet
+    (view the owner's match history to ingest it)."""
+    from app import matches as matches_mod
+
+    with db.open_session() as session:
+        result = matches_mod.detail(session, match_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="match not stored")
+    return result
+
+
 @app.get("/api/meta-sync/full")
 def meta_sync_full(min_games: int = Query(default=8, ge=3)) -> dict:
     """Everything the local app's full sync needs in one response (meta stats,

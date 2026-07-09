@@ -56,3 +56,10 @@ def profile_icon_url(icon_id: int | None) -> str | None:
     if icon_id is None:
         return None
     return f"{_CDN}/{version()}/img/profileicon/{icon_id}.png"
+
+
+def item_url(item_id: int | None) -> str | None:
+    """Item icon URL on the Data Dragon CDN, version-pinned. 0/None = empty slot."""
+    if not item_id:
+        return None
+    return f"{_CDN}/{version()}/img/item/{item_id}.png"

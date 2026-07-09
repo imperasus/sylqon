@@ -116,6 +116,44 @@ def test_summoner_page_not_found(client, monkeypatch):
     assert "Player not found" in r.text
 
 
+def test_matches_page_lists_stored_games(client, monkeypatch):
+    import app.main as main_mod
+
+    class StubRiot:
+        def get_account_by_riot_id(self, g, t):
+            return {"puuid": ME, "gameName": g, "tagLine": t}
+
+    class StubIngest:
+        _riot = StubRiot()
+
+        def ingest(self, g, t):
+            class R:
+                puuid = ME
+            return R()
+
+    monkeypatch.setattr(main_mod, "_ingest_service", StubIngest())
+    r = client.get("/summoner/Me/TAG/matches")
+    assert r.status_code == 200
+    assert "mrow" in r.text  # at least one match row rendered
+    assert "Jinx" in r.text
+    assert "Ranked Solo/Duo" in r.text
+
+
+def test_match_page_shows_scoreboard(client):
+    # client fixture seeded EUN1_0 (Jinx vs Caitlyn, blue win).
+    r = client.get("/match/EUN1_0")
+    assert r.status_code == 200
+    assert "Champion" in r.text and "Items" in r.text  # scoreboard header
+    assert "Victory" in r.text and "Defeat" in r.text  # both teams labelled
+    assert "Jinx" in r.text
+
+
+def test_match_page_not_stored(client):
+    r = client.get("/match/EUN1_999")
+    assert r.status_code == 200
+    assert "Match not stored" in r.text
+
+
 def test_champions_index_and_detail(client):
     r = client.get("/champions")
     assert r.status_code == 200

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import html
 import logging
+import time
 from urllib.parse import quote
 
 from fastapi import APIRouter, Query
@@ -86,6 +87,28 @@ color:var(--accent);margin:.15rem 0}
 padding:.7rem;text-align:center}
 .champ img{border-radius:8px;margin-bottom:.4rem}
 .champ-name{font-family:var(--font-display);font-weight:600;font-size:.92rem}
+.mlist{display:flex;flex-direction:column;gap:.5rem;margin-top:1rem}
+.mrow{display:flex;align-items:center;gap:.9rem;background:var(--surface);color:var(--text);
+border:1px solid var(--border);border-left-width:3px;border-radius:10px;padding:.6rem .9rem}
+.mrow:hover{border-color:var(--muted)}
+.mrow.win{border-left-color:var(--accent)}.mrow.loss{border-left-color:var(--red)}
+.mrow>img{width:44px;height:44px;border-radius:8px;flex:none}
+.mrow .mmeta{min-width:118px}
+.mrow .res{font-family:var(--font-display);font-weight:700;font-size:.85rem}
+.mrow .res.win{color:var(--accent)}.mrow .res.loss{color:var(--red)}
+.mrow .champ-lbl{font-family:var(--font-display);font-weight:600}
+.mrow .kda{font-family:var(--font-mono);font-weight:700}
+.mspacer{flex:1}
+.team{margin:1.2rem 0}
+.team-head{display:flex;justify-content:space-between;align-items:baseline;margin:.2rem 0 .4rem}
+.team-head .res{font-family:var(--font-display);font-weight:700}
+.team-head .res.win{color:var(--accent)}.team-head .res.loss{color:var(--red)}
+.sb-wrap{overflow-x:auto}
+.cchamp{display:flex;align-items:center;gap:.5rem;font-weight:600}
+.cchamp img{width:32px;height:32px;border-radius:6px;flex:none}
+.num{font-family:var(--font-mono);text-align:right;white-space:nowrap}
+.items{display:flex;gap:2px}
+.items img{width:22px;height:22px;border-radius:4px;background:var(--surface2)}
 footer{border-top:1px solid var(--border);margin-top:3rem;padding:1.4rem 0;color:var(--muted);font-size:.78rem}
 """
 
@@ -137,6 +160,25 @@ champion presence in our dataset — never player skill.</div></footer>
 
 def _bar(value: int) -> str:
     return f'<div class="bar"><i style="width:{max(2, min(100, value))}%"></i></div>'
+
+
+def _fmt_duration(secs: int | None) -> str:
+    if not secs:
+        return "—"
+    minutes, seconds = divmod(int(secs), 60)
+    return f"{minutes}:{seconds:02d}"
+
+
+def _fmt_ago(created_ms: int | None) -> str:
+    """Relative age of a match from its epoch-ms creation time."""
+    if not created_ms:
+        return ""
+    delta = time.time() - created_ms / 1000
+    if delta < 3600:
+        return f"{int(delta // 60)}m ago"
+    if delta < 86400:
+        return f"{int(delta // 3600)}h ago"
+    return f"{int(delta // 86400)}d ago"
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -310,7 +352,8 @@ def summoner_page(game_name: str, tag_line: str) -> HTMLResponse:
 <div class="profile-head">{icon}<div>
 <h1 style="margin:.2rem 0">{html.escape(data["riot_id"])}</h1>{level}</div></div>
 <div class="cta-row" style="margin:.6rem 0 1.2rem">
-<a class="btn" href="/pool-report?riot_id={quote(riot_id)}">Audit this champion pool</a>
+<a class="btn" href="/summoner/{quote(data["game_name"], safe="")}/{quote(data["tag_line"], safe="")}/matches">Match history</a>
+<a class="btn ghost" href="/pool-report?riot_id={quote(riot_id)}">Audit champion pool</a>
 <a class="btn ghost" href="/">Home</a></div>
 <h2>Ranked</h2><div class="grid">{rank_cards}</div>
 <h2>Top champions <span class="muted small">· mastery</span></h2>
@@ -319,6 +362,117 @@ def summoner_page(game_name: str, tag_line: str) -> HTMLResponse:
 League &amp; Champion Mastery) — profile display only.</p>"""
     return _page(f"{data['riot_id']} — profile", body,
                  f"Summoner profile for {data['riot_id']}: level, rank and top champion mastery.")
+
+
+@router.get("/summoner/{game_name}/{tag_line}/matches", response_class=HTMLResponse)
+def matches_page(game_name: str, tag_line: str) -> HTMLResponse:
+    riot_id = f"{game_name}#{tag_line}"
+    from app.main import _ingest_service  # resolved lazily; may be None in tests
+
+    if _ingest_service is None:
+        return _page("Match history", "<h1>Service unavailable</h1>"
+                     '<p class="muted">Try again in a moment.</p>')
+    from app import matches as matches_mod
+    from app.crawler import AccountNotFound
+
+    not_found = (f'<h1>Player not found</h1><p class="muted">No account found for '
+                 f"<strong>{html.escape(riot_id)}</strong> — check the spelling (Name#TAG).</p>")
+
+    puuid = None
+    try:
+        puuid = _ingest_service.ingest(game_name.strip(), tag_line.strip()).puuid
+    except AccountNotFound:
+        return _page("Player not found", not_found)
+    except Exception as exc:  # transient — fall back to a direct resolve + stored data
+        log.info("matches-page ingest failed for %s: %s", riot_id, exc)
+    if puuid is None:
+        account = _ingest_service._riot.get_account_by_riot_id(
+            game_name.strip(), tag_line.strip())
+        puuid = account.get("puuid") if account else None
+    if puuid is None:
+        return _page("Player not found", not_found)
+
+    with db.open_session() as session:
+        rows = matches_mod.list_for_puuid(session, puuid, limit=20)
+
+    prof = f'/summoner/{quote(game_name, safe="")}/{quote(tag_line, safe="")}'
+    if not rows:
+        body = (f'<h1>{html.escape(riot_id)} <span class="muted small">· matches</span></h1>'
+                '<p class="muted">No matches stored yet — check back in a minute while we '
+                f'fetch them.</p><div class="cta-row"><a class="btn ghost" href="{prof}">'
+                "Back to profile</a></div>")
+        return _page(f"{riot_id} — matches", body)
+
+    items = []
+    for r in rows:
+        res = "win" if r["win"] else "loss"
+        label = "Victory" if r["win"] else "Defeat"
+        cspm = f' · {r["cs_per_min"]}/min' if r["cs_per_min"] is not None else ""
+        icon = (f'<img src="{html.escape(r["champion_url"])}" alt="">'
+                if r["champion_url"] else "")
+        items.append(
+            f'<a class="mrow {res}" href="/match/{quote(r["match_id"], safe="")}">{icon}'
+            f'<div class="mmeta"><div class="res {res}">{label}</div>'
+            f'<div class="muted small">{html.escape(r["queue"])} · {_fmt_ago(r["created"])}</div></div>'
+            f'<div class="champ-lbl">{html.escape(r["champion"] or "?")}'
+            f'<div class="muted small">{html.escape((r["role"] or "").title())}</div></div>'
+            '<div class="mspacer"></div>'
+            f'<div style="text-align:right"><span class="kda">'
+            f'{r["kills"]}/{r["deaths"]}/{r["assists"]}</span>'
+            f'<div class="muted small">{r["cs"]} CS{cspm}</div></div></a>'
+        )
+    body = (f'<h1>{html.escape(riot_id)} <span class="muted small">· matches</span></h1>'
+            f'<div class="cta-row" style="margin:.4rem 0"><a class="btn ghost" href="{prof}">'
+            f'Profile</a></div><div class="mlist">{"".join(items)}</div>')
+    return _page(f"{riot_id} — match history", body,
+                 f"Recent matches for {riot_id} from official Riot match data.")
+
+
+@router.get("/match/{match_id}", response_class=HTMLResponse)
+def match_page(match_id: str) -> HTMLResponse:
+    from app import matches as matches_mod
+
+    with db.open_session() as session:
+        data = matches_mod.detail(session, match_id)
+    if data is None:
+        return _page("Match", '<h1>Match not stored</h1><p class="muted">This match is not in '
+                     "our dataset yet — open the owner’s match history to fetch it.</p>")
+
+    teams_html = []
+    for team in data["teams"]:
+        res = "win" if team["win"] else "loss"
+        side = "Blue" if team["team_id"] == 100 else "Red"
+        label = "Victory" if team["win"] else "Defeat"
+        rows = []
+        for p in team["participants"]:
+            icon = (f'<img src="{html.escape(p["champion_url"])}" alt="">'
+                    if p["champion_url"] else "")
+            item_imgs = "".join(f'<img src="{html.escape(u)}" alt="">' for u in p["items"])
+            gold = f'{(p["gold"] or 0) / 1000:.1f}k'
+            rows.append(
+                f'<tr><td><div class="cchamp">{icon}'
+                f'<span>{html.escape(p["champion"] or "?")}</span></div></td>'
+                f'<td class="num">{p["kills"]}/{p["deaths"]}/{p["assists"]}</td>'
+                f'<td class="num">{p["cs"]}</td><td class="num">{gold}</td>'
+                f'<td class="num">{(p["damage"] or 0):,}</td>'
+                f'<td class="num">{p["vision"] or 0}</td>'
+                f'<td><div class="items">{item_imgs}</div></td></tr>'
+            )
+        teams_html.append(
+            f'<div class="team"><div class="team-head">'
+            f'<span class="res {res}">{label} — {side} team</span>'
+            f'<span class="muted small">{team["kills"]} kills · '
+            f'{team["gold"] / 1000:.1f}k gold</span></div>'
+            '<div class="sb-wrap"><table><tr><th>Champion</th><th class="num">KDA</th>'
+            '<th class="num">CS</th><th class="num">Gold</th><th class="num">Dmg</th>'
+            f'<th class="num">Vis</th><th>Items</th></tr>{"".join(rows)}</table></div></div>'
+        )
+
+    patch = f' · patch {html.escape(data["patch"])}' if data["patch"] else ""
+    head = (f'<h1>Match <span class="muted small">· {html.escape(data["queue"])} · '
+            f'{_fmt_duration(data["duration"])}{patch}</span></h1>')
+    return _page(f"Match {html.escape(match_id)}", head + "".join(teams_html),
+                 f"{data['queue']} match scoreboard from official Riot match data.")
 
 
 @router.get("/champions", response_class=HTMLResponse)
