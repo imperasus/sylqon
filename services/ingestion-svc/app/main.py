@@ -163,6 +163,29 @@ def match_detail(match_id: str) -> dict:
     return result
 
 
+@app.get("/api/leaderboard/{queue}")
+def leaderboard(
+    queue: str,
+    tier: str = Query(default="CHALLENGER"),
+    region: str = Query(default=regions.DEFAULT_PLATFORM),
+) -> dict:
+    """Apex-league ladder (League-V4 challenger/grandmaster/master) for a queue,
+    region and tier — cached per (queue, platform, tier). Official public Riot
+    ladder data."""
+    from app import leaderboard as lb
+
+    assert _ingest_service is not None
+    platform = regions.normalize(region)
+    tier = tier.upper()
+    if tier not in lb.TIERS or queue not in lb.QUEUES:
+        raise HTTPException(status_code=400, detail="unknown tier or queue")
+    with db.open_session() as session:
+        payload = lb.get_leaderboard(session, _ingest_service._riot, tier, queue, platform)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="leaderboard unavailable")
+    return {"queue": queue, "tier": tier, "region": platform, "rows": payload["rows"]}
+
+
 @app.get("/api/meta-sync/full")
 def meta_sync_full(min_games: int = Query(default=8, ge=3)) -> dict:
     """Everything the local app's full sync needs in one response (meta stats,

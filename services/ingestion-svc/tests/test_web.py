@@ -168,6 +168,28 @@ def test_match_page_not_stored(client):
     assert "Match not stored" in r.text
 
 
+def test_leaderboard_page_renders_ladder(client, monkeypatch):
+    import app.main as main_mod
+
+    class StubRiot:
+        def get_apex_league(self, tier, queue="RANKED_SOLO_5x5", platform=None):
+            return {"tier": tier, "entries": [
+                {"summonerName": "Hide on bush", "leaguePoints": 1500, "wins": 200,
+                 "losses": 100, "hotStreak": True, "summonerId": "x"}]}
+
+    class StubIngest:
+        _riot = StubRiot()
+
+    monkeypatch.setattr(main_mod, "_ingest_service", StubIngest())
+    r = client.get("/leaderboard/RANKED_SOLO_5x5", params={"tier": "CHALLENGER"})
+    assert r.status_code == 200
+    assert "Hide on bush" in r.text
+    assert "1,500" in r.text  # LP thousands-formatted
+    assert "Challenger" in r.text and "Grandmaster" in r.text  # tier tabs
+    low = r.text.lower()
+    assert "mmr" not in low and "elo" not in low
+
+
 def test_champions_index_and_detail(client):
     r = client.get("/champions")
     assert r.status_code == 200

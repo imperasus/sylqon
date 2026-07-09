@@ -108,6 +108,21 @@ class RiotClient:
             platform or self.platform_region, f"/lol/league/v4/entries/by-puuid/{puuid}"
         )
 
+    def get_apex_league(self, tier: str, queue: str = "RANKED_SOLO_5x5",
+                        platform: str | None = None) -> dict | None:
+        """LEAGUE-V4: challenger/grandmaster/master league list for a queue
+        (platform route). ``tier`` is CHALLENGER/GRANDMASTER/MASTER."""
+        path = {
+            "CHALLENGER": "challengerleagues",
+            "GRANDMASTER": "grandmasterleagues",
+            "MASTER": "masterleagues",
+        }.get(tier.upper())
+        if not path:
+            return None
+        return self._get(
+            platform or self.platform_region, f"/lol/league/v4/{path}/by-queue/{queue}"
+        )
+
     def get_summoner_by_puuid(self, puuid: str, platform: str | None = None) -> dict | None:
         """SUMMONER-V4: {summonerLevel, profileIconId, ...} for a puuid (platform route)."""
         return self._get(

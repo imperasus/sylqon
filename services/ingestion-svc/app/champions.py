@@ -51,6 +51,16 @@ def square_url(champion_id: int | str | None) -> str | None:
     return f"{_CDN}/{version()}/img/champion/{key}.png"
 
 
+@lru_cache(maxsize=1)
+def _name_index() -> dict:
+    return {e["name"].lower(): cid for cid, e in _catalog()["champions"].items()}
+
+
+def square_url_by_name(name: str | None) -> str | None:
+    """Champion square icon URL looked up by display name (case-insensitive)."""
+    return square_url(_name_index().get((name or "").lower()))
+
+
 def profile_icon_url(icon_id: int | None) -> str | None:
     """Summoner profile-icon URL on the Data Dragon CDN, version-pinned."""
     if icon_id is None:

@@ -112,6 +112,12 @@ border:1px solid var(--border);border-left-width:3px;border-radius:10px;padding:
 .num{font-family:var(--font-mono);text-align:right;white-space:nowrap}
 .items{display:flex;gap:2px}
 .items img{width:22px;height:22px;border-radius:4px;background:var(--surface2)}
+.tabs{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.6rem 0}
+.tab{padding:.38rem .8rem;border:1px solid var(--border);border-radius:999px;color:var(--muted);
+font-size:.82rem;font-family:var(--font-display);font-weight:600}
+.tab:hover{color:var(--text)}
+.tab.active{background:var(--accent);color:#0e0e0f;border-color:var(--accent)}
+.hot{color:var(--accent-2)}
 footer{border-top:1px solid var(--border);margin-top:3rem;padding:1.4rem 0;color:var(--muted);font-size:.78rem}
 """
 
@@ -151,7 +157,7 @@ def _page(title: str, body: str, description: str = "") -> HTMLResponse:
 <style>{_CSS}</style></head><body>
 <header><div class="wrap">
 <a class="brand" href="/">{_MARK}SYL<span>QON</span> <span class="muted small">pool coverage</span></a>
-<nav><a href="/">Pool audit</a><a href="/champions">Champions</a>
+<nav><a href="/champions">Champions</a><a href="/leaderboard/RANKED_SOLO_5x5">Leaderboard</a>
 <a href="{_DOWNLOAD_URL}">Desktop app</a></nav>
 </div></header>
 <main class="wrap">{body}</main>
@@ -502,6 +508,70 @@ def match_page(match_id: str) -> HTMLResponse:
                  f"{data['queue']} match scoreboard from official Riot match data.")
 
 
+@router.get("/leaderboard/{queue}", response_class=HTMLResponse)
+def leaderboard_page(queue: str, tier: str = "CHALLENGER", region: str = "euw1") -> HTMLResponse:
+    from app import leaderboard as lb
+    from app.main import _ingest_service  # resolved lazily; may be None in tests
+
+    platform = regions.normalize(region)
+    tier = tier.upper()
+    if queue not in lb.QUEUES:
+        queue = lb.DEFAULT_QUEUE
+    if tier not in lb.TIERS:
+        tier = "CHALLENGER"
+    if _ingest_service is None:
+        return _page("Leaderboard", "<h1>Service unavailable</h1>"
+                     '<p class="muted">Try again in a moment.</p>')
+
+    with db.open_session() as session:
+        data = lb.get_leaderboard(session, _ingest_service._riot, tier, queue, platform)
+
+    qtabs = "".join(
+        f'<a class="tab{" active" if q == queue else ""}" '
+        f'href="/leaderboard/{q}?tier={tier}&amp;region={platform}">{html.escape(label)}</a>'
+        for q, label in lb.QUEUES.items()
+    )
+    ttabs = "".join(
+        f'<a class="tab{" active" if t == tier else ""}" '
+        f'href="/leaderboard/{queue}?tier={t}&amp;region={platform}">{t.title()}</a>'
+        for t in lb.TIERS
+    )
+    region_form = (
+        f'<form method="get" action="/leaderboard/{queue}" class="searchbar" '
+        f'style="margin-left:auto"><input type="hidden" name="tier" value="{tier}">'
+        f'<select name="region" aria-label="Region">{_region_options(platform)}</select>'
+        "<button type=\"submit\">Go</button></form>"
+    )
+
+    if data and data["rows"]:
+        row_html = []
+        for r in data["rows"]:
+            hot = ' <span class="hot" title="Hot streak">▲</span>' if r["hot_streak"] else ""
+            wr = f'{r["winrate"]}%' if r["winrate"] is not None else "—"
+            row_html.append(
+                f'<tr><td class="num">{r["rank"]}</td>'
+                f'<td>{html.escape(r["name"] or "—")}{hot}</td>'
+                f'<td class="num">{(r["lp"] or 0):,}</td>'
+                f'<td class="num">{r["wins"]}W/{r["losses"]}L</td>'
+                f'<td class="num">{wr}</td></tr>'
+            )
+        table = (f'<div class="sb-wrap"><table><tr><th class="num">#</th><th>Summoner</th>'
+                 f'<th class="num">LP</th><th class="num">W/L</th><th class="num">Win%</th></tr>'
+                 f'{"".join(row_html)}</table></div>')
+    else:
+        table = '<p class="muted">Ladder unavailable right now — try again shortly.</p>'
+
+    head = (f'<h1>Leaderboard <span class="muted small">· {platform.upper()} · '
+            f'{tier.title()} · {html.escape(lb.QUEUES[queue])}</span></h1>')
+    body = (head + f'<div class="tabs">{qtabs}{region_form}</div>'
+            f'<div class="tabs">{ttabs}</div>' + table
+            + '<p class="muted small" style="margin-top:1rem">Official Riot ladder '
+              "(League-V4). Names Riot no longer returns show as a short id.</p>")
+    return _page(f"{tier.title()} leaderboard — {platform.upper()}", body,
+                 f"{tier.title()} {lb.QUEUES[queue]} ladder for {platform.upper()} — "
+                 "official Riot ladder data.")
+
+
 @router.get("/champions", response_class=HTMLResponse)
 def champions_page() -> HTMLResponse:
     with db.open_session() as session:
@@ -512,17 +582,29 @@ def champions_page() -> HTMLResponse:
             if data:
                 rows.append(data)
     rows.sort(key=lambda d: -d["games"])
+    from app import champions
+
+    def _cell(d):
+        url = champions.square_url_by_name(d["champion"])
+        img = (f'<img src="{html.escape(url)}" alt="" width="28" height="28" loading="lazy">'
+               if url else "")
+        return (f'<div class="cchamp">{img}<a href="/champion/{quote(d["champion"])}">'
+                f'{html.escape(d["champion"])}</a></div>')
+
     table = "".join(
-        f'<tr><td><a href="/champion/{quote(d["champion"])}">{html.escape(d["champion"])}</a></td>'
-        f'<td>{d["role"]}</td><td>{d["games"]}</td><td>{d["winrate_pct"]}%</td></tr>'
+        f'<tr><td>{_cell(d)}</td>'
+        f'<td>{d["role"]}</td><td class="num">{d["games"]}</td>'
+        f'<td class="num">{d["winrate_pct"]}%</td></tr>'
         for d in rows
     )
-    body = (f'<h1>Champions in our dataset</h1><p class="muted small">Presence and win rate '
+    patch = champions.version()
+    patch_lbl = f' <span class="muted small">· patch {html.escape(patch)}</span>' if patch else ""
+    body = (f'<h1>Champion meta{patch_lbl}</h1><p class="muted small">Presence and win rate '
             f'across the Summoner’s Rift matches we have aggregated ({len(rows)} champions '
             f'with enough games).</p>'
             f'<div class="card"><table><tr><th>Champion</th><th>Main role</th>'
-            f'<th>Games</th><th>Win rate</th></tr>{table}</table></div>')
-    return _page("Champions", body, "Champion presence and win rates from our own aggregation.")
+            f'<th class="num">Games</th><th class="num">Win rate</th></tr>{table}</table></div>')
+    return _page("Champion meta", body, "Champion presence and win rates from our own aggregation.")
 
 
 @router.get("/champion/{name}", response_class=HTMLResponse)

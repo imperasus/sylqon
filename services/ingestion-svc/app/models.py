@@ -152,6 +152,20 @@ class MetaBuild(Base):
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class LeaderboardSnapshot(Base):
+    """Cached apex-league ladder (League-V4 challenger/grandmaster/master) per
+    queue+platform+tier. Refreshed on a TTL — apex ladders move slowly, and one
+    snapshot serves every visitor. Official public Riot ladder data."""
+
+    __tablename__ = "leaderboard_snapshots"
+
+    queue: Mapped[str] = mapped_column(Text, primary_key=True)  # RANKED_SOLO_5x5 / RANKED_FLEX_SR
+    platform: Mapped[str] = mapped_column(Text, primary_key=True)  # euw1, na1, …
+    tier: Mapped[str] = mapped_column(Text, primary_key=True)  # CHALLENGER/GRANDMASTER/MASTER
+    payload: Mapped[dict] = mapped_column(JsonCol)  # shaped, LP-ranked rows
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class CrawlTarget(Base):
     """PUUIDs discovered from stored matches' co-players — the seed-crawl
     frontier. last_crawled_at=None → never crawled yet."""
