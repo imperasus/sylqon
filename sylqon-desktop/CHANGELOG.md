@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.24.3](https://github.com/imperasus/sylqon/compare/v1.24.2...v1.24.3) (2026-07-10)
+
+
+### Performance
+
+* **ingestion-svc:** SQL self-join aggregate replaces ORM row scan in matchup() ([f027aaa](https://github.com/imperasus/sylqon/commit/f027aaaba863e17d299b907d1e05857a486bfe18))
+
 ### [1.24.2](https://github.com/imperasus/sylqon/compare/v1.24.1...v1.24.2) (2026-07-10)
 
 
