@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.24.2](https://github.com/imperasus/sylqon/compare/v1.24.1...v1.24.2) (2026-07-10)
+
+
+### Performance
+
+* **web:** SQL slot extraction on the public champion page ([3cde7f4](https://github.com/imperasus/sylqon/commit/3cde7f4d9c6b822277ec2834d7955f8852ec1533))
+
 ### [1.24.1](https://github.com/imperasus/sylqon/compare/v1.24.0...v1.24.1) (2026-07-10)
 
 ## [1.24.0](https://github.com/imperasus/sylqon/compare/v1.23.0...v1.24.0) (2026-07-10)
