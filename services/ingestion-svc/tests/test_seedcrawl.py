@@ -2,14 +2,12 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
 from app import config, seedcrawl, store
 from app.crawler import IngestService
 from app.models import Base, CrawlTarget, LinkedAccount, Match
-
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from tests.test_store_crawler import make_match, make_riot, make_timeline
 
 

@@ -2,13 +2,12 @@
 from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
 from app import store
 from app.crawler import AccountNotFound, IngestService
 from app.models import Base, Match, MatchParticipant, Timeline
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 @pytest.fixture()

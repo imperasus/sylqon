@@ -1,24 +1,10 @@
-"""Offline tests for the stored-match read views (list + detail)."""
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+"""Offline tests for the stored-match read views (list + detail).
 
+The ``factory`` fixture comes from tests/conftest.py.
+"""
 from app import matches, store
-from app.models import Base
 
 ME = "puuid-me"
-
-
-@pytest.fixture()
-def factory():
-    engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        poolclass=StaticPool,
-        connect_args={"check_same_thread": False},
-    )
-    Base.metadata.create_all(engine)
-    return sessionmaker(bind=engine, expire_on_commit=False)
 
 
 def _participant(i, puuid, champ_id, champ_name, team, win):

@@ -7,7 +7,6 @@ import time
 import uuid
 
 import pytest
-
 from app.ratelimit import RateLimitTimeout, RedisTokenBucketLimiter
 
 

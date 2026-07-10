@@ -20,7 +20,7 @@ never player skill — no MMR/ELO-like language anywhere.
 from __future__ import annotations
 
 import logging
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, aliased

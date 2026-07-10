@@ -1,14 +1,12 @@
 """Offline tests for own-data builds/matchups and the bot's DB-side logic."""
 import pytest
+from app import builds, store
+from app.advice import benchmarks
+from app.models import AdviceFeedback, Base, LinkedAccount
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app import builds, store
-from app.advice import benchmarks
-from app.models import AdviceFeedback, Base, LinkedAccount
-
 from tests.test_store_crawler import make_match, make_riot, make_timeline
 from tests.test_watcher import make_watcher
 

@@ -1,11 +1,10 @@
 """Leaderboard shaping + TTL cache, mocked Riot client, fully offline."""
 import pytest
+from app import leaderboard
+from app.models import Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app import leaderboard
-from app.models import Base
 
 
 @pytest.fixture()

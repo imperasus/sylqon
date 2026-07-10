@@ -67,7 +67,7 @@ def ingest(
     try:
         result = _ingest_service.ingest(game_name, tag_line, count)
     except AccountNotFound as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return asdict(result)
 
 
@@ -82,7 +82,7 @@ def pool_report(game_name: str, tag_line: str, refresh: bool = Query(default=Tru
     try:
         result = _ingest_service.ingest(game_name, tag_line) if refresh else None
     except AccountNotFound as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     puuid = result.puuid if result else None
     with db.open_session() as session:
         if puuid is None:
@@ -138,7 +138,7 @@ def summoner_matches(
         result = _ingest_service.ingest(game_name, tag_line, platform=platform) if refresh else None
         puuid = result.puuid if result else None
     except AccountNotFound as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     with db.open_session() as session:
         if puuid is None:
             account = _ingest_service._riot.get_account_by_riot_id(
@@ -251,4 +251,4 @@ def advice(match_id: str, puuid: str, lang: str = Query(default="hu")) -> dict:
         try:
             return get_or_generate_advice(session, match_id, puuid, lang=lang)
         except AdviceNotPossible as exc:
-            raise HTTPException(status_code=404, detail=str(exc))
+            raise HTTPException(status_code=404, detail=str(exc)) from exc

@@ -2,13 +2,11 @@
 import time
 
 import pytest
+from app import report, store
+from app.models import Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app import report, store
-from app.models import Base
-
 from tests.test_advice import CORE_ITEM, build_view, item_event
 from tests.test_store_crawler import make_match
 

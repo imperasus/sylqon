@@ -14,7 +14,7 @@ from collections import Counter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.advice.pipeline import AdviceNotPossible, generate_findings, _tuning_with_own_benchmarks
+from app.advice.pipeline import AdviceNotPossible, _tuning_with_own_benchmarks, generate_findings
 from app.models import Match, MatchParticipant
 
 log = logging.getLogger(__name__)

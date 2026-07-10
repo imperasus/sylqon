@@ -2,13 +2,12 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
 from app import metabuild, store
 from app.advice import benchmarks
 from app.models import Base, MetaBuild
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 CORE = sorted(benchmarks.CORE_ITEM_IDS)[:4]
 ROLE_POOL = sorted(benchmarks.CORE_ITEM_IDS)[4:12]  # enemy-BOTTOM final items

@@ -1,13 +1,11 @@
 """Route tests for the public S3 pages (TestClient + seeded SQLite)."""
 import pytest
+from app import db, store
+from app.models import Base
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app import db, store
-from app.models import Base
-
 from tests.test_pool import ME, lane_match
 
 
@@ -240,7 +238,8 @@ def test_leaderboard_page_renders_ladder(client, monkeypatch):
 def test_champion_index_aggregate(client):
     # Direct check of the SQL aggregate the meta page uses (client fixture DB):
     # Jinx 4 games (2W), Caitlyn 5 games (4W... from specs), sorted by games.
-    from app import builds, db as db_mod
+    from app import builds
+    from app import db as db_mod
 
     with db_mod.open_session() as s:
         rows = builds.champion_index(s)

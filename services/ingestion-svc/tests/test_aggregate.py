@@ -1,11 +1,10 @@
 """Offline tests for own-data benchmark aggregation and seed override."""
 import pytest
+from app import aggregate, config, store
+from app.models import Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app import aggregate, config, store
-from app.models import Base
 
 
 @pytest.fixture()
@@ -125,9 +124,8 @@ def test_band_for_tier():
 
 
 def test_old_shape_table_is_dropped_on_init():
-    from sqlalchemy import create_engine, inspect, text
-
     from app import db as app_db
+    from sqlalchemy import create_engine, inspect, text
 
     engine = create_engine("sqlite+pysqlite:///:memory:")
     with engine.begin() as conn:  # simulate the pre-band table shape

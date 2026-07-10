@@ -1,15 +1,13 @@
 """End-to-end advice pipeline over stored data (SQLite in-memory)."""
 import pytest
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
 from app import store
 from app.advice.pipeline import AdviceNotPossible, get_or_generate_advice
 from app.models import Advice, Base
-
-from tests.test_store_crawler import make_match
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from tests.test_advice import CORE_ITEM, build_view, item_event, kill_event
+from tests.test_store_crawler import make_match
 
 
 @pytest.fixture()

@@ -216,7 +216,7 @@ class SylqonBot(discord.Client):
                 except discord.DiscordException:
                     log.exception("weekly report post failed in %s", channel_id)
             if sent:
-                def _stamp():
+                def _stamp(guild_id=guild_id):
                     with self.session_factory() as session:
                         cfg = session.get(GuildConfig, guild_id)
                         if cfg:

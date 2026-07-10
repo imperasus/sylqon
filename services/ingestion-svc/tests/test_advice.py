@@ -1,6 +1,5 @@
 """Offline tests for the advice layer: synthetic timelines with known
 deaths/CS/items/wards → expected findings, top-1 selection, HU/EN rendering."""
-import pytest
 
 from app.advice import benchmarks, messages
 from app.advice.heuristics import (

@@ -1,6 +1,5 @@
 """Offline tests for the in-memory dual-window token bucket."""
 import pytest
-
 from app.ratelimit import InMemoryTokenBucketLimiter, RateLimitTimeout
 
 

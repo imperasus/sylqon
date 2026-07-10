@@ -25,7 +25,6 @@ from statistics import median
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import config
 from app.advice import benchmarks
 from app.models import Match, MatchParticipant, MetaBuild, Timeline  # noqa: F401
 

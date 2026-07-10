@@ -1,11 +1,10 @@
 """Offline tests for the pool-coverage analysis (synthetic controlled dataset)."""
 import pytest
+from app import pool, store
+from app.models import Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app import pool, store
-from app.models import Base
 
 ME = "puuid-me"
 
@@ -134,11 +133,11 @@ def test_shrunk_wr_regresses_small_samples():
 def test_suggested_pool_size_and_reasons(session_factory):
     specs = []
     # Me: strong on Jinx (4W/1L)
-    for i in range(4):
+    for _ in range(4):
         specs.append(("Jinx", "Caitlyn", True, ME))
     specs.append(("Jinx", "Draven", False, ME))
     # Dataset: Caitlyn and Ashe present enough to be candidates
-    for i in range(3):
+    for _ in range(3):
         specs.append(("Caitlyn", "Draven", True, "o1"))
         specs.append(("Ashe", "Draven", True, "o2"))
     seed(session_factory, specs)

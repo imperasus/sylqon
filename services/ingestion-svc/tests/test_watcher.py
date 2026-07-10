@@ -2,15 +2,13 @@
 from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
 from app.crawler import IngestService
 from app.models import Base, Delivery
 from app.notifier import DiscordWebhookNotifier, build_embed
 from app.watcher import MatchWatcher
-
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from tests.test_store_crawler import make_match, make_riot, make_timeline
 
 PUUID = "puuid-1"

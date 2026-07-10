@@ -1,9 +1,7 @@
 """Offline tests for the Riot client: mocked HTTP session, recording limiter."""
 from unittest.mock import MagicMock
 
-import pytest
 import requests
-
 from app.riot_client import RiotClient
 
 

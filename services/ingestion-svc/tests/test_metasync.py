@@ -1,12 +1,10 @@
 """Offline tests for the bulk meta-sync bundle (op.gg exit contract)."""
 import pytest
+from app import metasync, store
+from app.models import Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app import metasync, store
-from app.models import Base
-
 from tests.test_metabuild import jinx_match
 
 

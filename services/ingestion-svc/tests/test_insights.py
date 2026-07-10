@@ -1,7 +1,9 @@
-"""Offline tests for the profile coaching-insights aggregation."""
-from app import insights, store
+"""Offline tests for the profile coaching-insights aggregation.
 
-from tests.test_matches import ME, _match, factory  # noqa: F401  (fixture reuse)
+The ``factory`` fixture comes from tests/conftest.py.
+"""
+from app import insights, store
+from tests.test_matches import ME, _match
 
 
 def _seed(factory, *specs):
