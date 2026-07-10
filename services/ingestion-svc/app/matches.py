@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import champions
-from app.models import Match, MatchParticipant
+from app.models import Match, MatchParticipant, Timeline
 
 # queueId → human label; anything else renders as "Other".
 QUEUE_LABELS = {
@@ -81,6 +81,22 @@ def _participant_view(p: dict) -> dict:
         "vision": p.get("visionScore"),
         "items": [u for u in items if u],
     }
+
+
+def gold_timeline(session: Session, match_id: str) -> list[dict] | None:
+    """Per-minute team-gold difference (blue − red) from the stored timeline,
+    or None when no usable frames are stored. Participants 1–5 are blue."""
+    tl = session.get(Timeline, match_id)
+    frames = (tl.payload or {}).get("frames") if tl else None
+    if not frames:
+        return None
+    points = []
+    for f in frames:
+        pf = f.get("participantFrames") or {}
+        blue = sum((pf.get(str(i)) or {}).get("totalGold") or 0 for i in range(1, 6))
+        red = sum((pf.get(str(i)) or {}).get("totalGold") or 0 for i in range(6, 11))
+        points.append({"minute": (f.get("timestamp") or 0) / 60000, "diff": blue - red})
+    return points if len(points) >= 2 else None
 
 
 def detail(session: Session, match_id: str) -> dict | None:

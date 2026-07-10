@@ -195,6 +195,66 @@ def _fmt_ago(created_ms: int | None) -> str:
     return f"{int(delta // 86400)}d ago"
 
 
+def _gold_svg(points: list[dict]) -> str:
+    """Team gold-difference chart as a server-rendered SVG (build-less; native
+    <title> tooltips). Poles are direct-labeled and split by the zero axis, so
+    identity is never color-alone; lime/red match the page's team semantics."""
+    W, H, PAD_L, PAD_R, PAD_T, PAD_B = 720, 190, 52, 10, 20, 26
+    plot_w, plot_h = W - PAD_L - PAD_R, H - PAD_T - PAD_B
+    last_min = max(points[-1]["minute"], 1)
+    max_abs = max(1000, max(abs(p["diff"]) for p in points))
+
+    def sx(minute: float) -> float:
+        return PAD_L + minute / last_min * plot_w
+
+    def sy(diff: float) -> float:
+        return PAD_T + plot_h / 2 - diff / max_abs * (plot_h / 2)
+
+    zero_y = sy(0)
+    line = " L ".join(f"{sx(p['minute']):.1f},{sy(p['diff']):.1f}" for p in points)
+    area = (f"M {sx(points[0]['minute']):.1f},{zero_y:.1f} L {line} "
+            f"L {sx(points[-1]['minute']):.1f},{zero_y:.1f} Z")
+
+    x_ticks = "".join(
+        f'<text x="{sx(m):.1f}" y="{H - 8}" text-anchor="middle">{m}</text>'
+        for m in range(0, int(last_min) + 1, 5)
+    )
+    step = plot_w / max(1, len(points) - 1)
+    hover = "".join(
+        f'<rect x="{sx(p["minute"]) - step / 2:.1f}" y="{PAD_T}" width="{step:.1f}" '
+        f'height="{plot_h}" fill="transparent"><title>min {p["minute"]:.0f}: '
+        f'{"+" if p["diff"] >= 0 else "−"}{abs(p["diff"]) / 1000:.1f}k '
+        f'{"blue" if p["diff"] >= 0 else "red"} lead</title></rect>'
+        for p in points
+    )
+    k = max_abs / 1000
+    return f"""
+<svg viewBox="0 0 {W} {H}" role="img" aria-label="Team gold difference over time"
+ style="width:100%;height:auto" font-family="JetBrains Mono,monospace" font-size="10">
+<defs>
+<clipPath id="gc-up"><rect x="0" y="0" width="{W}" height="{zero_y:.1f}"/></clipPath>
+<clipPath id="gc-dn"><rect x="0" y="{zero_y:.1f}" width="{W}" height="{H - zero_y:.1f}"/></clipPath>
+</defs>
+<path d="{area}" fill="var(--accent)" opacity=".22" clip-path="url(#gc-up)"/>
+<path d="{area}" fill="var(--red)" opacity=".22" clip-path="url(#gc-dn)"/>
+<line x1="{PAD_L}" y1="{zero_y:.1f}" x2="{W - PAD_R}" y2="{zero_y:.1f}"
+ stroke="var(--border)" stroke-width="1"/>
+<path d="M {line}" fill="none" stroke="var(--text)" stroke-width="2"
+ stroke-linejoin="round" stroke-linecap="round"/>
+<g fill="var(--muted)">
+<text x="{PAD_L - 6}" y="{PAD_T + 8}" text-anchor="end">+{k:.0f}k</text>
+<text x="{PAD_L - 6}" y="{zero_y + 3:.1f}" text-anchor="end">0</text>
+<text x="{PAD_L - 6}" y="{H - PAD_B}" text-anchor="end">−{k:.0f}k</text>
+{x_ticks}
+</g>
+<text x="{PAD_L + 8}" y="{PAD_T + 12}" fill="var(--accent)" font-weight="700"
+ letter-spacing=".08em">BLUE LEAD</text>
+<text x="{PAD_L + 8}" y="{H - PAD_B - 6}" fill="var(--red)" font-weight="700"
+ letter-spacing=".08em">RED LEAD</text>
+{hover}
+</svg>"""
+
+
 def _region_options(selected: str = regions.DEFAULT_PLATFORM) -> str:
     return "".join(
         f'<option value="{code}"{" selected" if code == selected else ""}>{label}</option>'
@@ -507,9 +567,16 @@ def match_page(match_id: str) -> HTMLResponse:
 
     with db.open_session() as session:
         data = matches_mod.detail(session, match_id)
+        gold = matches_mod.gold_timeline(session, match_id) if data else None
     if data is None:
         return _page("Match", '<h1>Match not stored</h1><p class="muted">This match is not in '
                      "our dataset yet — open the owner’s match history to fetch it.</p>")
+
+    gold_html = ""
+    if gold:
+        gold_html = (f'<div class="card"><h2 style="margin-top:0">Gold difference '
+                     f'<span class="muted small">· blue − red, per minute</span></h2>'
+                     f"{_gold_svg(gold)}</div>")
 
     teams_html = []
     for team in data["teams"]:
@@ -544,7 +611,7 @@ def match_page(match_id: str) -> HTMLResponse:
     patch = f' · patch {html.escape(data["patch"])}' if data["patch"] else ""
     head = (f'<h1>Match <span class="muted small">· {html.escape(data["queue"])} · '
             f'{_fmt_duration(data["duration"])}{patch}</span></h1>')
-    return _page(f"Match {html.escape(match_id)}", head + "".join(teams_html),
+    return _page(f"Match {html.escape(match_id)}", head + gold_html + "".join(teams_html),
                  f"{data['queue']} match scoreboard from official Riot match data.")
 
 

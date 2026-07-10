@@ -191,6 +191,24 @@ def test_match_page_shows_scoreboard(client):
     assert "Jinx" in r.text
 
 
+def test_match_page_gold_chart(client):
+    from app import db as db_mod
+
+    frames = []
+    for i, d in enumerate([0, 800, -400, 1200]):
+        pf = {str(p): {"totalGold": 1000 + (d if p == 1 else 0)} for p in range(1, 6)}
+        pf.update({str(p): {"totalGold": 1000} for p in range(6, 11)})
+        frames.append({"timestamp": i * 60000, "participantFrames": pf})
+    m = lane_match("EUN1_G", "Jinx", "Caitlyn", True, a_puuid=ME)
+    with db_mod.open_session() as s:
+        store.insert_match_bundle(s, m, {"info": {"frames": frames}}, region="europe")
+
+    r = client.get("/match/EUN1_G")
+    assert r.status_code == 200
+    assert "Gold difference" in r.text
+    assert "<svg" in r.text and "BLUE LEAD" in r.text and "RED LEAD" in r.text
+
+
 def test_match_page_not_stored(client):
     r = client.get("/match/EUN1_999")
     assert r.status_code == 200

@@ -91,3 +91,29 @@ def test_detail_splits_two_teams(factory):
 def test_detail_none_for_unknown_match(factory):
     with factory() as s:
         assert matches.detail(s, "NOPE_1") is None
+
+
+def _frames(diffs):
+    """Per-minute frames where blue-team gold leads red by the given amounts."""
+    frames = []
+    for i, d in enumerate(diffs):
+        pf = {str(p): {"totalGold": 1000 + (d if p == 1 else 0)} for p in range(1, 6)}
+        pf.update({str(p): {"totalGold": 1000} for p in range(6, 11)})
+        frames.append({"timestamp": i * 60000, "participantFrames": pf})
+    return frames
+
+
+def test_gold_timeline_computes_team_diffs(factory):
+    with factory() as s:
+        store.insert_match_bundle(s, _match("EUN1_1", 1000, ME, True),
+                                  {"info": {"frames": _frames([0, 500, -300])}},
+                                  region="europe")
+        points = matches.gold_timeline(s, "EUN1_1")
+    assert [p["diff"] for p in points] == [0, 500, -300]
+    assert [p["minute"] for p in points] == [0.0, 1.0, 2.0]
+
+
+def test_gold_timeline_none_without_frames(factory):
+    _seed(factory, ("EUN1_1", 1000, True))  # seeded with an empty timeline
+    with factory() as s:
+        assert matches.gold_timeline(s, "EUN1_1") is None
