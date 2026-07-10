@@ -66,24 +66,31 @@ def champion_names(session: Session, prefix: str = "") -> list[str]:
 
 
 def build_for_champion(session: Session, champion: str) -> dict | None:
-    rows = list(
-        session.execute(
-            select(MatchParticipant)
-            .join(Match, Match.match_id == MatchParticipant.match_id)
-            .where(MatchParticipant.champion_name.ilike(champion))
-            .where(Match.queue_id.in_([420, 440, 400, 430]))
-        ).scalars()
-    )
+    """Games, win rate, main role and core-item build rates for one champion.
+
+    Only the six item-slot ids are extracted from the stats JSONB in SQL
+    (portable across Postgres and SQLite) — loading each participant's full
+    stats payload made the public champion page take seconds at
+    crawled-dataset scale."""
+    item_cols = [MatchParticipant.stats[f"item{slot}"].as_integer()
+                 for slot in range(6)]
+    rows = session.execute(
+        select(MatchParticipant.champion_name, MatchParticipant.team_position,
+               MatchParticipant.win, *item_cols)
+        .join(Match, Match.match_id == MatchParticipant.match_id)
+        .where(MatchParticipant.champion_name.ilike(champion))
+        .where(Match.queue_id.in_(SR_QUEUES))
+    ).all()
     if len(rows) < MIN_BUILD_GAMES:
         return None
 
-    wins = sum(1 for p in rows if p.win)
+    wins = 0
     items: Counter = Counter()
     roles: Counter = Counter()
-    for p in rows:
-        roles[p.team_position or "?"] += 1
-        for slot in range(6):
-            item_id = p.stats.get(f"item{slot}")
+    for _, role, win, *slot_items in rows:
+        wins += 1 if win else 0
+        roles[role or "?"] += 1
+        for item_id in slot_items:
             if item_id and item_id in benchmarks.CORE_ITEM_IDS:
                 items[item_id] += 1
 

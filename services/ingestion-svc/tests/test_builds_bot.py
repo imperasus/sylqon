@@ -53,6 +53,28 @@ def test_build_aggregation_and_min_games(session_factory):
         assert builds.build_for_champion(s, "Teemo") is None  # no data
 
 
+def test_build_counts_items_per_slot(session_factory):
+    """The SQL slot extraction keeps the original semantics: a completed item
+    counts once per inventory slot, non-core ids and missing slots are ignored."""
+    non_core = max(benchmarks.CORE_ITEM_IDS) + 1
+    for i in range(3):
+        match = make_match(f"EUN1_s{i}")
+        jinx = match["info"]["participants"][3]
+        jinx["championName"] = "Jinx"
+        if i == 0:
+            jinx["item0"] = CORE[0]
+            jinx["item1"] = CORE[0]  # two copies in the final inventory
+            jinx["item2"] = non_core
+        with session_factory() as s:
+            store.insert_match_bundle(s, match, make_timeline(f"EUN1_s{i}"), region="europe")
+    with session_factory() as s:
+        data = builds.build_for_champion(s, "Jinx")
+    assert data["games"] == 3
+    assert data["core_items"] == [
+        {"id": CORE[0], "name": benchmarks.CORE_ITEM_NAMES[CORE[0]], "games": 2, "pct": 67}
+    ]
+
+
 def test_matchup_same_lane_only(session_factory):
     for i in range(2):
         store_match_with_champs(session_factory, f"EUN1_m{i}", jinx_win=True)
