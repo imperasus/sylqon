@@ -112,6 +112,11 @@ border:1px solid var(--border);border-left-width:3px;border-radius:10px;padding:
 .num{font-family:var(--font-mono);text-align:right;white-space:nowrap}
 .items{display:flex;gap:2px}
 .items img{width:22px;height:22px;border-radius:4px;background:var(--surface2)}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.7rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:.8rem 1rem}
+.stat .v{font-family:var(--font-mono);font-size:1.5rem;font-weight:700;color:var(--accent)}
+.stat .l{color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.08em}
+.lesson{border-left:3px solid var(--accent-2)}
 .tabs{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.6rem 0}
 .tab{padding:.38rem .8rem;border:1px solid var(--border);border-radius:999px;color:var(--muted);
 font-size:.82rem;font-family:var(--font-display);font-weight:600}
@@ -378,6 +383,39 @@ def summoner_page(region: str, game_name: str, tag_line: str) -> HTMLResponse:
         for c in data["top_champions"]
     ) or '<div class="muted">No mastery data.</div>'
 
+    from app import insights as insights_mod
+
+    with db.open_session() as session:
+        ins = insights_mod.build_insights(session, data["puuid"], lang="en")
+
+    if ins:
+        tiles = []
+        form = ins["recent_form"]
+        for label, value in (
+            ("Win rate", f'{ins["winrate"]}%'),
+            ("KDA", f'{ins["kda"]}'),
+            ("CS / min", "—" if ins["avg_cs_per_min"] is None else f'{ins["avg_cs_per_min"]}'),
+            ("Vision / game", "—" if ins["avg_vision"] is None else f'{ins["avg_vision"]}'),
+            (f'Last {form["games"]}', f'{form["wins"]}W/{form["games"] - form["wins"]}L'),
+        ):
+            tiles.append(f'<div class="stat"><div class="v">{value}</div>'
+                         f'<div class="l">{label}</div></div>')
+        lesson = ins["lesson"]
+        lesson_html = ""
+        if lesson and lesson.get("text"):
+            lesson_html = (
+                f'<div class="card lesson"><div class="muted small">Latest lesson · '
+                f'{html.escape(lesson.get("champion") or "")}</div>'
+                f'<p style="margin:.4rem 0 0">{html.escape(lesson["text"])}</p></div>'
+            )
+        insights_html = (
+            f'<h2>Coaching insights <span class="muted small">· last {ins["games"]} stored '
+            f'matches</span></h2><div class="stats-row">{"".join(tiles)}</div>{lesson_html}'
+        )
+    else:
+        insights_html = ('<h2>Coaching insights</h2><p class="muted">No stored matches yet — '
+                         'open the match history to fetch recent games, then check back.</p>')
+
     body = f"""
 <div class="profile-head">{icon}<div>
 <h1 style="margin:.2rem 0">{html.escape(data["riot_id"])}</h1>{level}</div></div>
@@ -388,8 +426,10 @@ def summoner_page(region: str, game_name: str, tag_line: str) -> HTMLResponse:
 <h2>Ranked</h2><div class="grid">{rank_cards}</div>
 <h2>Top champions <span class="muted small">· mastery</span></h2>
 <div class="champ-grid">{champ_cells}</div>
+{insights_html}
 <p class="muted small" style="margin-top:1.2rem">Official Riot data (Account, Summoner,
-League &amp; Champion Mastery) — profile display only.</p>"""
+League &amp; Champion Mastery). Insights are coaching aids computed from your own stored
+matches — descriptive display only.</p>"""
     return _page(f"{data['riot_id']} — profile", body,
                  f"Summoner profile for {data['riot_id']}: level, rank and top champion mastery.")
 

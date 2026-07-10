@@ -114,6 +114,35 @@ def test_summoner_page_renders_profile(client, monkeypatch):
     assert "mmr" not in low and "elo" not in low  # framing holds on the profile too
 
 
+def test_summoner_page_insights_from_stored_matches(client, monkeypatch):
+    # StubRiot resolves to ME, whose Jinx games the fixture seeded → the
+    # insights section renders aggregates instead of the empty state.
+    import app.main as main_mod
+
+    class StubRiot:
+        def get_account_by_riot_id(self, g, t, region=None):
+            return {"puuid": ME, "gameName": g, "tagLine": t}
+
+        def get_summoner_by_puuid(self, p, platform=None):
+            return None
+
+        def get_ranked_stats(self, p, platform=None):
+            return None
+
+        def get_top_mastery(self, p, count=6, platform=None):
+            return None
+
+    class StubIngest:
+        _riot = StubRiot()
+
+    monkeypatch.setattr(main_mod, "_ingest_service", StubIngest())
+    r = client.get("/summoner/euw1/Me/TAG")
+    assert r.status_code == 200
+    assert "Coaching insights" in r.text
+    assert "Win rate" in r.text and "KDA" in r.text
+    assert "No stored matches yet" not in r.text
+
+
 def test_summoner_page_not_found(client, monkeypatch):
     import app.main as main_mod
 

@@ -163,6 +163,32 @@ def match_detail(match_id: str) -> dict:
     return result
 
 
+@app.get("/api/insights/{game_name}/{tag_line}")
+def summoner_insights(
+    game_name: str,
+    tag_line: str,
+    lang: str = Query(default="en"),
+    region: str = Query(default=regions.DEFAULT_PLATFORM),
+) -> dict:
+    """Coaching insights: descriptive aggregates over the player's recent stored
+    matches + one lesson from the newest analysable game. 404 when the Riot ID
+    is unknown or nothing is stored yet."""
+    from app import insights as insights_mod
+
+    assert _ingest_service is not None
+    platform = regions.normalize(region)
+    cluster = regions.cluster_for(platform)
+    account = _ingest_service._riot.get_account_by_riot_id(game_name, tag_line, region=cluster)
+    if not account or not account.get("puuid"):
+        raise HTTPException(status_code=404, detail="Riot ID not found")
+    with db.open_session() as session:
+        result = insights_mod.build_insights(session, account["puuid"], lang=lang)
+    if result is None:
+        raise HTTPException(status_code=404, detail="no stored matches for this player yet")
+    result["riot_id"] = f"{game_name}#{tag_line}"
+    return result
+
+
 @app.get("/api/leaderboard/{queue}")
 def leaderboard(
     queue: str,

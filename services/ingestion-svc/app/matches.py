@@ -55,6 +55,7 @@ def list_for_puuid(session: Session, puuid: str, limit: int = 20) -> list[dict]:
             "kills": p.kills, "deaths": p.deaths, "assists": p.assists,
             "cs": cs,
             "cs_per_min": round(cs / minutes, 1) if minutes else None,
+            "vision": p.vision_score,
             "role": p.team_position,
             "queue": queue_label(m.queue_id),
             "duration": m.game_duration,
