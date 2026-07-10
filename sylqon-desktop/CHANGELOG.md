@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.24.4](https://github.com/imperasus/sylqon/compare/v1.24.3...v1.24.4) (2026-07-10)
+
+
+### Bug Fixes
+
+* **web:** leaderboard names resolve from puuid; bare /leaderboard redirects ([c48b48d](https://github.com/imperasus/sylqon/commit/c48b48d0021f517eb2d82d7c59080a3460990fe3))
+
 ### [1.24.3](https://github.com/imperasus/sylqon/compare/v1.24.2...v1.24.3) (2026-07-10)
 
 
