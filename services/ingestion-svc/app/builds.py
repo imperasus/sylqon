@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import Counter
 
 from sqlalchemy import case, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.advice import benchmarks
 from app.models import Match, MatchParticipant
@@ -106,31 +106,26 @@ def build_for_champion(session: Session, champion: str) -> dict | None:
 
 
 def matchup(session: Session, champ_a: str, champ_b: str) -> dict | None:
-    """Lane-opponent record: same match, same teamPosition, opposite teams."""
-    rows = list(
-        session.execute(
-            select(MatchParticipant)
-            .join(Match, Match.match_id == MatchParticipant.match_id)
-            .where(
-                MatchParticipant.champion_name.ilike(champ_a)
-                | MatchParticipant.champion_name.ilike(champ_b)
-            )
-            .where(Match.queue_id.in_([420, 440, 400, 430]))
-        ).scalars()
-    )
-    by_match: dict[str, list[MatchParticipant]] = {}
-    for p in rows:
-        by_match.setdefault(p.match_id, []).append(p)
+    """Lane-opponent record: same match, same teamPosition, opposite teams.
 
-    games = a_wins = 0
-    for participants in by_match.values():
-        a_list = [p for p in participants if p.champion_name.lower() == champ_a.lower()]
-        b_list = [p for p in participants if p.champion_name.lower() == champ_b.lower()]
-        for pa in a_list:
-            for pb in b_list:
-                if pa.team_id != pb.team_id and pa.team_position == pb.team_position:
-                    games += 1
-                    a_wins += 1 if pa.win else 0
+    One self-join aggregate over typed columns (the pool.role_dataset pattern)
+    — the previous version loaded every stored MatchParticipant row of both
+    champions, stats JSONB included, and paired them in Python; at
+    crawled-dataset scale that made the bot command slow and memory-heavy.
+    """
+    a, b = aliased(MatchParticipant), aliased(MatchParticipant)
+    games, a_wins = session.execute(
+        select(func.count(), func.sum(case((a.win.is_(True), 1), else_=0)))
+        .select_from(a)
+        .join(b, (b.match_id == a.match_id)
+              & (b.team_id != a.team_id)
+              & (b.team_position.is_not_distinct_from(a.team_position)))
+        .join(Match, Match.match_id == a.match_id)
+        .where(Match.queue_id.in_(SR_QUEUES),
+               func.lower(a.champion_name) == champ_a.lower(),
+               func.lower(b.champion_name) == champ_b.lower())
+    ).one()
+    a_wins = int(a_wins or 0)
 
     if games < MIN_MATCHUP_GAMES:
         return None
