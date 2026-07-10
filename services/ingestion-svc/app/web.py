@@ -615,6 +615,14 @@ def match_page(match_id: str) -> HTMLResponse:
                  f"{data['queue']} match scoreboard from official Riot match data.")
 
 
+@router.get("/leaderboard")
+def leaderboard_root() -> RedirectResponse:
+    """Bare /leaderboard → the default queue (was a raw JSON 404)."""
+    from app import leaderboard as lb
+
+    return RedirectResponse(f"/leaderboard/{lb.DEFAULT_QUEUE}", status_code=303)
+
+
 @router.get("/leaderboard/{queue}", response_class=HTMLResponse)
 def leaderboard_page(queue: str, tier: str = "CHALLENGER", region: str = "euw1") -> HTMLResponse:
     from app import leaderboard as lb
@@ -673,7 +681,8 @@ def leaderboard_page(queue: str, tier: str = "CHALLENGER", region: str = "euw1")
     body = (head + f'<div class="tabs">{qtabs}{region_form}</div>'
             f'<div class="tabs">{ttabs}</div>' + table
             + '<p class="muted small" style="margin-top:1rem">Official Riot ladder '
-              "(League-V4). Top entries are resolved to Riot IDs; the rest show a short id.</p>")
+              "(League-V4). Riot IDs resolve a few per refresh and fill in as the board "
+              "updates; not-yet-resolved rows show a dash.</p>")
     return _page(f"{tier.title()} leaderboard — {platform.upper()}", body,
                  f"{tier.title()} {lb.QUEUES[queue]} ladder for {platform.upper()} — "
                  "official Riot ladder data.")

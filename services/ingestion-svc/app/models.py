@@ -166,17 +166,16 @@ class LeaderboardSnapshot(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
-class ResolvedName(Base):
-    """summonerId → Riot ID cache for leaderboard display. League-V4 apex
-    entries stopped carrying summoner names post Riot-ID migration; resolving
-    costs 2 calls (Summoner-V4 + Account-V1), so resolved names are kept
-    permanently — a rename just re-resolves on the next cold entry."""
+class ResolvedRiotId(Base):
+    """puuid → Riot ID cache for leaderboard display. League-V4 apex entries
+    carry only a puuid (no summoner name/id), so names come from Account-V1;
+    resolved ids are kept permanently and the ladder fills in progressively —
+    a rename just re-resolves if the entry ever goes cold."""
 
-    __tablename__ = "resolved_names"
+    __tablename__ = "resolved_riot_ids"
 
-    summoner_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    puuid: Mapped[str] = mapped_column(Text, primary_key=True)
     platform: Mapped[str] = mapped_column(Text)
-    puuid: Mapped[str | None] = mapped_column(Text)
     riot_id: Mapped[str] = mapped_column(Text)  # "Name#TAG"
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

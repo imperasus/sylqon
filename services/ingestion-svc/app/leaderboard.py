@@ -1,12 +1,12 @@
 """Apex-league leaderboard (League-V4 challenger / grandmaster / master),
 cached per queue+platform+tier on a TTL.
 
-Official public Riot ladder data, shown as-is (LP-ranked). Riot's league entries
-no longer carry the summoner's Riot ID (post Riot-ID migration), so names are
-resolved separately — summonerId → Summoner-V4 (puuid) → Account-V1 (Riot ID) —
-but quota-frugally: only the top RESOLVE_TOP rows, only at snapshot-refresh
-time, and resolved ids are cached permanently in ``resolved_names`` so a warm
-ladder costs zero extra calls. Unresolved entries fall back to a short id.
+Official public Riot ladder data, shown as-is (LP-ranked). League-V4 apex
+entries carry only a ``puuid`` (no summoner name or id), so display names come
+from Account-V1 — quota-frugally: at most RESOLVE_PER_REFRESH uncached rows per
+snapshot refresh (1 call each), cached permanently in ``resolved_riot_ids``, so
+the ladder fills in progressively and a warm board costs zero extra calls.
+Unresolved rows render as a placeholder until a later refresh reaches them.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app import regions
-from app.models import LeaderboardSnapshot, ResolvedName
+from app.models import LeaderboardSnapshot, ResolvedRiotId
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ QUEUES = {"RANKED_SOLO_5x5": "Solo/Duo", "RANKED_FLEX_SR": "Flex"}
 DEFAULT_QUEUE = "RANKED_SOLO_5x5"
 TTL_SECONDS = 1800  # apex ladders move slowly; one snapshot serves everyone
 TOP_N = 100
-RESOLVE_TOP = 20  # rows whose Riot ID we resolve per refresh (2 calls each, cold)
+RESOLVE_PER_REFRESH = 20  # uncached Riot-ID lookups per refresh (1 call each)
 
 
 def _winrate(wins: int, losses: int) -> int | None:
@@ -39,13 +39,10 @@ def _shape(league: dict) -> dict:
     rows = []
     for i, e in enumerate(entries[:TOP_N], start=1):
         wins, losses = e.get("wins", 0), e.get("losses", 0)
-        name = e.get("summonerName") or ""
-        if not name and e.get("summonerId"):
-            name = e["summonerId"][:8] + "…"
         rows.append({
             "rank": i,
-            "name": name,
-            "summoner_id": e.get("summonerId"),
+            "name": e.get("summonerName") or "",  # apex entries no longer carry one
+            "puuid": e.get("puuid"),
             "lp": e.get("leaguePoints"),
             "wins": wins,
             "losses": losses,
@@ -56,29 +53,32 @@ def _shape(league: dict) -> dict:
 
 
 def _resolve_names(session: Session, riot, rows: list[dict], platform: str) -> None:
-    """Fill Riot IDs for the top rows in place. Cache-first (resolved_names);
-    cold entries cost 2 calls each. Per-row failures keep the short-id fallback."""
+    """Fill Riot IDs in place: cache hits are free for every row; at most
+    RESOLVE_PER_REFRESH uncached rows are looked up live (Account-V1 by puuid,
+    1 call each), walking down the ladder — so the board completes over a few
+    refreshes. Per-row failures leave the placeholder for the next refresh."""
     cluster = regions.cluster_for(platform)
-    for r in rows[:RESOLVE_TOP]:
-        sid = r.get("summoner_id")
-        if not sid or (r["name"] and not r["name"].endswith("…")):
+    budget = RESOLVE_PER_REFRESH
+    for r in rows:
+        if r["name"] or not r.get("puuid"):
             continue
-        cached = session.get(ResolvedName, sid)
+        cached = session.get(ResolvedRiotId, r["puuid"])
         if cached:
             r["name"] = cached.riot_id
             continue
+        if budget <= 0:
+            continue
+        budget -= 1
         try:
-            summoner = riot.get_summoner_by_id(sid, platform=platform)
-            puuid = summoner.get("puuid") if summoner else None
-            account = riot.get_account_by_puuid(puuid, region=cluster) if puuid else None
+            account = riot.get_account_by_puuid(r["puuid"], region=cluster)
         except Exception as exc:  # resolution must never break the ladder
-            log.warning("name resolution failed for %s: %s", sid, exc)
+            log.warning("name resolution failed for %s: %s", r["puuid"], exc)
             continue
         if account and account.get("gameName"):
             riot_id = f'{account["gameName"]}#{account.get("tagLine", "")}'
             r["name"] = riot_id
-            session.merge(ResolvedName(
-                summoner_id=sid, platform=platform, puuid=puuid, riot_id=riot_id))
+            session.merge(ResolvedRiotId(
+                puuid=r["puuid"], platform=platform, riot_id=riot_id))
 
 
 def _fresh(snap: LeaderboardSnapshot, ttl: int) -> bool:

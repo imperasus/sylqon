@@ -213,6 +213,12 @@ def test_match_page_not_stored(client):
     assert "Match not stored" in r.text
 
 
+def test_leaderboard_bare_url_redirects(client):
+    r = client.get("/leaderboard", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/leaderboard/RANKED_SOLO_5x5"
+
+
 def test_leaderboard_page_renders_ladder(client, monkeypatch):
     import app.main as main_mod
 
