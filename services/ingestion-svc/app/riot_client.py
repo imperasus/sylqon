@@ -129,6 +129,19 @@ class RiotClient:
             platform or self.platform_region, f"/lol/summoner/v4/summoners/by-puuid/{puuid}"
         )
 
+    def get_summoner_by_id(self, summoner_id: str, platform: str | None = None) -> dict | None:
+        """SUMMONER-V4: summoner by encrypted summonerId (platform route) — the
+        id League-V4 apex entries carry; its puuid keys the Riot-ID lookup."""
+        return self._get(
+            platform or self.platform_region, f"/lol/summoner/v4/summoners/{summoner_id}"
+        )
+
+    def get_account_by_puuid(self, puuid: str, region: str | None = None) -> dict | None:
+        """ACCOUNT-V1: puuid → {gameName, tagLine} (regional cluster route)."""
+        return self._get(
+            region or self.mass_region, f"/riot/account/v1/accounts/by-puuid/{puuid}"
+        )
+
     def get_top_mastery(self, puuid: str, count: int = 6,
                         platform: str | None = None) -> list | None:
         """CHAMPION-MASTERY-V4: top N champions by mastery points (platform route)."""

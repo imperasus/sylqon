@@ -606,7 +606,7 @@ def leaderboard_page(queue: str, tier: str = "CHALLENGER", region: str = "euw1")
     body = (head + f'<div class="tabs">{qtabs}{region_form}</div>'
             f'<div class="tabs">{ttabs}</div>' + table
             + '<p class="muted small" style="margin-top:1rem">Official Riot ladder '
-              "(League-V4). Names Riot no longer returns show as a short id.</p>")
+              "(League-V4). Top entries are resolved to Riot IDs; the rest show a short id.</p>")
     return _page(f"{tier.title()} leaderboard — {platform.upper()}", body,
                  f"{tier.title()} {lb.QUEUES[queue]} ladder for {platform.upper()} — "
                  "official Riot ladder data.")

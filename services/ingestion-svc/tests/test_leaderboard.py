@@ -20,13 +20,26 @@ def factory():
 
 
 class FakeRiot:
-    def __init__(self, league):
+    def __init__(self, league, accounts=None):
         self.league = league
         self.calls = 0
+        self.resolve_calls = 0
+        # summoner_id → riot-id parts; None → resolution fails for that id
+        self.accounts = accounts or {}
 
     def get_apex_league(self, tier, queue="RANKED_SOLO_5x5", platform=None):
         self.calls += 1
         return self.league
+
+    def get_summoner_by_id(self, summoner_id, platform=None):
+        self.resolve_calls += 1
+        return {"puuid": f"puuid-{summoner_id}"} if summoner_id in self.accounts else None
+
+    def get_account_by_puuid(self, puuid, region=None):
+        self.resolve_calls += 1
+        sid = puuid.removeprefix("puuid-")
+        entry = self.accounts.get(sid)
+        return {"gameName": entry[0], "tagLine": entry[1]} if entry else None
 
 
 def _league(n=3):
@@ -67,8 +80,29 @@ def test_blank_name_falls_back_to_short_id(factory):
     league = {"tier": "CHALLENGER", "entries": [
         {"summonerName": "", "summonerId": "abcdefghij", "leaguePoints": 500,
          "wins": 10, "losses": 0}]}
-    data = _get(factory, FakeRiot(league))
+    data = _get(factory, FakeRiot(league))  # no accounts → resolution fails
     assert data["rows"][0]["name"] == "abcdefgh…"
+
+
+def test_blank_name_resolved_to_riot_id(factory):
+    league = {"tier": "CHALLENGER", "entries": [
+        {"summonerName": "", "summonerId": "sid1", "leaguePoints": 500,
+         "wins": 10, "losses": 0}]}
+    riot = FakeRiot(league, accounts={"sid1": ("Hide on bush", "KR1")})
+    data = _get(factory, riot)
+    assert data["rows"][0]["name"] == "Hide on bush#KR1"
+    assert riot.resolve_calls == 2  # summoner + account
+
+
+def test_resolved_names_cached_across_refreshes(factory):
+    league = {"tier": "CHALLENGER", "entries": [
+        {"summonerName": "", "summonerId": "sid1", "leaguePoints": 500,
+         "wins": 10, "losses": 0}]}
+    riot = FakeRiot(league, accounts={"sid1": ("Faker", "KR1")})
+    _get(factory, riot, ttl=0)
+    _get(factory, riot, ttl=0)  # snapshot stale → refetch, but the name is cached
+    assert riot.calls == 2
+    assert riot.resolve_calls == 2  # only the first refresh resolved
 
 
 def test_fetch_failure_serves_stale_snapshot(factory):
