@@ -682,13 +682,7 @@ def leaderboard_page(queue: str, tier: str = "CHALLENGER", region: str = "euw1")
 @router.get("/champions", response_class=HTMLResponse)
 def champions_page() -> HTMLResponse:
     with db.open_session() as session:
-        names = builds.champion_names(session)
-        rows = []
-        for name in names:
-            data = builds.build_for_champion(session, name)
-            if data:
-                rows.append(data)
-    rows.sort(key=lambda d: -d["games"])
+        rows = builds.champion_index(session)
     from app import champions
 
     def _cell(d):

@@ -22,8 +22,8 @@ from __future__ import annotations
 import logging
 from collections import Counter, defaultdict
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import case, func, select
+from sqlalchemy.orm import Session, aliased
 
 from app.models import Match, MatchParticipant
 
@@ -49,30 +49,54 @@ def role_dataset(session: Session, role: str) -> dict:
     Returns ``{"champs": {name: [games, wins]}, "matchups": {(a, b): [games,
     a_wins]}}`` where matchup keys are directed (a's record against b) and
     names keep their display casing from the data.
-    """
-    champs: dict[str, list[int]] = defaultdict(lambda: [0, 0])
-    matchups: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0])
 
-    for match in session.execute(select(Match)).scalars():
-        if match.queue_id not in SR_QUEUES:
-            continue
-        laners = [
-            p for p in match.raw.get("participants", [])
-            if p.get("teamPosition") == role and p.get("championName")
-        ]
-        for p in laners:
-            entry = champs[p["championName"]]
-            entry[0] += 1
-            entry[1] += 1 if p.get("win") else 0
-        if len(laners) == 2 and laners[0].get("teamId") != laners[1].get("teamId"):
-            a, b = laners
-            ma = matchups[(a["championName"], b["championName"])]
-            ma[0] += 1
-            ma[1] += 1 if a.get("win") else 0
-            mb = matchups[(b["championName"], a["championName"])]
-            mb[0] += 1
-            mb[1] += 1 if b.get("win") else 0
-    return {"champs": dict(champs), "matchups": dict(matchups)}
+    Pure SQL over the typed ``match_participants`` columns — the earlier
+    per-match ``Match.raw`` JSONB scan parsed the full payload of every stored
+    match per call, which at crawled-dataset scale (40k+ matches) took the API
+    down. Semantics preserved: a "laner" is a participant in this role with a
+    non-empty champion name; matchups only count matches with exactly two such
+    laners on opposite teams.
+    """
+    _win = func.sum(case((MatchParticipant.win.is_(True), 1), else_=0))
+    _is_laner = (
+        MatchParticipant.team_position == role,
+        MatchParticipant.champion_name.isnot(None),
+        MatchParticipant.champion_name != "",
+    )
+
+    champ_rows = session.execute(
+        select(MatchParticipant.champion_name, func.count(), _win)
+        .join(Match, Match.match_id == MatchParticipant.match_id)
+        .where(Match.queue_id.in_(SR_QUEUES), *_is_laner)
+        .group_by(MatchParticipant.champion_name)
+    ).all()
+    champs = {name: [games, int(wins or 0)] for name, games, wins in champ_rows}
+
+    # Matches with exactly two laners in this role (the well-formed-SR guard).
+    paired = (
+        select(MatchParticipant.match_id)
+        .join(Match, Match.match_id == MatchParticipant.match_id)
+        .where(Match.queue_id.in_(SR_QUEUES), *_is_laner)
+        .group_by(MatchParticipant.match_id)
+        .having(func.count() == 2)
+    ).subquery()
+
+    a, b = aliased(MatchParticipant), aliased(MatchParticipant)
+    matchup_rows = session.execute(
+        select(a.champion_name, b.champion_name, func.count(),
+               func.sum(case((a.win.is_(True), 1), else_=0)))
+        .join(b, (b.match_id == a.match_id)
+              & (b.team_position == a.team_position)
+              & (b.team_id != a.team_id))
+        .where(a.team_position == role,
+               a.champion_name.isnot(None), a.champion_name != "",
+               b.champion_name.isnot(None), b.champion_name != "",
+               a.match_id.in_(select(paired.c.match_id)))
+        .group_by(a.champion_name, b.champion_name)
+    ).all()
+    matchups = {(an, bn): [games, int(wins or 0)]
+                for an, bn, games, wins in matchup_rows}
+    return {"champs": champs, "matchups": matchups}
 
 
 def player_role_stats(session: Session, puuid: str) -> dict[str, dict[str, list[int]]]:

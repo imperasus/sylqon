@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.advice import benchmarks
@@ -16,6 +16,45 @@ from app.models import Match, MatchParticipant
 
 MIN_BUILD_GAMES = 3
 MIN_MATCHUP_GAMES = 2
+SR_QUEUES = [420, 440, 400, 430]
+
+
+def champion_index(session: Session) -> list[dict]:
+    """Per-champion presence, win rate and main role for the meta index page —
+    one SQL aggregate over typed columns. The page previously looped
+    build_for_champion over every champion, loading each participant's stats
+    JSONB; at crawled-dataset scale that killed the API process."""
+    rows = session.execute(
+        select(MatchParticipant.champion_name, MatchParticipant.team_position,
+               func.count(),
+               func.sum(case((MatchParticipant.win.is_(True), 1), else_=0)))
+        .join(Match, Match.match_id == MatchParticipant.match_id)
+        .where(Match.queue_id.in_(SR_QUEUES),
+               MatchParticipant.champion_name.isnot(None),
+               MatchParticipant.champion_name != "")
+        .group_by(MatchParticipant.champion_name, MatchParticipant.team_position)
+    ).all()
+
+    by_champ: dict[str, dict] = {}
+    for name, role, games, wins in rows:
+        c = by_champ.setdefault(name, {"champion": name, "games": 0, "wins": 0,
+                                       "roles": Counter()})
+        c["games"] += games
+        c["wins"] += int(wins or 0)
+        c["roles"][role or "?"] += games
+
+    out = []
+    for c in by_champ.values():
+        if c["games"] < MIN_BUILD_GAMES:
+            continue
+        out.append({
+            "champion": c["champion"],
+            "games": c["games"],
+            "winrate_pct": round(c["wins"] / c["games"] * 100),
+            "role": c["roles"].most_common(1)[0][0],
+        })
+    out.sort(key=lambda d: -d["games"])
+    return out
 
 
 def champion_names(session: Session, prefix: str = "") -> list[str]:

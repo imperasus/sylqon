@@ -237,6 +237,19 @@ def test_leaderboard_page_renders_ladder(client, monkeypatch):
     assert "mmr" not in low and "elo" not in low
 
 
+def test_champion_index_aggregate(client):
+    # Direct check of the SQL aggregate the meta page uses (client fixture DB):
+    # Jinx 4 games (2W), Caitlyn 5 games (4W... from specs), sorted by games.
+    from app import builds, db as db_mod
+
+    with db_mod.open_session() as s:
+        rows = builds.champion_index(s)
+    by_name = {r["champion"]: r for r in rows}
+    assert by_name["Jinx"]["games"] == 4
+    assert by_name["Jinx"]["role"] == "BOTTOM"
+    assert rows == sorted(rows, key=lambda d: -d["games"])
+
+
 def test_champions_index_and_detail(client):
     r = client.get("/champions")
     assert r.status_code == 200
