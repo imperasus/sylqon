@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.24.0](https://github.com/imperasus/sylqon/compare/v1.23.0...v1.24.0) (2026-07-10)
+
+
+### Features
+
+* **deploy:** serve sylqon.com via Caddy with automatic TLS ([9acae1f](https://github.com/imperasus/sylqon/commit/9acae1fa5c44295b28c5a6e0f5d31eabd3f45e59))
+* **web:** apex leaderboard page + champion-meta polish ([b41f4c5](https://github.com/imperasus/sylqon/commit/b41f4c580fb70ec57c5c201adc4ab462caaf1859))
+* **web:** coaching insights on the summoner profile ([ee047d1](https://github.com/imperasus/sylqon/commit/ee047d1fc5696e76aad27411271834be23fdfb1c))
+* **web:** gold-difference timeline chart on match detail ([66b8763](https://github.com/imperasus/sylqon/commit/66b87638bd4ca0b8c6ac7b5a97903fe4e6fcfcb7))
+* **web:** Graphite Volt public site — branded home + summoner profile ([7cf525c](https://github.com/imperasus/sylqon/commit/7cf525c9999b8c3fdf1ab23f2fdf668f16d7b083))
+* **web:** match history + match detail pages ([0625456](https://github.com/imperasus/sylqon/commit/062545685070552eb590adbd9d8a04b15a4f3fe0))
+* **web:** region-aware summoner search ([0fcc263](https://github.com/imperasus/sylqon/commit/0fcc2634ad4ff96630c0a30bb6ede50f47e6745a))
+* **web:** resolve leaderboard names to Riot IDs ([973ddf4](https://github.com/imperasus/sylqon/commit/973ddf453c55e74429df9115fe5b3af01f335e23))
+
+
+### Performance
+
+* **web:** SQL aggregates replace full-raw scans on public pages ([cf47d6a](https://github.com/imperasus/sylqon/commit/cf47d6a5c12860ae65226f37f455f4e14788381b))
+
 ## [1.23.0](https://github.com/imperasus/sylqon/compare/v1.22.0...v1.23.0) (2026-07-09)
 
 
