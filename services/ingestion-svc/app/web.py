@@ -723,12 +723,7 @@ def champion_page(name: str) -> HTMLResponse:
         data = builds.build_for_champion(session, name)
         matchup_rows = []
         if data:
-            role_data = pool.role_dataset(session, data["role"])
-            for (a, b), (games, wins) in sorted(
-                role_data["matchups"].items(), key=lambda kv: -kv[1][0]
-            ):
-                if a.lower() == name.lower() and games >= builds.MIN_MATCHUP_GAMES:
-                    matchup_rows.append((b, games, round(wins / games * 100)))
+            matchup_rows = builds.champion_matchups(session, data["champion"], data["role"])
     if not data:
         return _page(name, f'<h1>{html.escape(name)}</h1><p class="muted">Not enough games '
                      'in our dataset for this champion yet — the crawler is still working.</p>')

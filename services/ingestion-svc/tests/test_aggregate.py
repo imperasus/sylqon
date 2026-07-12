@@ -137,6 +137,27 @@ def test_old_shape_table_is_dropped_on_init():
     assert "band" in {c["name"] for c in inspect(engine).get_columns("computed_benchmarks")}
 
 
+def test_new_indexes_created_on_existing_table():
+    """create_all never alters existing tables — init_db must add indexes that
+    models.py gained after the table shipped, and stay idempotent afterwards
+    (SQLite reflection skips expression indexes, so checkfirst can't be trusted)."""
+    from app import db as app_db
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    app_db.init_db(engine)
+    with engine.begin() as conn:  # simulate a DB from before the indexes shipped
+        conn.execute(text("DROP INDEX ix_participants_champ_lower"))
+        conn.execute(text("DROP INDEX ix_participants_match_role"))
+    app_db.init_db(engine)
+    app_db.init_db(engine)  # second startup must not re-issue CREATE INDEX
+    with engine.connect() as conn:
+        names = {r[0] for r in conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='index' "
+            "AND tbl_name='match_participants'"))}
+    assert {"ix_participants_champ_lower", "ix_participants_match_role"} <= names
+
+
 def test_overrides_empty_below_threshold(session_factory, monkeypatch):
     seed_matches(session_factory, count=3)  # 6 samples/role
     monkeypatch.setattr(config, "BENCHMARK_MIN_SAMPLES", 40)

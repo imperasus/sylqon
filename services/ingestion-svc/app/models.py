@@ -19,6 +19,7 @@ from sqlalchemy import (
     Integer,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -79,6 +80,13 @@ class MatchParticipant(Base):
     __table_args__ = (
         Index("ix_participants_puuid", "puuid"),
         Index("ix_participants_champ_role", "champion_id", "team_position"),
+        # builds.py filters on lower(champion_name) — only an expression index
+        # can serve that; a plain btree on the column cannot.
+        Index("ix_participants_champ_lower", func.lower(champion_name)),
+        # Lane-opponent self-joins (builds.matchup, pool.role_dataset) probe
+        # (match_id, team_position); the PK alone forces a filter over all ten
+        # participants of every probed match.
+        Index("ix_participants_match_role", "match_id", "team_position"),
     )
 
 

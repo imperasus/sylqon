@@ -25,7 +25,31 @@ def init_db(engine: Engine | None = None) -> Engine:
     engine = engine or get_engine()
     _migrate_computed_benchmarks(engine)
     Base.metadata.create_all(engine)
+    _ensure_indexes(engine)
     return engine
+
+
+def _ensure_indexes(engine: Engine) -> None:
+    """Additive index migration: ``create_all`` never alters existing tables,
+    so an index added to models.py after its table shipped must be created
+    here. Existing names are read straight from the catalog — ``checkfirst``
+    relies on reflection, and SQLite reflection skips expression-based indexes
+    entirely, which would re-issue their CREATE INDEX on every startup. Plain
+    CREATE INDEX blocks writes while it builds — on a large live table,
+    pre-create the same index (same name) with CREATE INDEX CONCURRENTLY and
+    this becomes a no-op."""
+    from sqlalchemy import text
+
+    if engine.dialect.name == "postgresql":
+        q = text("SELECT indexname FROM pg_indexes WHERE schemaname = 'public'")
+    else:  # sqlite
+        q = text("SELECT name FROM sqlite_master WHERE type = 'index'")
+    with engine.connect() as conn:
+        existing = {row[0] for row in conn.execute(q)}
+    for table in Base.metadata.tables.values():
+        for index in table.indexes:
+            if index.name not in existing:
+                index.create(engine)
 
 
 def _migrate_computed_benchmarks(engine: Engine) -> None:

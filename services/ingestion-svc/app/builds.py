@@ -78,7 +78,9 @@ def build_for_champion(session: Session, champion: str) -> dict | None:
         select(MatchParticipant.champion_name, MatchParticipant.team_position,
                MatchParticipant.win, *item_cols)
         .join(Match, Match.match_id == MatchParticipant.match_id)
-        .where(MatchParticipant.champion_name.ilike(champion))
+        # lower() equality, not ilike: Postgres can serve the former from the
+        # ix_participants_champ_lower expression index; ilike always seq-scans.
+        .where(func.lower(MatchParticipant.champion_name) == champion.lower())
         .where(Match.queue_id.in_(SR_QUEUES))
     ).all()
     if len(rows) < MIN_BUILD_GAMES:
@@ -110,6 +112,48 @@ def build_for_champion(session: Session, champion: str) -> dict | None:
             for item_id, n in items.most_common(6)
         ],
     }
+
+
+def champion_matchups(session: Session, champion: str, role: str) -> list[tuple[str, int, int]]:
+    """``(opponent, games, winrate_pct)`` lane records for one champion in one
+    role, most-played first — the champion page's matchup table.
+
+    Same pairing rules as ``pool.role_dataset`` (same match, same
+    teamPosition, opposite teams, exactly two such laners in the match), but
+    anchored to one champion up front: the page previously built every lane
+    pairing in the role via role_dataset and threw away all but one champion's
+    rows — a multi-second aggregate at crawled-dataset scale.
+    """
+    a, b, c = aliased(MatchParticipant), aliased(MatchParticipant), aliased(MatchParticipant)
+    # The well-formed-SR guard from role_dataset, per anchored row: exactly
+    # two named laners share this match+position, so pairings stay 1:1.
+    laners = (
+        select(func.count())
+        .where(c.match_id == a.match_id,
+               c.team_position == a.team_position,
+               c.champion_name.isnot(None), c.champion_name != "")
+        .correlate(a)
+        .scalar_subquery()
+    )
+    rows = session.execute(
+        select(b.champion_name, func.count(),
+               func.sum(case((a.win.is_(True), 1), else_=0)))
+        .select_from(a)
+        .join(b, (b.match_id == a.match_id)
+              & (b.team_position == a.team_position)
+              & (b.team_id != a.team_id))
+        .join(Match, Match.match_id == a.match_id)
+        .where(Match.queue_id.in_(SR_QUEUES),
+               func.lower(a.champion_name) == champion.lower(),
+               a.team_position == role,
+               b.champion_name.isnot(None), b.champion_name != "",
+               laners == 2)
+        .group_by(b.champion_name)
+    ).all()
+    records = [(name, games, round(int(wins or 0) / games * 100))
+               for name, games, wins in rows if games >= MIN_MATCHUP_GAMES]
+    records.sort(key=lambda r: -r[1])
+    return records
 
 
 def matchup(session: Session, champ_a: str, champ_b: str) -> dict | None:
