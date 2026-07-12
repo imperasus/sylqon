@@ -24,6 +24,10 @@ services:
     image: postgres:16-alpine
     container_name: sylqon-postgres
     restart: unless-stopped
+    # The default 128MB shared_buffers starves a multi-GB, crawl-heavy DB —
+    # every page aggregate re-reads heap blocks from disk. Sized for the 12GB
+    # VPS alongside the API, bot and Redis.
+    command: postgres -c shared_buffers=1GB -c effective_cache_size=3GB
     environment:
       POSTGRES_USER: sylqon
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sylqon}
