@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.24.6](https://github.com/imperasus/sylqon/compare/v1.24.5...v1.24.6) (2026-07-12)
+
+
+### Performance
+
+* **ingestion-svc:** cache rendered champion pages ([2fbf5f6](https://github.com/imperasus/sylqon/commit/2fbf5f6290a8a31dc572127aee9eebecfcf05023))
+
 ### [1.24.5](https://github.com/imperasus/sylqon/compare/v1.24.4...v1.24.5) (2026-07-12)
 
 
