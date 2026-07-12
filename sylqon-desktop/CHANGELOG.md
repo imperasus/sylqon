@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.24.7](https://github.com/imperasus/sylqon/compare/v1.24.6...v1.24.7) (2026-07-12)
+
+
+### Performance
+
+* **ingestion-svc:** raise prod Postgres buffers past the 128MB default ([4cdf9d0](https://github.com/imperasus/sylqon/commit/4cdf9d09a218e28a354fe1e82a4d71d54b6f7694))
+
 ### [1.24.6](https://github.com/imperasus/sylqon/compare/v1.24.5...v1.24.6) (2026-07-12)
 
 
