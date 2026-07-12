@@ -18,7 +18,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app import builds, db, pool, regions
+from app import builds, config, db, pool, regions
 
 log = logging.getLogger(__name__)
 
@@ -717,8 +717,18 @@ def champions_page() -> HTMLResponse:
     return _page("Champion meta", body, "Champion presence and win rates from our own aggregation.")
 
 
+# Rendered champion pages, keyed by lowercase champion name. Only names that
+# resolved to data are stored: misses are index-fast anyway, and the key space
+# is arbitrary URL input — caching misses would grow the dict without bound.
+_champ_cache: dict[str, tuple[float, bytes]] = {}
+
+
 @router.get("/champion/{name}", response_class=HTMLResponse)
 def champion_page(name: str) -> HTMLResponse:
+    key = name.lower()
+    hit = _champ_cache.get(key)
+    if hit and hit[0] > time.time():
+        return HTMLResponse(hit[1])
     with db.open_session() as session:
         data = builds.build_for_champion(session, name)
         matchup_rows = []
@@ -747,5 +757,7 @@ def champion_page(name: str) -> HTMLResponse:
 {matchups}</table>
 <p class="muted small">Own-data lane records; small samples are listed as-is — judge accordingly.</p></div>
 """
-    return _page(f"{data['champion']} — builds & matchups", body,
+    resp = _page(f"{data['champion']} — builds & matchups", body,
                  f"{data['champion']}: most-built items and lane matchups from our aggregation.")
+    _champ_cache[key] = (time.time() + config.WEB_CHAMPION_CACHE_TTL, resp.body)
+    return resp

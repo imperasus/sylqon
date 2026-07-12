@@ -30,6 +30,9 @@ def client(monkeypatch):
             m = lane_match(f"EUN1_{i}", a, b, win, a_puuid=ME if a == "Jinx" else "o1")
             store.insert_match_bundle(s, m, {"info": {"frames": []}}, region="europe")
 
+    from app import web
+    web._champ_cache.clear()  # rendered-page cache must not leak across tests
+
     from app.main import app
     return TestClient(app, raise_server_exceptions=True)
 
@@ -268,6 +271,34 @@ def test_champions_index_and_detail(client):
     r = client.get("/champion/Teemo")
     assert r.status_code == 200
     assert "Not enough games" in r.text
+
+
+def test_champion_page_is_cached(client, monkeypatch):
+    from app import builds, web
+
+    r = client.get("/champion/Jinx")
+    assert r.status_code == 200 and "jinx" in web._champ_cache
+
+    # A repeat view (any casing) must be served from the cache, not the DB.
+    def boom(*a, **kw):
+        raise AssertionError("cache miss: aggregate recomputed")
+
+    monkeypatch.setattr(builds, "build_for_champion", boom)
+    r2 = client.get("/champion/JINX")
+    assert r2.status_code == 200 and "Caitlyn" in r2.text
+
+    # An expired entry is recomputed (and here that recompute must blow up).
+    web._champ_cache["jinx"] = (0.0, b"stale")
+    with pytest.raises(AssertionError, match="cache miss"):
+        client.get("/champion/Jinx")
+
+
+def test_champion_page_unknown_name_not_cached(client):
+    from app import web
+
+    r = client.get("/champion/Teemo")
+    assert r.status_code == 200 and "Not enough games" in r.text
+    assert web._champ_cache == {}  # arbitrary URL input must not grow the dict
 
 
 def test_no_skill_rating_vocabulary(client):

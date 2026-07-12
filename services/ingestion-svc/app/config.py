@@ -70,6 +70,11 @@ CRAWL_BATCH = int(_env("CRAWL_BATCH", "3"))
 CRAWL_MATCH_COUNT = int(_env("CRAWL_MATCH_COUNT", "10"))
 CRAWL_RECRAWL_HOURS = float(_env("CRAWL_RECRAWL_HOURS", "72"))
 
+# Public champion pages are cached fully rendered for this long: they are pure
+# aggregates that move slowly, while the crawler keeps the DB's buffer cache
+# churning — recomputing them per view costs seconds at crawled-dataset scale.
+WEB_CHAMPION_CACHE_TTL = float(_env("WEB_CHAMPION_CACHE_TTL", "21600"))
+
 # Discord delivery (webhook MVP — the JDA-style gateway/slash-commands come
 # later with account linking). Watcher polls tracked PUUIDs and posts the
 # post-game advice to the webhook channel.
