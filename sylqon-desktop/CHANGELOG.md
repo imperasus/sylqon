@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.24.11](https://github.com/imperasus/sylqon/compare/v1.24.10...v1.24.11) (2026-07-13)
+
+
+### Bug Fixes
+
+* **ingestion-svc:** survive the deploy-time index-creation race ([1ffb1f8](https://github.com/imperasus/sylqon/commit/1ffb1f838da112d798a3b9e6830ba0af380b7808))
+
 ### [1.24.10](https://github.com/imperasus/sylqon/compare/v1.24.9...v1.24.10) (2026-07-13)
 
 
