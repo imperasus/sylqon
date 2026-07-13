@@ -3,12 +3,16 @@ the schema is additive-only for now; Alembic arrives when a breaking change does
 """
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app import config
 from app.models import Base
+
+log = logging.getLogger(__name__)
 
 _engine: Engine | None = None
 _session_factory: sessionmaker | None = None
@@ -49,7 +53,22 @@ def _ensure_indexes(engine: Engine) -> None:
     for table in Base.metadata.tables.values():
         for index in table.indexes:
             if index.name not in existing:
-                index.create(engine)
+                _create_index_idempotent(index, engine)
+
+
+def _create_index_idempotent(index, engine: Engine) -> None:
+    """The api and bot containers run init_db concurrently at deploy time —
+    both can see the same index as missing and race the CREATE; the loser's
+    duplicate error must not kill its startup."""
+    from sqlalchemy.exc import DatabaseError
+
+    try:
+        index.create(engine)
+    except DatabaseError as exc:
+        message = str(exc).lower()
+        if "already exists" not in message and "duplicate" not in message:
+            raise
+        log.info("index %s already created by a concurrent starter", index.name)
 
 
 def _migrate_computed_benchmarks(engine: Engine) -> None:

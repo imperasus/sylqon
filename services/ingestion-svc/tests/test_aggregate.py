@@ -189,3 +189,15 @@ def test_scan_limit_bounds_the_window(session_factory, monkeypatch):
     # only the newest match is inside the window: 2 laners per role, cs10=90
     assert computed[("TOP", "ALL")]["samples"] == 2
     assert computed[("TOP", "ALL")]["cs10"] == 90
+
+
+def test_index_create_race_is_survivable(session_factory):
+    # Two containers race init_db at deploy: the loser's duplicate CREATE
+    # INDEX must be swallowed, anything else must still raise.
+    from app import db
+    from app.models import Base
+
+    with session_factory() as s:
+        engine = s.get_bind()
+    index = next(iter(Base.metadata.tables["match_participants"].indexes))
+    db._create_index_idempotent(index, engine)  # exists (create_all) → no-op
