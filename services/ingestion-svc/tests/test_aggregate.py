@@ -165,3 +165,27 @@ def test_overrides_empty_below_threshold(session_factory, monkeypatch):
         aggregate.refresh_benchmarks(s)
         cs_over, vision_over = aggregate.load_effective_overrides(s)
     assert cs_over == {} and vision_over == {}
+
+
+def test_refresh_is_throttled_and_forceable(session_factory):
+    seed_matches(session_factory, count=3)
+    with session_factory() as s:
+        assert aggregate.refresh_benchmarks(s)  # cold table → computes
+        # within BENCHMARK_REFRESH_MINUTES of the last refresh → no-op
+        assert aggregate.refresh_benchmarks(s) == {}
+        assert aggregate.refresh_benchmarks(s, force=True)  # explicit recompute
+
+
+def test_scan_limit_bounds_the_window(session_factory, monkeypatch):
+    monkeypatch.setattr(config, "BENCHMARK_SCAN_LIMIT", 1)
+    with session_factory() as s:
+        old_m, old_t = make_bundle("EUN1_old", cs_at_10=10)
+        old_m["info"]["gameCreation"] = 1_000
+        store.insert_match_bundle(s, old_m, old_t, region="europe")
+        new_m, new_t = make_bundle("EUN1_new", cs_at_10=90)
+        new_m["info"]["gameCreation"] = 2_000
+        store.insert_match_bundle(s, new_m, new_t, region="europe")
+        computed = aggregate.compute_role_benchmarks(s)
+    # only the newest match is inside the window: 2 laners per role, cs10=90
+    assert computed[("TOP", "ALL")]["samples"] == 2
+    assert computed[("TOP", "ALL")]["cs10"] == 90

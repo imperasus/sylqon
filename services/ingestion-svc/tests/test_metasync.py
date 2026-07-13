@@ -62,3 +62,14 @@ def test_tier_buckets():
     assert metasync._tier(0.55, 10) == 1   # not enough games for S+
     assert metasync._tier(0.50, 30) == 2
     assert metasync._tier(0.45, 30) == 3
+
+
+def test_scan_limit_bounds_the_bundle(session_factory, monkeypatch):
+    from app import config
+
+    monkeypatch.setattr(config, "METASYNC_SCAN_LIMIT", 8)
+    seed(session_factory, count=10, win=True)
+    with session_factory() as s:
+        bundle = metasync.build_sync_bundle(s, min_games=8)
+    jinx = next(e for e in bundle["entries"] if e["champion"] == "Jinx")
+    assert jinx["games"] == 8  # the newest-window cap, not all 10 stored

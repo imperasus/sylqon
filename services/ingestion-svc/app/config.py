@@ -62,6 +62,19 @@ ADVICE_TUNING: dict = json.loads(_env("ADVICE_TUNING_JSON", "{}"))
 # have been aggregated for that role (every stored SR match adds 2 per role).
 BENCHMARK_MIN_SAMPLES = int(_env("BENCHMARK_MIN_SAMPLES", "40"))
 
+# Benchmark recompute reads this many of the NEWEST stored SR matches (with
+# their timelines) — medians over a recent window are statistically ample and
+# meta-fresher than all-history, and the cap turns an unbounded scan into a
+# constant cost as the crawler grows the table. Refreshes are also throttled:
+# the watcher fires after every crawl cycle (~3 min), which at dataset scale
+# OOM-crash-looped both containers before these bounds existed.
+BENCHMARK_SCAN_LIMIT = int(_env("BENCHMARK_SCAN_LIMIT", "4000"))
+BENCHMARK_REFRESH_MINUTES = float(_env("BENCHMARK_REFRESH_MINUTES", "360"))
+
+# The desktop full-sync bundle scans this many newest SR matches for meta
+# stats/matchups/synergies — same bounded-window reasoning as the benchmarks.
+METASYNC_SCAN_LIMIT = int(_env("METASYNC_SCAN_LIMIT", "8000"))
+
 # Co-player seed crawl: every stored match discovers 9 more PUUIDs; each watch
 # cycle additionally crawls CRAWL_BATCH of the least-recently-crawled ones.
 # Widens the benchmark/build/matchup pool without extra tracked accounts.

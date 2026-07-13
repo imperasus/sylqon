@@ -14,7 +14,7 @@ from collections import Counter, defaultdict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import metabuild
+from app import config, metabuild
 from app.advice import benchmarks
 from app.models import Match
 
@@ -47,9 +47,18 @@ def sync_aggregates(session: Session) -> dict:
     pairs: dict[tuple[str, str, str], list[int]] = defaultdict(lambda: [0, 0])     # (role,name,ally)
     role_matches: Counter = Counter()
 
-    for match in session.execute(select(Match)).scalars():
-        if match.queue_id not in SR_QUEUES:
-            continue
+    # Newest-first bounded window on a server-side cursor — the unbounded
+    # all-history scan buffered every raw payload client-side and ballooned
+    # the process to OOM at crawled-dataset scale; recent matches are also
+    # what a meta bundle should reflect.
+    stmt = (
+        select(Match)
+        .where(Match.queue_id.in_(SR_QUEUES))
+        .order_by(Match.game_creation.desc().nullslast())
+        .limit(config.METASYNC_SCAN_LIMIT)
+        .execution_options(yield_per=50)
+    )
+    for match in session.execute(stmt).scalars():
         parts = [p for p in match.raw.get("participants", [])
                  if p.get("championName") and p.get("teamPosition") in ROLES]
         by_role: dict[str, list[dict]] = defaultdict(list)

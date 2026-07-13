@@ -10,9 +10,10 @@ seed values.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 from statistics import median
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import config
@@ -48,9 +49,11 @@ def _cs_at(frames: list[dict], pid: int, minute: int) -> int | None:
 
 
 def compute_role_benchmarks(session: Session) -> dict[tuple[str, str], dict]:
-    """Aggregate (role, band) medians from every stored SR match + timeline.
-    Every sample lands in band "ALL"; ranked players additionally land in
-    their tier band (player_ranks coverage grows with the seed crawl)."""
+    """Aggregate (role, band) medians over the newest ``BENCHMARK_SCAN_LIMIT``
+    stored SR matches + timelines. Every sample lands in band "ALL"; ranked
+    players additionally land in their tier band (player_ranks coverage grows
+    with the seed crawl). Medians over a recent window are statistically ample
+    and meta-fresher than all-history."""
     bands_by_puuid = {
         r.puuid: band_for_tier(r.tier)
         for r in session.execute(select(PlayerRank)).scalars()
@@ -62,15 +65,20 @@ def compute_role_benchmarks(session: Session) -> dict[tuple[str, str], dict]:
             (role, band), {"cs10": [], "cs15": [], "wards_per_min": [], "control_wards": []}
         )
 
+    # Streamed on a server-side cursor: without yield_per the driver buffers
+    # every (raw + timeline) payload client-side — gigabytes at crawled-dataset
+    # scale, which OOM-crash-looped both containers before these bounds.
     rows = session.execute(
-        select(Match, Timeline).join(Timeline, Timeline.match_id == Match.match_id)
+        select(Match, Timeline)
+        .join(Timeline, Timeline.match_id == Match.match_id)
+        .where(Match.queue_id.in_(SR_QUEUES),
+               Match.game_duration >= 16 * 60)  # remakes/stomps skew medians
+        .order_by(Match.game_creation.desc().nullslast())
+        .limit(config.BENCHMARK_SCAN_LIMIT)
+        .execution_options(yield_per=50)
     )
     for match, timeline in rows:
-        if match.queue_id not in SR_QUEUES:
-            continue
         duration_min = (match.game_duration or 0) / 60
-        if duration_min < 16:  # remakes/stomps skew medians
-            continue
         frames = timeline.payload.get("frames", [])
         for p in match.raw.get("participants", []):
             role = p.get("teamPosition")
@@ -106,8 +114,24 @@ def compute_role_benchmarks(session: Session) -> dict[tuple[str, str], dict]:
     return out
 
 
-def refresh_benchmarks(session: Session) -> dict[tuple[str, str], dict]:
-    """Recompute and upsert the computed_benchmarks table."""
+def _benchmarks_fresh(session: Session) -> bool:
+    newest = session.execute(select(func.max(ComputedBenchmark.computed_at))).scalar()
+    if newest is None:
+        return False
+    if newest.tzinfo is None:  # SQLite hands back naive datetimes
+        newest = newest.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - newest
+    return age < timedelta(minutes=config.BENCHMARK_REFRESH_MINUTES)
+
+
+def refresh_benchmarks(session: Session, force: bool = False) -> dict[tuple[str, str], dict]:
+    """Recompute and upsert the computed_benchmarks table.
+
+    Throttled: the watcher calls this after every crawl cycle (~3 min), but
+    medians move on the scale of patches — within ``BENCHMARK_REFRESH_MINUTES``
+    of the last refresh this is a no-op returning ``{}`` unless ``force``d."""
+    if not force and _benchmarks_fresh(session):
+        return {}
     computed = compute_role_benchmarks(session)
     for (role, band), data in computed.items():
         row = session.get(ComputedBenchmark, (role, band)) or ComputedBenchmark(
@@ -115,6 +139,7 @@ def refresh_benchmarks(session: Session) -> dict[tuple[str, str], dict]:
         )
         row.data = {k: v for k, v in data.items() if k != "samples"}
         row.samples = data["samples"]
+        row.computed_at = datetime.now(timezone.utc)  # default fires on INSERT only
         session.add(row)
     session.commit()
     log.info("benchmarks refreshed: %s",
