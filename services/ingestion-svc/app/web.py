@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import html
 import logging
+import threading
 import time
 from urllib.parse import quote
 
@@ -727,15 +728,43 @@ def champions_page() -> HTMLResponse:
 # Rendered champion pages, keyed by lowercase champion name. Only names that
 # resolved to data are stored: misses are index-fast anyway, and the key space
 # is arbitrary URL input — caching misses would grow the dict without bound.
+# Stale entries are served immediately and refreshed in the background (a cold
+# render costs seconds at crawled-dataset scale), so only the first-ever
+# render of a champion blocks a visitor — and the startup warmer covers that.
 _champ_cache: dict[str, tuple[float, bytes]] = {}
+_champ_refreshing: set[str] = set()
+_champ_lock = threading.Lock()
+
+
+def _refresh_champion_page(name: str) -> None:
+    """Background re-render of an expired cache entry; single-flight per key."""
+    key = name.lower()
+    with _champ_lock:
+        if key in _champ_refreshing:
+            return
+        _champ_refreshing.add(key)
+    try:
+        _render_champion_page(name)
+    except Exception:  # a failed refresh keeps serving the stale page
+        log.exception("champion page refresh failed for %s", name)
+    finally:
+        with _champ_lock:
+            _champ_refreshing.discard(key)
 
 
 @router.get("/champion/{name}", response_class=HTMLResponse)
 def champion_page(name: str) -> HTMLResponse:
     key = name.lower()
     hit = _champ_cache.get(key)
-    if hit and hit[0] > time.time():
+    if hit:
+        if hit[0] <= time.time():  # expired: serve stale, refresh off-thread
+            threading.Thread(target=_refresh_champion_page, args=(name,),
+                             daemon=True).start()
         return HTMLResponse(hit[1])
+    return _render_champion_page(name)
+
+
+def _render_champion_page(name: str) -> HTMLResponse:
     with db.open_session() as session:
         data = builds.build_for_champion(session, name)
         matchup_rows = []
@@ -766,5 +795,24 @@ def champion_page(name: str) -> HTMLResponse:
 """
     resp = _page(f"{data['champion']} — builds & matchups", body,
                  f"{data['champion']}: most-built items and lane matchups from our aggregation.")
-    _champ_cache[key] = (time.time() + config.WEB_CHAMPION_CACHE_TTL, resp.body)
+    _champ_cache[name.lower()] = (time.time() + config.WEB_CHAMPION_CACHE_TTL, resp.body)
     return resp
+
+
+def warm_champion_pages() -> int:
+    """Render every champion page whose cache entry is missing or expired —
+    called from the startup warmer thread so visitors never hit a cold render.
+    Returns the number of pages (re)rendered."""
+    with db.open_session() as session:
+        names = [row["champion"] for row in builds.champion_index(session)]
+    warmed = 0
+    for n in names:
+        hit = _champ_cache.get(n.lower())
+        if hit and hit[0] > time.time():
+            continue
+        try:
+            _render_champion_page(n)
+            warmed += 1
+        except Exception:  # one bad champion must not stop the sweep
+            log.exception("champion warmup failed for %s", n)
+    return warmed

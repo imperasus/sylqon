@@ -287,10 +287,31 @@ def test_champion_page_is_cached(client, monkeypatch):
     r2 = client.get("/champion/JINX")
     assert r2.status_code == 200 and "Caitlyn" in r2.text
 
-    # An expired entry is recomputed (and here that recompute must blow up).
+    # An expired entry serves the stale page instantly — the refresh happens
+    # off-thread (stale-while-revalidate), so a visitor never waits on it.
     web._champ_cache["jinx"] = (0.0, b"stale")
-    with pytest.raises(AssertionError, match="cache miss"):
-        client.get("/champion/Jinx")
+    r3 = client.get("/champion/Jinx")
+    assert r3.status_code == 200 and r3.text == "stale"
+
+
+def test_champion_refresh_repopulates_cache(client):
+    import time
+
+    from app import web
+
+    web._champ_cache["jinx"] = (0.0, b"stale")
+    web._refresh_champion_page("Jinx")  # the background worker, run inline
+    expires, body = web._champ_cache["jinx"]
+    assert expires > time.time() and b"Caitlyn" in body
+
+
+def test_champion_warmup_prerenders_pages(client):
+    from app import web
+
+    warmed = web.warm_champion_pages()
+    assert warmed >= 2  # the fixture seeds Jinx and Caitlyn with enough games
+    assert "jinx" in web._champ_cache and "caitlyn" in web._champ_cache
+    assert web.warm_champion_pages() == 0  # everything fresh → no-op sweep
 
 
 def test_champion_page_unknown_name_not_cached(client):

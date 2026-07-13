@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 
@@ -37,7 +38,27 @@ async def lifespan(app: FastAPI):
 
         watcher = MatchWatcher(_ingest_service, db.get_session_factory(engine), notifier)
         watcher.start()
+
+    # Champion-page warmer: pre-render every champion at startup, then re-sweep
+    # before the render cache expires — visitors never pay the cold render
+    # (seconds at crawled-dataset scale). Daemon thread, dies with the process.
+    def _warm_loop(stop: threading.Event) -> None:
+        from app import web
+
+        while not stop.is_set():
+            try:
+                warmed = web.warm_champion_pages()
+                if warmed:
+                    log.info("champion pages warmed: %d", warmed)
+            except Exception:
+                log.exception("champion warmup sweep failed")
+            stop.wait(config.WEB_CHAMPION_CACHE_TTL * 0.75)
+
+    warm_stop = threading.Event()
+    threading.Thread(target=_warm_loop, args=(warm_stop,), daemon=True,
+                     name="champion-warmer").start()
     yield
+    warm_stop.set()
     if watcher:
         watcher.stop()
 

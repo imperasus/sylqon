@@ -83,6 +83,11 @@ class MatchParticipant(Base):
         # builds.py filters on lower(champion_name) — only an expression index
         # can serve that; a plain btree on the column cannot.
         Index("ix_participants_champ_lower", func.lower(champion_name)),
+        # champion_matchups anchors on lower(name) + role together; without the
+        # composite the planner BitmapAnds champ_lower with a 165k-entry
+        # position bitmap per query (measured on the 1M-row live table).
+        Index("ix_participants_champ_lower_role", func.lower(champion_name),
+              "team_position"),
         # Lane-opponent self-joins (builds.matchup, pool.role_dataset) probe
         # (match_id, team_position); the PK alone forces a filter over all ten
         # participants of every probed match.
