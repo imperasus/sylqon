@@ -317,3 +317,11 @@ def test_brand_refresh_assets(client):
     assert "Space+Grotesk" in text  # font stylesheet link
     assert 'aria-label="Sylqon"' in text  # Signal-S mark rendered in the header
     assert "--accent-2" in text  # amber secondary token in the palette
+
+
+def test_champions_plural_detail_redirects(client):
+    r = client.get("/champions/Lux", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/champion/Lux"
+    r = client.get("/champions/Aurelion%20Sol", follow_redirects=False)
+    assert r.headers["location"] == "/champion/Aurelion%20Sol"

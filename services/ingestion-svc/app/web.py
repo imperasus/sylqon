@@ -688,6 +688,13 @@ def leaderboard_page(queue: str, tier: str = "CHALLENGER", region: str = "euw1")
                  "official Riot ladder data.")
 
 
+@router.get("/champions/{name}")
+def champions_name_redirect(name: str) -> RedirectResponse:
+    """/champions/Lux → /champion/Lux — the plural form is what people type
+    from the /champions index URL (same trap as the bare /leaderboard was)."""
+    return RedirectResponse(f"/champion/{quote(name, safe='')}", status_code=303)
+
+
 @router.get("/champions", response_class=HTMLResponse)
 def champions_page() -> HTMLResponse:
     with db.open_session() as session:
