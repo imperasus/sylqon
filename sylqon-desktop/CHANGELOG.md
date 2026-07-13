@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.24.9](https://github.com/imperasus/sylqon/compare/v1.24.8...v1.24.9) (2026-07-13)
+
+
+### Bug Fixes
+
+* **web:** /champions/{name} redirects to the champion page ([aab5625](https://github.com/imperasus/sylqon/commit/aab5625b8aca0196a9dc927d83e6a25f456b07c3))
+
 ### [1.24.8](https://github.com/imperasus/sylqon/compare/v1.24.7...v1.24.8) (2026-07-13)
 
 
