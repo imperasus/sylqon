@@ -163,7 +163,7 @@ def _page(title: str, body: str, description: str = "") -> HTMLResponse:
 <style>{_CSS}</style></head><body>
 <header><div class="wrap">
 <a class="brand" href="/">{_MARK}SYL<span>QON</span> <span class="muted small">pool coverage</span></a>
-<nav><a href="/champions">Champions</a><a href="/leaderboard/RANKED_SOLO_5x5">Leaderboard</a>
+<nav><a href="/daily">Daily Draft</a><a href="/champions">Champions</a><a href="/leaderboard/RANKED_SOLO_5x5">Leaderboard</a>
 <a href="{_DOWNLOAD_URL}">Desktop app</a></nav>
 </div></header>
 <main class="wrap">{body}</main>

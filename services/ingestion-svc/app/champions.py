@@ -61,6 +61,14 @@ def square_url_by_name(name: str | None) -> str | None:
     return square_url(_name_index().get((name or "").lower()))
 
 
+def square_url_for_slug(slug: str | None) -> str | None:
+    """Champion square icon URL from a DDragon key/slug ("MonkeyKing") —
+    the image basename IS the slug, so no catalog lookup is needed."""
+    if not slug:
+        return None
+    return f"{_CDN}/{version()}/img/champion/{slug}.png"
+
+
 def profile_icon_url(icon_id: int | None) -> str | None:
     """Summoner profile-icon URL on the Data Dragon CDN, version-pinned."""
     if icon_id is None:

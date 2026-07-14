@@ -205,6 +205,25 @@ class CrawlTarget(Base):
     last_crawled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class DailyPuzzle(Base):
+    """One Daily Draft puzzle per calendar day (/daily): a real stored match
+    frozen before one pick, with all six answer candidates pre-analysed by the
+    deterministic draft engine at generation time. The payload is everything
+    the page renders — serving needs no computation, and the stored analysis
+    never shifts as the aggregates grow. The payload is anonymous by design
+    (champions only, no puuid/name); the match_id lives here solely for
+    cross-day dedupe and must never be rendered."""
+
+    __tablename__ = "daily_puzzles"
+
+    puzzle_date: Mapped[str] = mapped_column(Text, primary_key=True)  # ISO "2026-07-15"
+    match_id: Mapped[str] = mapped_column(
+        ForeignKey("matches.match_id", ondelete="CASCADE")
+    )
+    payload: Mapped[dict] = mapped_column(JsonCol)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class LinkedAccount(Base):
     """Discord user ↔ Riot PUUID link (Riot-ID-based fallback linking; RSO
     OAuth replaces the verification story later, roadmap §4.1)."""

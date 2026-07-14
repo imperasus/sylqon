@@ -66,8 +66,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Sylqon Ingestion Service", version="0.1.0", lifespan=lifespan)
 
 from app.web import router as web_router  # noqa: E402
+from app.webdaily import router as daily_router  # noqa: E402
 
 app.include_router(web_router)  # public S3 pages: /, /pool-report, /champions, /champion/{name}
+app.include_router(daily_router)  # Daily Draft puzzle: /daily, /daily/{date}
 
 
 @app.get("/healthz")

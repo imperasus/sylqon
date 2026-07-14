@@ -198,6 +198,46 @@ def _cmd_watch(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_puzzle_gen(args: argparse.Namespace) -> int:
+    """Generate (or curate via --replace) Daily Draft puzzles. The summary
+    line per day is the curation surface: weak/unfair reads are a
+    `--date ... --replace` away, which freezes a different match."""
+    from datetime import date, datetime, timedelta, timezone
+
+    from app import puzzles
+
+    db.init_db()
+    start = (date.fromisoformat(args.date) if args.date
+             else datetime.now(timezone.utc).date())
+    failures = 0
+    with db.open_session() as session:
+        for offset in range(args.days):
+            day = (start + timedelta(days=offset)).isoformat()
+            try:
+                payload, changed = puzzles.generate_for_date(
+                    session, day, replace=args.replace)
+            except puzzles.PuzzleNotPossible as exc:
+                print(f"{day}: FAILED — {exc}", file=sys.stderr)
+                failures += 1
+                continue
+            real = next(c for c in payload["candidates"] if c["is_real"])
+            top = next(c for c in payload["candidates"] if c["is_engine_top"])
+            # Tier spread is the curation signal: "6×strong" means the engine
+            # can't tell the candidates apart — a boring puzzle worth a regen.
+            from collections import Counter
+            spread = Counter(c["tier"] for c in payload["candidates"])
+            # plain "x" — the curation console is Windows (cp1250 chokes on ×)
+            spread_txt = " ".join(f"{n}x{t}" for t, n in spread.most_common())
+            print(f"{day}: {'generated' if changed else 'exists'} | "
+                  f"{payload['role_label']} ({payload['side']}) | "
+                  f"band={payload['match']['rank_band'] or '-'} | "
+                  f"patch={payload['match']['patch'] or '-'} | "
+                  f"real={real['name']} [{real['tier']}] | "
+                  f"engine_top={top['name']} {top['balance']['win_pct']}% | "
+                  f"tiers: {spread_txt}")
+    return 1 if failures else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser(prog="app.cli")
@@ -249,6 +289,13 @@ def main(argv: list[str] | None = None) -> int:
     p_watch = sub.add_parser("watch", help="poll tracked accounts and deliver post-game advice")
     p_watch.add_argument("--once", action="store_true", help="run a single poll cycle and exit")
     p_watch.set_defaults(func=_cmd_watch)
+
+    p_puzzle = sub.add_parser("puzzle-gen", help="generate Daily Draft puzzles (/daily)")
+    p_puzzle.add_argument("--date", default=None, help="start date YYYY-MM-DD (default: today UTC)")
+    p_puzzle.add_argument("--days", type=int, default=1, help="consecutive days to generate")
+    p_puzzle.add_argument("--replace", action="store_true",
+                          help="regenerate existing days onto a different match (curation)")
+    p_puzzle.set_defaults(func=_cmd_puzzle_gen)
 
     args = parser.parse_args(argv)
     return args.func(args)
