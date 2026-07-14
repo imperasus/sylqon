@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.26.0](https://github.com/imperasus/sylqon/compare/v1.25.0...v1.26.0) (2026-07-14)
+
+
+### Features
+
+* **web:** the radical cut — puzzle-first homepage, /audit, /download, noindex sunset ([426f2eb](https://github.com/imperasus/sylqon/commit/426f2eb6dd87cc858077195103d8a1c0ef6b1ea9))
+
 ## [1.25.0](https://github.com/imperasus/sylqon/compare/v1.24.11...v1.25.0) (2026-07-14)
 
 
