@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.25.0](https://github.com/imperasus/sylqon/compare/v1.24.11...v1.25.0) (2026-07-14)
+
+
+### Features
+
+* **ingestion-svc:** draft-intel engine port with cross-suite parity bridge ([8d7f101](https://github.com/imperasus/sylqon/commit/8d7f10185503fe82440169fba08a3e06e153d518))
+* **web:** Daily Draft puzzle (/daily) — generator, pages, curation CLI ([339c711](https://github.com/imperasus/sylqon/commit/339c711fab1f9f2d3e168d6259b434380dcbdd08))
+
 ### [1.24.11](https://github.com/imperasus/sylqon/compare/v1.24.10...v1.24.11) (2026-07-13)
 
 
