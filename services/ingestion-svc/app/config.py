@@ -98,6 +98,11 @@ PUZZLE_SELECT_WINDOW = int(_env("PUZZLE_SELECT_WINDOW", "600"))
 PUZZLE_TRIES = int(_env("PUZZLE_TRIES", "40"))
 PUZZLE_CANDIDATE_POOL = int(_env("PUZZLE_CANDIDATE_POOL", "12"))
 
+# Draft Gauntlet (/gym): fixed-length runs keep every score comparable; the
+# pool is topped up to this size by the cron (`gym-pool`).
+GYM_RUN_LENGTH = int(_env("GYM_RUN_LENGTH", "10"))
+GYM_POOL_TARGET = int(_env("GYM_POOL_TARGET", "200"))
+
 # Discord delivery (webhook MVP — the JDA-style gateway/slash-commands come
 # later with account linking). Watcher polls tracked PUUIDs and posts the
 # post-game advice to the webhook channel.

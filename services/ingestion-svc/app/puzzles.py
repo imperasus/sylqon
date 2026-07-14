@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 
 from app import config, draftintel
 from app.builds import SR_QUEUES, champion_matchups
-from app.models import DailyPuzzle, Match, MatchParticipant, PlayerRank
+from app.models import DailyPuzzle, GymPuzzle, Match, MatchParticipant, PlayerRank
 
 log = logging.getLogger(__name__)
 
@@ -320,6 +320,70 @@ def generate_for_date(session: Session, date_iso: str, *,
 
 def get_puzzle(session: Session, date_iso: str) -> dict | None:
     row = session.get(DailyPuzzle, date_iso)
+    return row.payload if row else None
+
+
+# -- Draft Gauntlet pool ----------------------------------------------------------
+def build_pool_batch(session: Session, target: int) -> int:
+    """Top the gym pool up to ``target`` puzzles; returns how many were added.
+
+    Two passes over the eligible matches: first only puzzles whose candidates
+    span at least two tiers (a monotone "everything is strong" board is a
+    boring question), then — only if the pool would starve — monotone ones
+    too. Deterministic per match (rng seeded by match_id), one puzzle per
+    match, daily-puzzle matches excluded."""
+    existing = session.execute(select(func.count()).select_from(GymPuzzle)).scalar() or 0
+    need = target - existing
+    if need <= 0:
+        return 0
+    used = set(session.execute(select(DailyPuzzle.match_id)).scalars())
+    used |= set(session.execute(select(GymPuzzle.match_id)).scalars())
+    eligible = _eligible_matches(session, used)
+
+    def _try(match_row) -> dict | None:
+        rng = random.Random(hashlib.sha256(
+            f"sylqon-gym:{match_row.match_id}".encode()).hexdigest())
+        by_team = _draft_of(session, match_row.match_id)
+        if by_team is None:
+            return None
+        role = rng.choice(ROLES)
+        side = rng.choice((100, 200))
+        try:
+            return _freeze(session, rng, match_row, by_team, side, role)
+        except PuzzleNotPossible:
+            return None
+
+    created = 0
+    monotone: list[tuple[str, dict]] = []
+    for match_row in eligible:
+        if created >= need:
+            break
+        payload = _try(match_row)
+        if payload is None:
+            continue
+        if len({c["tier"] for c in payload["candidates"]}) < 2:
+            monotone.append((match_row.match_id, payload))
+            continue
+        session.add(GymPuzzle(match_id=match_row.match_id, payload=payload))
+        created += 1
+    for match_id, payload in monotone:  # starvation fallback, worst last
+        if created >= need:
+            break
+        session.add(GymPuzzle(match_id=match_id, payload=payload))
+        created += 1
+    session.commit()
+    return created
+
+
+def draw_pool_ids(session: Session, count: int) -> list[int]:
+    """``count`` random pool puzzle ids — one run's worth of questions."""
+    return list(session.execute(
+        select(GymPuzzle.id).order_by(func.random()).limit(count)
+    ).scalars())
+
+
+def get_pool_puzzle(session: Session, puzzle_id: int) -> dict | None:
+    row = session.get(GymPuzzle, puzzle_id)
     return row.payload if row else None
 
 

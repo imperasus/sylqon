@@ -244,6 +244,7 @@ def _solution_html(payload: dict, date_iso: str, interactive: bool) -> str:
              '<button type="button" id="share-btn">Share result</button>'
              '<span class="streak" id="streak"></span>'
              f'<a class="small" href="/daily/{date_iso}">Permalink</a>'
+             '<a class="small" href="/gym">Want more? Draft Gauntlet — 10 drafts, 30 points →</a>'
              "</div></div>") if interactive else ""
     return f"""
 <div id="solution">

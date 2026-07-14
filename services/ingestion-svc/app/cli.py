@@ -238,6 +238,18 @@ def _cmd_puzzle_gen(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def _cmd_gym_pool(args: argparse.Namespace) -> int:
+    """Top the Draft Gauntlet puzzle pool up to the target size."""
+    from app import config, puzzles
+
+    db.init_db()
+    target = args.size if args.size is not None else config.GYM_POOL_TARGET
+    with db.open_session() as session:
+        created = puzzles.build_pool_batch(session, target)
+    print(f"gym pool: +{created} puzzle(s) (target {target})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser(prog="app.cli")
@@ -296,6 +308,11 @@ def main(argv: list[str] | None = None) -> int:
     p_puzzle.add_argument("--replace", action="store_true",
                           help="regenerate existing days onto a different match (curation)")
     p_puzzle.set_defaults(func=_cmd_puzzle_gen)
+
+    p_gym = sub.add_parser("gym-pool", help="top up the Draft Gauntlet puzzle pool (/gym)")
+    p_gym.add_argument("--size", type=int, default=None,
+                       help="pool target size (default: GYM_POOL_TARGET)")
+    p_gym.set_defaults(func=_cmd_gym_pool)
 
     args = parser.parse_args(argv)
     return args.func(args)

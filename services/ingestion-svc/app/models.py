@@ -224,6 +224,39 @@ class DailyPuzzle(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class GymPuzzle(Base):
+    """Pre-generated puzzle pool for the Draft Gauntlet (/gym) — same payload
+    shape as DailyPuzzle but keyed by id, topped up by the cron
+    (`python -m app.cli gym-pool`). Kept server-side so run answers can be
+    graded without ever shipping the verdicts to the client."""
+
+    __tablename__ = "gym_puzzles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    match_id: Mapped[str] = mapped_column(
+        ForeignKey("matches.match_id", ondelete="CASCADE"), unique=True
+    )
+    payload: Mapped[dict] = mapped_column(JsonCol)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class GymRun(Base):
+    """One Draft Gauntlet run: a server-held sequence of pool puzzles with the
+    answers and score — grading happens here, never in the browser, so the
+    leaderboard stays honest. The score measures puzzle answers (a game
+    mechanic), never player skill from match data."""
+
+    __tablename__ = "gym_runs"
+
+    run_id: Mapped[str] = mapped_column(Text, primary_key=True)  # uuid4 hex
+    puzzle_ids: Mapped[list] = mapped_column(JsonCol)
+    answers: Mapped[list] = mapped_column(JsonCol, default=list)  # [{pick, tier, points}]
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    nickname: Mapped[str | None] = mapped_column(Text)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class PuzzleDelivery(Base):
     """One row per guild per puzzle day — the dedupe guard for the bot's
     daily Daily-Draft embed. A separate table (not a guild_configs column)
