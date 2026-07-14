@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.27.0](https://github.com/imperasus/sylqon/compare/v1.26.0...v1.27.0) (2026-07-14)
+
+
+### Features
+
+* **bot:** daily Daily-Draft teaser embed into guild channels ([369f315](https://github.com/imperasus/sylqon/commit/369f315a8fb47ab0abd55d49e3a4dc51a1dd5518))
+
 ## [1.26.0](https://github.com/imperasus/sylqon/compare/v1.25.0...v1.26.0) (2026-07-14)
 
 
