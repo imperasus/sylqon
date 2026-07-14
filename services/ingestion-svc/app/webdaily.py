@@ -283,13 +283,25 @@ def _archive_links(dates: list[str]) -> str:
     return f'<h2>Previous puzzles</h2><div class="arch-list">{links}</div>'
 
 
-def _render(date_iso: str, payload: dict, recent: list[str],
-            interactive: bool) -> HTMLResponse:
-    mode = "play" if interactive else "solved"
+def _puzzle_core(date_iso: str, payload: dict, interactive: bool) -> str:
+    """Teams + enemy read + candidates + solution — everything but the hero
+    and the archive strip, shared by /daily and the homepage."""
     back = ("" if interactive else
             '<p><a class="btn ghost" href="/daily">Play today\'s puzzle →</a></p>')
     prompt = ("<h2>Pick your answer</h2>" if interactive else
               "<h2>The candidates <span class='muted small'>· solution shown</span></h2>")
+    return f"""{back}
+<div class="dd-cols">{_team_card(payload, payload["side"])}
+{_team_card(payload, "red" if payload["side"] == "blue" else "blue")}</div>
+{_enemy_read_card(payload)}
+{prompt}
+{_candidate_buttons(payload, solved=not interactive)}
+{_solution_html(payload, date_iso, interactive)}"""
+
+
+def _render(date_iso: str, payload: dict, recent: list[str],
+            interactive: bool) -> HTMLResponse:
+    mode = "play" if interactive else "solved"
     body = f"""<style>{_DAILY_CSS}</style>
 <div id="daily" class="{mode}" data-date="{date_iso}" data-mode="{mode}">
 <section class="hero" style="padding-bottom:0">
@@ -298,13 +310,7 @@ def _render(date_iso: str, payload: dict, recent: list[str],
 <p class="dd-meta">{_meta_line(payload)} · you fill the
 <strong>{html.escape(payload["role_label"])}</strong> slot.</p>
 </section>
-{back}
-<div class="dd-cols">{_team_card(payload, payload["side"])}
-{_team_card(payload, "red" if payload["side"] == "blue" else "blue")}</div>
-{_enemy_read_card(payload)}
-{prompt}
-{_candidate_buttons(payload, solved=not interactive)}
-{_solution_html(payload, date_iso, interactive)}
+{_puzzle_core(date_iso, payload, interactive)}
 {_archive_links(recent)}
 </div>
 <script>{_DAILY_JS}</script>"""
@@ -313,6 +319,48 @@ def _render(date_iso: str, payload: dict, recent: list[str],
     return _page(title, body,
                  "A real draft frozen before one pick. Choose the missing champion, "
                  "see the engine's read — and what actually happened in the game.")
+
+
+@router.get("/", response_class=HTMLResponse)
+def home() -> HTMLResponse:
+    """sylqon.com homepage — the hero doesn't tell, it makes you play
+    (WEB_DRAFT_TERV §5): today's puzzle above the fold, download as the CTA."""
+    today = _today_iso()
+    with db.open_session() as session:
+        payload = puzzles.get_puzzle(session, today)
+        recent = puzzles.recent_dates(session, today, limit=7)
+    hero = """
+<section class="hero" style="padding-bottom:.4rem">
+<p class="eyebrow">Counter-draft AI · League of Legends</p>
+<h1>Can you make <span class="hl">the right call?</span></h1>
+<p class="lead">Every day, one real draft frozen before a pick. Choose — the engine explains
+its read, then you see what actually happened. The desktop app makes this exact call live in
+your champ select, and writes the counter-loadout into your client.</p>
+<div class="cta-row">
+<a class="btn" href="/download">Download for Windows</a>
+<a class="btn ghost" href="/audit">Audit your pool</a>
+</div>
+<p class="trust small muted">100% local — your credentials never leave your PC ·
+No Overwolf, no ads</p>
+</section>"""
+    if payload is None:
+        body = hero + _archive_links(recent)
+        return _page("Sylqon — counter-draft AI for League of Legends", body,
+                     "Sylqon picks the strongest answer from your pool live in champ select "
+                     "and builds the counter-loadout. Plus a daily draft puzzle from real games.")
+    body = f"""<style>{_DAILY_CSS}</style>
+<div id="daily" class="play" data-date="{today}" data-mode="play">
+{hero}
+<h2 style="margin-top:1.2rem">Today's puzzle <span class="muted small">· {today}</span></h2>
+<p class="dd-meta">{_meta_line(payload)} · you fill the
+<strong>{html.escape(payload["role_label"])}</strong> slot.</p>
+{_puzzle_core(today, payload, interactive=True)}
+{_archive_links(recent)}
+</div>
+<script>{_DAILY_JS}</script>"""
+    return _page("Sylqon — counter-draft AI for League of Legends", body,
+                 "Sylqon picks the strongest answer from your pool live in champ select "
+                 "and builds the counter-loadout. Plus a daily draft puzzle from real games.")
 
 
 @router.get("/daily", response_class=HTMLResponse)

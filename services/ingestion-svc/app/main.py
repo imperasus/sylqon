@@ -65,11 +65,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Sylqon Ingestion Service", version="0.1.0", lifespan=lifespan)
 
+from app.web import NOINDEX_PREFIXES  # noqa: E402
 from app.web import router as web_router  # noqa: E402
 from app.webdaily import router as daily_router  # noqa: E402
 
-app.include_router(web_router)  # public S3 pages: /, /pool-report, /champions, /champion/{name}
-app.include_router(daily_router)  # Daily Draft puzzle: /daily, /daily/{date}
+app.include_router(web_router)  # public pages: /audit, /download + sunset lookup pages
+app.include_router(daily_router)  # Daily Draft: / (homepage), /daily, /daily/{date}
+
+
+@app.middleware("http")
+async def _robots_noindex(request, call_next):
+    """The radical cut (WEB_DRAFT_TERV §5): the generic lookup pages keep being
+    served through their sunset window but leave the search index. The header
+    is equivalent to a noindex meta tag for crawlers and covers the cached
+    champion pages centrally."""
+    response = await call_next(request)
+    if request.url.path.startswith(NOINDEX_PREFIXES):
+        response.headers["X-Robots-Tag"] = "noindex"
+    return response
 
 
 @app.get("/healthz")

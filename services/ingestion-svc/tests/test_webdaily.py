@@ -116,3 +116,14 @@ def test_daily_framing_guard(client):
 
 def test_home_nav_links_daily(client):
     assert 'href="/daily"' in client.get("/").text
+
+
+def test_home_hosts_todays_puzzle(client):
+    _gen(0)
+    r = client.get("/")
+    assert r.status_code == 200
+    assert 'data-mode="play"' in r.text
+    assert r.text.count('class="cand t-') == puzzles.CANDIDATE_COUNT
+    assert "Today's puzzle" in r.text
+    assert "Download for Windows" in r.text  # the conversion CTA stays above the fold
+    assert "EUN1_" not in r.text  # anonymity holds on the homepage too

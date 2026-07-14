@@ -150,6 +150,13 @@ _MARK = (
 # Desktop app release page (GitHub Pages); same target the footer/nav point to.
 _DOWNLOAD_URL = "https://imperasus.github.io/sylqon/"
 
+# The radical cut (docs/WEB_DRAFT_TERV.md §5): the generic lookup pages stay
+# served through a 90-day sunset window but leave the index — main.py stamps
+# an X-Robots-Tag: noindex header on these path prefixes (equivalent to the
+# meta tag for crawlers, and it covers the cached champion pages centrally).
+NOINDEX_PREFIXES = ("/summoner/", "/match/", "/leaderboard", "/champions",
+                    "/champion/", "/search", "/pool-report")
+
 
 def _page(title: str, body: str, description: str = "") -> HTMLResponse:
     desc = html.escape(description or
@@ -163,8 +170,8 @@ def _page(title: str, body: str, description: str = "") -> HTMLResponse:
 <style>{_CSS}</style></head><body>
 <header><div class="wrap">
 <a class="brand" href="/">{_MARK}SYL<span>QON</span> <span class="muted small">pool coverage</span></a>
-<nav><a href="/daily">Daily Draft</a><a href="/champions">Champions</a><a href="/leaderboard/RANKED_SOLO_5x5">Leaderboard</a>
-<a href="{_DOWNLOAD_URL}">Desktop app</a></nav>
+<nav><a href="/daily">Daily Draft</a><a href="/audit">Pool audit</a>
+<a href="/download">Download</a></nav>
 </div></header>
 <main class="wrap">{body}</main>
 <footer><div class="wrap">Sylqon is an unofficial fan-made tool. Not endorsed by Riot Games.
@@ -263,34 +270,61 @@ def _region_options(selected: str = regions.DEFAULT_PLATFORM) -> str:
     )
 
 
-@router.get("/", response_class=HTMLResponse)
-def home() -> HTMLResponse:
-    # sylqon.com homepage: product hero (the desktop counter-draft app) up top,
-    # the web's own pool-coverage audit as the section below it.
+# NOTE: the "/" homepage lives in webdaily.py — the daily puzzle IS the hero
+# (docs/WEB_DRAFT_TERV.md §5: the hero doesn't tell, it makes you play).
+
+
+@router.get("/download", response_class=HTMLResponse)
+def download_page() -> HTMLResponse:
+    """Download + the "why you can trust installing this" story — the explicit
+    counter-position to the companion-app pain points (Overwolf, RAM, ads)."""
     body = f"""
 <section class="hero">
-<p class="eyebrow">Counter-draft AI · League of Legends</p>
-<h1>Counter the enemy team <span class="hl">before you lock in.</span></h1>
+<p class="eyebrow">Sylqon Desktop · Windows</p>
+<h1>The counter-draft AI, <span class="hl">live in your champ select.</span></h1>
 <p class="lead">Sylqon reads your live Champion Select, names the strongest pick from your own
 pool, then builds the items, runes and summoner spells that beat those specific five enemies —
 and writes the whole loadout into your client automatically.</p>
-<div class="cta-row">
-<a class="btn" href="{_DOWNLOAD_URL}">Download for Windows</a>
-<a class="btn ghost" href="#search">Look up a summoner</a>
-</div>
-<p class="trust small muted">100% local — your credentials never leave your PC ·
-Powered by a local Ollama LLM</p>
+<div class="cta-row"><a class="btn" href="{_DOWNLOAD_URL}">Download for Windows</a></div>
 </section>
+<h2>Why you can trust installing it</h2>
+<div class="grid">
+<div class="card"><strong>100% local</strong><p class="muted small">Runs entirely on your PC
+against the official League client API. Your credentials never leave your machine; the AI is
+a local Ollama model.</p></div>
+<div class="card"><strong>No Overwolf, no ads</strong><p class="muted small">A lean native app —
+no ad overlays, no gigabyte-scale RAM footprint, no bundled extras.</p></div>
+<div class="card"><strong>Read-only in game</strong><p class="muted small">The in-game coach
+only reads Riot's official Live Client Data API. No memory reads, no injection — nothing that
+touches the game process.</p></div>
+<div class="card"><strong>Open releases</strong><p class="muted small">Every build is published
+on GitHub with auto-update — you can see exactly what ships.</p></div>
+</div>"""
+    return _page("Download Sylqon", body,
+                 "Download the Sylqon counter-draft desktop app for Windows — 100% local, "
+                 "no Overwolf, read-only in game.")
 
-<section id="search">
-<h2>Look up any summoner</h2>
-<p class="muted" style="max-width:56ch">Search a Riot ID to see the profile — rank, top-champion
-mastery and recent matches — then audit how well that champion pool covers the meta, from our
-own aggregation of official Riot match data.</p>
-<div class="card"><form action="/search" method="get" class="searchbar">
-<select name="region" aria-label="Region">{_region_options()}</select>
+
+@router.get("/pool-report")
+def pool_report_redirect(riot_id: str | None = Query(None)) -> RedirectResponse:
+    """Permanent home of the audit is /audit ("your personal difficulty map")."""
+    url = f"/audit?riot_id={quote(riot_id)}" if riot_id else "/audit"
+    return RedirectResponse(url, status_code=301)
+
+
+@router.get("/audit", response_class=HTMLResponse)
+def audit_page(riot_id: str | None = Query(None)) -> HTMLResponse:
+    if not riot_id:
+        body = """
+<section class="hero">
+<p class="eyebrow">Pool audit</p>
+<h1>Your personal <span class="hl">difficulty map.</span></h1>
+<p class="lead">Which comps and threats does your champion pool leave uncovered? Paste a Riot ID
+and we audit the pool against the meta, from our own aggregation of official Riot match data.</p>
+</section>
+<div class="card"><form action="/audit" method="get" class="searchbar">
 <input type="text" name="riot_id" placeholder="Name#TAG" required>
-<button type="submit">Search</button></form>
+<button type="submit">Audit my pool</button></form>
 <div class="muted small" style="margin-top:.5rem">Official Riot data only. Pool analysis
 measures coverage, not player skill.</div></div>
 <h2>What you get</h2>
@@ -301,16 +335,10 @@ blending performance, blind-pick safety and counter coverage.</p></div>
 your comfort pick, filled to cover the gaps your current pool leaves open.</p></div>
 <div class="card"><strong>Uncovered threats</strong><p class="muted small">The common picks in
 your role that none of your champions hold an even lane record against.</p></div>
-</div>
-</section>"""
-    return _page("Sylqon — counter-draft AI for League of Legends", body,
-                 "Sylqon reads your live Champion Select, picks the strongest answer from your "
-                 "pool, and builds the counter-loadout automatically. Plus a free champion-pool "
-                 "coverage audit from official Riot match data.")
-
-
-@router.get("/pool-report", response_class=HTMLResponse)
-def pool_report_page(riot_id: str = Query(..., min_length=3)) -> HTMLResponse:
+</div>"""
+        return _page("Pool audit — your personal difficulty map", body,
+                     "Audit how well your champion pool covers the meta — coverage, "
+                     "blind-pick safety and counter coverage from official Riot data.")
     game_name, _, tag_line = riot_id.partition("#")
     if not game_name or not tag_line:
         return _page("Pool audit", '<h1>Invalid Riot ID</h1><p class="muted">'

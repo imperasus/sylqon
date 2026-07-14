@@ -37,12 +37,49 @@ def client(monkeypatch):
     return TestClient(app, raise_server_exceptions=True)
 
 
-def test_home_renders_form(client):
+def test_home_is_puzzle_first(client):
+    # The fixture's 2-player lane matches can't freeze a puzzle → the homepage
+    # falls back to the hero alone; the CTAs point at the new spine pages.
     r = client.get("/")
     assert r.status_code == 200
-    assert 'action="/search"' in r.text
-    assert 'value="euw1"' in r.text  # region selector rendered
-    assert "pool coverage" in r.text.lower()
+    assert "Download for Windows" in r.text
+    assert 'href="/audit"' in r.text and 'href="/download"' in r.text
+    assert 'action="/search"' not in r.text  # the old lookup-first home is gone
+
+
+def test_radical_cut_nav_and_noindex(client):
+    home = client.get("/")
+    header = home.text.split("</header>")[0]
+    assert 'href="/champions"' not in header and "/leaderboard" not in header
+    # sunset pages keep serving but leave the index (header ≙ noindex meta)
+    for path in ("/champions", "/champion/Jinx", "/match/EUN1_0",
+                 "/leaderboard/RANKED_SOLO_5x5", "/summoner/euw1/Ghost/NONE"):
+        r = client.get(path)
+        assert r.status_code == 200
+        assert r.headers.get("x-robots-tag") == "noindex", f"{path} missing noindex"
+    for path in ("/", "/audit", "/download"):
+        assert "x-robots-tag" not in client.get(path).headers, f"{path} must stay indexable"
+
+
+def test_download_page(client):
+    r = client.get("/download")
+    assert r.status_code == 200
+    assert "100% local" in r.text
+    assert "imperasus.github.io/sylqon" in r.text
+
+
+def test_audit_landing_form(client):
+    r = client.get("/audit")
+    assert r.status_code == 200
+    assert 'action="/audit"' in r.text
+    assert "difficulty map" in r.text
+
+
+def test_pool_report_redirects_to_audit(client):
+    r = client.get("/pool-report", params={"riot_id": "Me#TAG"}, follow_redirects=False)
+    assert r.status_code == 301
+    assert r.headers["location"] == "/audit?riot_id=Me%23TAG"
+    assert client.get("/pool-report", follow_redirects=False).headers["location"] == "/audit"
 
 
 def test_search_redirects_to_profile(client):
@@ -69,7 +106,7 @@ def test_pool_report_uses_stored_data(client, monkeypatch):
             return R()
 
     monkeypatch.setattr(main_mod, "_ingest_service", StubIngest())
-    r = client.get("/pool-report", params={"riot_id": "Me#TAG"})
+    r = client.get("/audit", params={"riot_id": "Me#TAG"})
     assert r.status_code == 200
     assert "BOTTOM" in r.text
     assert "Jinx" in r.text
@@ -77,8 +114,8 @@ def test_pool_report_uses_stored_data(client, monkeypatch):
     assert "Draven" in r.text  # uncovered threat linked
 
 
-def test_pool_report_invalid_riot_id(client):
-    r = client.get("/pool-report", params={"riot_id": "no-tag"})
+def test_audit_invalid_riot_id(client):
+    r = client.get("/audit", params={"riot_id": "no-tag"})
     assert r.status_code == 200
     assert "Invalid Riot ID" in r.text
 
@@ -326,7 +363,7 @@ def test_no_skill_rating_vocabulary(client):
     # ToS framing: the public pages never talk about MMR/ELO/skill ratings.
     # ("never player skill" in the footer is the allowed, deliberate phrasing.)
     forbidden = ("mmr", "elo", "skill rating", "skill score", "matchmaking rating")
-    for path in ("/", "/champions", "/champion/Jinx"):
+    for path in ("/", "/audit", "/download", "/champions", "/champion/Jinx"):
         text = client.get(path).text.lower()
         for word in forbidden:
             assert word not in text, f"{word!r} leaked into {path}"
