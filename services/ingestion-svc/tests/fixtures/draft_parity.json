@@ -1,0 +1,1103 @@
+{
+ "generated_by": "python -m sylqon.tools.export_draft_tables",
+ "bundle_version": 1,
+ "patch": "16.13.1",
+ "comp_cases": [
+  {
+   "id": "engage_vs_poke",
+   "ally": [
+    "Amumu",
+    "Sejuani",
+    "Alistar",
+    "Miss Fortune",
+    "Yasuo"
+   ],
+   "enemy": [
+    "Xerath",
+    "Ziggs",
+    "Jayce",
+    "Caitlyn",
+    "Karma"
+   ],
+   "lane_advantage": null,
+   "expected": {
+    "ally_comp": {
+     "archetype": "hard_engage",
+     "label": "Hard Engage / Dive",
+     "confidence": 100,
+     "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
+     "signals": [
+      "3 hard-engage frontline",
+      "3 tanks"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "poke_siege",
+     "label": "Poke / Siege",
+     "confidence": 100,
+     "counter_plan": "Force engage onto them — they fold once you close the gap; stack sustain/shields and look for hard-engage angles.",
+     "signals": [
+      "5 poke/siege threats"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 2,
+     "magic_threats": 1,
+     "mixed_threats": 2,
+     "heavy_cc_count": 3,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 2,
+     "frontline": 4
+    },
+    "enemy_summary": {
+     "physical_threats": 2,
+     "magic_threats": 3,
+     "mixed_threats": 0,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 1
+    },
+    "balance": {
+     "win_pct": 61,
+     "edge": 1.8,
+     "label": "FAVOURED",
+     "tone": "good",
+     "confidence": 100,
+     "drivers": [
+      {
+       "text": "Engage > Poke",
+       "sign": 1
+      },
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      },
+      {
+       "text": "CC edge",
+       "sign": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "pick_vs_protect",
+   "ally": [
+    "Zed",
+    "LeBlanc",
+    "Rengar",
+    "Pyke",
+    "Ahri"
+   ],
+   "enemy": [
+    "Soraka",
+    "Braum",
+    "Kog'Maw",
+    "Orianna",
+    "Shen"
+   ],
+   "lane_advantage": null,
+   "expected": {
+    "ally_comp": {
+     "archetype": "pick",
+     "label": "Pick / Assassinate",
+     "confidence": 100,
+     "counter_plan": "Never walk alone: ward deep, group, and bring a Zhonya/GA/QSS to survive the first burst.",
+     "signals": [
+      "5 burst/assassin threats"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "protect_carry",
+     "label": "Protect the Carry",
+     "confidence": 84,
+     "counter_plan": "Dive past the peel onto the hyper-carry, or out-scale — bring anti-heal and dive/flank threats.",
+     "signals": [
+      "1 hard-engage frontline",
+      "2 tanks",
+      "enchanter + carry peel core"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 3,
+     "magic_threats": 2,
+     "mixed_threats": 0,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": true,
+     "burst_ap": true,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 1
+    },
+    "enemy_summary": {
+     "physical_threats": 1,
+     "magic_threats": 2,
+     "mixed_threats": 2,
+     "heavy_cc_count": 1,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": true,
+     "tanks": 1,
+     "frontline": 2
+    },
+    "balance": {
+     "win_pct": 57,
+     "edge": 1.24,
+     "label": "FAVOURED",
+     "tone": "good",
+     "confidence": 100,
+     "drivers": [
+      {
+       "text": "Pick > Protect",
+       "sign": 1
+      },
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "split_vs_teamfight",
+   "ally": [
+    "Fiora",
+    "Jax",
+    "Tryndamere",
+    "Sivir",
+    "Lulu"
+   ],
+   "enemy": [
+    "Shen",
+    "Dr. Mundo",
+    "Jinx",
+    "Ashe",
+    "Orianna"
+   ],
+   "lane_advantage": null,
+   "expected": {
+    "ally_comp": {
+     "archetype": "split_push",
+     "label": "Split Push",
+     "confidence": 100,
+     "counter_plan": "Match their side-laner or force 5v4 mid; track the splitter and trade objectives, don't chase.",
+     "signals": [
+      "2 burst/assassin threats",
+      "3 side-lane threats"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "teamfight",
+     "label": "Teamfight / Wombo",
+     "confidence": 96,
+     "counter_plan": "Don't group into their AoE: split the map, pick before fights and bring flash-clears / spread positioning.",
+     "signals": [
+      "2 tanks"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 3,
+     "magic_threats": 1,
+     "mixed_threats": 1,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": true,
+     "tanks": 0,
+     "frontline": 3
+    },
+    "enemy_summary": {
+     "physical_threats": 2,
+     "magic_threats": 1,
+     "mixed_threats": 2,
+     "heavy_cc_count": 1,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": true,
+     "tanks": 2,
+     "frontline": 2
+    },
+    "balance": {
+     "win_pct": 58,
+     "edge": 1.36,
+     "label": "FAVOURED",
+     "tone": "good",
+     "confidence": 100,
+     "drivers": [
+      {
+       "text": "Split > Teamfight",
+       "sign": 1
+      },
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "suppression_engage",
+   "ally": [
+    "Malzahar",
+    "Warwick",
+    "Urgot",
+    "Leona",
+    "Nautilus"
+   ],
+   "enemy": [
+    "Vel'Koz",
+    "Lux",
+    "Ezreal",
+    "Varus",
+    "Thresh"
+   ],
+   "lane_advantage": null,
+   "expected": {
+    "ally_comp": {
+     "archetype": "hard_engage",
+     "label": "Hard Engage / Dive",
+     "confidence": 100,
+     "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
+     "signals": [
+      "4 hard-engage frontline",
+      "4 tanks",
+      "point-click lockdown"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "poke_siege",
+     "label": "Poke / Siege",
+     "confidence": 100,
+     "counter_plan": "Force engage onto them — they fold once you close the gap; stack sustain/shields and look for hard-engage angles.",
+     "signals": [
+      "4 poke/siege threats",
+      "1 hard-engage frontline"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 2,
+     "magic_threats": 1,
+     "mixed_threats": 2,
+     "heavy_cc_count": 5,
+     "suppression": true,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": true,
+     "tanks": 0,
+     "frontline": 4
+    },
+    "enemy_summary": {
+     "physical_threats": 1,
+     "magic_threats": 2,
+     "mixed_threats": 2,
+     "heavy_cc_count": 3,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 1
+    },
+    "balance": {
+     "win_pct": 61,
+     "edge": 1.8,
+     "label": "FAVOURED",
+     "tone": "good",
+     "confidence": 100,
+     "drivers": [
+      {
+       "text": "Engage > Poke",
+       "sign": 1
+      },
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      },
+      {
+       "text": "CC edge",
+       "sign": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "mirror_engage",
+   "ally": [
+    "Amumu",
+    "Leona",
+    "Ornn",
+    "Jinx",
+    "Annie"
+   ],
+   "enemy": [
+    "Zac",
+    "Nautilus",
+    "Sion",
+    "Ashe",
+    "Veigar"
+   ],
+   "lane_advantage": null,
+   "expected": {
+    "ally_comp": {
+     "archetype": "hard_engage",
+     "label": "Hard Engage / Dive",
+     "confidence": 100,
+     "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
+     "signals": [
+      "3 hard-engage frontline",
+      "3 tanks"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "hard_engage",
+     "label": "Hard Engage / Dive",
+     "confidence": 100,
+     "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
+     "signals": [
+      "3 hard-engage frontline",
+      "3 tanks"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 1,
+     "magic_threats": 2,
+     "mixed_threats": 2,
+     "heavy_cc_count": 4,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": true,
+     "heavy_healing": false,
+     "tanks": 2,
+     "frontline": 3
+    },
+    "enemy_summary": {
+     "physical_threats": 1,
+     "magic_threats": 2,
+     "mixed_threats": 2,
+     "heavy_cc_count": 5,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": true,
+     "heavy_healing": true,
+     "tanks": 2,
+     "frontline": 3
+    },
+    "balance": {
+     "win_pct": 52,
+     "edge": 0.4,
+     "label": "EVEN",
+     "tone": "amber",
+     "confidence": 100,
+     "drivers": [
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "balanced_two_picks",
+   "ally": [
+    "Garen",
+    "Orianna"
+   ],
+   "enemy": [
+    "Ezreal",
+    "Thresh"
+   ],
+   "lane_advantage": null,
+   "expected": {
+    "ally_comp": {
+     "archetype": "balanced",
+     "label": "Balanced",
+     "confidence": 0,
+     "counter_plan": "No single win condition — play the standard lane-and-objective game.",
+     "signals": []
+    },
+    "enemy_comp": {
+     "archetype": "hard_engage",
+     "label": "Hard Engage / Dive",
+     "confidence": 36,
+     "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
+     "signals": [
+      "1 hard-engage frontline"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 1,
+     "magic_threats": 1,
+     "mixed_threats": 0,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 1
+    },
+    "enemy_summary": {
+     "physical_threats": 0,
+     "magic_threats": 0,
+     "mixed_threats": 2,
+     "heavy_cc_count": 1,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 1
+    },
+    "balance": {
+     "win_pct": 52,
+     "edge": 0.4,
+     "label": "EVEN",
+     "tone": "amber",
+     "confidence": 40,
+     "drivers": [
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "unknown_single",
+   "ally": [
+    "Aatrox"
+   ],
+   "enemy": [],
+   "lane_advantage": null,
+   "expected": {
+    "ally_comp": {
+     "archetype": "unknown",
+     "label": "Reading…",
+     "confidence": 0,
+     "counter_plan": "Too few picks revealed to read the composition.",
+     "signals": []
+    },
+    "enemy_comp": {
+     "archetype": "unknown",
+     "label": "Reading…",
+     "confidence": 0,
+     "counter_plan": "Too few picks revealed to read the composition.",
+     "signals": []
+    },
+    "ally_summary": {
+     "physical_threats": 1,
+     "magic_threats": 0,
+     "mixed_threats": 0,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": true,
+     "tanks": 0,
+     "frontline": 1
+    },
+    "enemy_summary": {
+     "physical_threats": 0,
+     "magic_threats": 0,
+     "mixed_threats": 0,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 0
+    },
+    "balance": {
+     "win_pct": 50,
+     "edge": 0.0,
+     "label": "EVEN",
+     "tone": "amber",
+     "confidence": 10,
+     "drivers": []
+    }
+   }
+  },
+  {
+   "id": "partial_three",
+   "ally": [
+    "Zed",
+    "Talon",
+    "Qiyana"
+   ],
+   "enemy": [
+    "Maokai",
+    "Braum"
+   ],
+   "lane_advantage": null,
+   "expected": {
+    "ally_comp": {
+     "archetype": "pick",
+     "label": "Pick / Assassinate",
+     "confidence": 100,
+     "counter_plan": "Never walk alone: ward deep, group, and bring a Zhonya/GA/QSS to survive the first burst.",
+     "signals": [
+      "3 burst/assassin threats"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "hard_engage",
+     "label": "Hard Engage / Dive",
+     "confidence": 96,
+     "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
+     "signals": [
+      "2 hard-engage frontline",
+      "2 tanks"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 2,
+     "magic_threats": 1,
+     "mixed_threats": 0,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": true,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 0
+    },
+    "enemy_summary": {
+     "physical_threats": 0,
+     "magic_threats": 1,
+     "mixed_threats": 1,
+     "heavy_cc_count": 2,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": true,
+     "tanks": 1,
+     "frontline": 2
+    },
+    "balance": {
+     "win_pct": 46,
+     "edge": -0.6,
+     "label": "EVEN",
+     "tone": "amber",
+     "confidence": 50,
+     "drivers": [
+      {
+       "text": "No frontline",
+       "sign": -1
+      },
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      },
+      {
+       "text": "CC deficit",
+       "sign": -1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "lane_adv_positive",
+   "ally": [
+    "Fiora",
+    "Jax",
+    "Tryndamere",
+    "Sivir",
+    "Lulu"
+   ],
+   "enemy": [
+    "Xerath",
+    "Ziggs",
+    "Jayce",
+    "Caitlyn",
+    "Karma"
+   ],
+   "lane_advantage": 4.0,
+   "expected": {
+    "ally_comp": {
+     "archetype": "split_push",
+     "label": "Split Push",
+     "confidence": 100,
+     "counter_plan": "Match their side-laner or force 5v4 mid; track the splitter and trade objectives, don't chase.",
+     "signals": [
+      "2 burst/assassin threats",
+      "3 side-lane threats"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "poke_siege",
+     "label": "Poke / Siege",
+     "confidence": 100,
+     "counter_plan": "Force engage onto them — they fold once you close the gap; stack sustain/shields and look for hard-engage angles.",
+     "signals": [
+      "5 poke/siege threats"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 3,
+     "magic_threats": 1,
+     "mixed_threats": 1,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": true,
+     "tanks": 0,
+     "frontline": 3
+    },
+    "enemy_summary": {
+     "physical_threats": 2,
+     "magic_threats": 3,
+     "mixed_threats": 0,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 1
+    },
+    "balance": {
+     "win_pct": 49,
+     "edge": -0.2,
+     "label": "EVEN",
+     "tone": "amber",
+     "confidence": 100,
+     "drivers": [
+      {
+       "text": "Poke > Split",
+       "sign": -1
+      },
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      },
+      {
+       "text": "Lane lead",
+       "sign": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "lane_adv_negative",
+   "ally": [
+    "Amumu",
+    "Sejuani",
+    "Alistar",
+    "Miss Fortune",
+    "Yasuo"
+   ],
+   "enemy": [
+    "Zed",
+    "LeBlanc",
+    "Rengar",
+    "Pyke",
+    "Ahri"
+   ],
+   "lane_advantage": -6.5,
+   "expected": {
+    "ally_comp": {
+     "archetype": "hard_engage",
+     "label": "Hard Engage / Dive",
+     "confidence": 100,
+     "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
+     "signals": [
+      "3 hard-engage frontline",
+      "3 tanks"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "pick",
+     "label": "Pick / Assassinate",
+     "confidence": 100,
+     "counter_plan": "Never walk alone: ward deep, group, and bring a Zhonya/GA/QSS to survive the first burst.",
+     "signals": [
+      "5 burst/assassin threats"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 2,
+     "magic_threats": 1,
+     "mixed_threats": 2,
+     "heavy_cc_count": 3,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 2,
+     "frontline": 4
+    },
+    "enemy_summary": {
+     "physical_threats": 3,
+     "magic_threats": 2,
+     "mixed_threats": 0,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": true,
+     "burst_ap": true,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 1
+    },
+    "balance": {
+     "win_pct": 51,
+     "edge": 0.15,
+     "label": "EVEN",
+     "tone": "amber",
+     "confidence": 100,
+     "drivers": [
+      {
+       "text": "Lane deficit",
+       "sign": -1
+      },
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      },
+      {
+       "text": "CC edge",
+       "sign": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "lane_adv_below_threshold",
+   "ally": [
+    "Malzahar",
+    "Warwick",
+    "Urgot",
+    "Leona",
+    "Nautilus"
+   ],
+   "enemy": [
+    "Soraka",
+    "Braum",
+    "Kog'Maw",
+    "Orianna",
+    "Shen"
+   ],
+   "lane_advantage": 1.0,
+   "expected": {
+    "ally_comp": {
+     "archetype": "hard_engage",
+     "label": "Hard Engage / Dive",
+     "confidence": 100,
+     "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
+     "signals": [
+      "4 hard-engage frontline",
+      "4 tanks",
+      "point-click lockdown"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "protect_carry",
+     "label": "Protect the Carry",
+     "confidence": 84,
+     "counter_plan": "Dive past the peel onto the hyper-carry, or out-scale — bring anti-heal and dive/flank threats.",
+     "signals": [
+      "1 hard-engage frontline",
+      "2 tanks",
+      "enchanter + carry peel core"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 2,
+     "magic_threats": 1,
+     "mixed_threats": 2,
+     "heavy_cc_count": 5,
+     "suppression": true,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": true,
+     "tanks": 0,
+     "frontline": 4
+    },
+    "enemy_summary": {
+     "physical_threats": 1,
+     "magic_threats": 2,
+     "mixed_threats": 2,
+     "heavy_cc_count": 1,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": true,
+     "tanks": 1,
+     "frontline": 2
+    },
+    "balance": {
+     "win_pct": 60,
+     "edge": 1.64,
+     "label": "FAVOURED",
+     "tone": "good",
+     "confidence": 100,
+     "drivers": [
+      {
+       "text": "Engage > Protect",
+       "sign": 1
+      },
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      },
+      {
+       "text": "CC edge",
+       "sign": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "frontline_vs_mono_ap",
+   "ally": [
+    "Ornn",
+    "Ahri",
+    "Jinx",
+    "Thresh",
+    "Vi"
+   ],
+   "enemy": [
+    "Xerath",
+    "Ziggs",
+    "Lux",
+    "Vel'Koz",
+    "Zoe"
+   ],
+   "lane_advantage": null,
+   "expected": {
+    "ally_comp": {
+     "archetype": "hard_engage",
+     "label": "Hard Engage / Dive",
+     "confidence": 72,
+     "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
+     "signals": [
+      "2 hard-engage frontline",
+      "2 burst/assassin threats",
+      "2 tanks"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "poke_siege",
+     "label": "Poke / Siege",
+     "confidence": 100,
+     "counter_plan": "Force engage onto them — they fold once you close the gap; stack sustain/shields and look for hard-engage angles.",
+     "signals": [
+      "5 poke/siege threats"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 2,
+     "magic_threats": 1,
+     "mixed_threats": 2,
+     "heavy_cc_count": 2,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 1,
+     "frontline": 3
+    },
+    "enemy_summary": {
+     "physical_threats": 0,
+     "magic_threats": 5,
+     "mixed_threats": 0,
+     "heavy_cc_count": 2,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": true,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 0
+    },
+    "balance": {
+     "win_pct": 62,
+     "edge": 1.92,
+     "label": "FAVOURED",
+     "tone": "good",
+     "confidence": 100,
+     "drivers": [
+      {
+       "text": "Engage > Poke",
+       "sign": 1
+      },
+      {
+       "text": "Mixed damage",
+       "sign": 1
+      },
+      {
+       "text": "Enemy mono-damage",
+       "sign": 1
+      },
+      {
+       "text": "Frontline edge",
+       "sign": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "mono_ad_ally",
+   "ally": [
+    "Zed",
+    "Talon",
+    "Draven",
+    "Caitlyn",
+    "Pyke"
+   ],
+   "enemy": [
+    "Malphite",
+    "Orianna",
+    "Jinx",
+    "Leona",
+    "Riven"
+   ],
+   "lane_advantage": null,
+   "expected": {
+    "ally_comp": {
+     "archetype": "pick",
+     "label": "Pick / Assassinate",
+     "confidence": 100,
+     "counter_plan": "Never walk alone: ward deep, group, and bring a Zhonya/GA/QSS to survive the first burst.",
+     "signals": [
+      "3 burst/assassin threats"
+     ]
+    },
+    "enemy_comp": {
+     "archetype": "teamfight",
+     "label": "Teamfight / Wombo",
+     "confidence": 66,
+     "counter_plan": "Don't group into their AoE: split the map, pick before fights and bring flash-clears / spread positioning.",
+     "signals": [
+      "1 hard-engage frontline",
+      "2 tanks"
+     ]
+    },
+    "ally_summary": {
+     "physical_threats": 5,
+     "magic_threats": 0,
+     "mixed_threats": 0,
+     "heavy_cc_count": 0,
+     "suppression": false,
+     "burst_ad": true,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 0,
+     "frontline": 0
+    },
+    "enemy_summary": {
+     "physical_threats": 2,
+     "magic_threats": 1,
+     "mixed_threats": 2,
+     "heavy_cc_count": 1,
+     "suppression": false,
+     "burst_ad": false,
+     "burst_ap": false,
+     "heavy_healing": false,
+     "tanks": 1,
+     "frontline": 3
+    },
+    "balance": {
+     "win_pct": 40,
+     "edge": -1.66,
+     "label": "BEHIND",
+     "tone": "bad",
+     "confidence": 100,
+     "drivers": [
+      {
+       "text": "Teamfight > Pick",
+       "sign": -1
+      },
+      {
+       "text": "No frontline",
+       "sign": -1
+      },
+      {
+       "text": "Mono-damage",
+       "sign": -1
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "counter_cases": [
+  {
+   "id": "locked",
+   "ctx": {
+    "locked": true,
+    "my_turn": false,
+    "enemies_revealed": 5,
+    "enemy_picks_after_me": 0
+   },
+   "expected": {
+    "phase": "locked",
+    "headline": "Locked in",
+    "detail": "Your pick is final — focus on the loadout."
+   }
+  },
+  {
+   "id": "waiting",
+   "ctx": {
+    "locked": false,
+    "my_turn": false,
+    "enemies_revealed": 3,
+    "enemy_picks_after_me": 2
+   },
+   "expected": {
+    "phase": "waiting",
+    "headline": "Not your turn yet",
+    "detail": "3 enemy pick(s) revealed so far — keep options open."
+   }
+  },
+  {
+   "id": "counter_window",
+   "ctx": {
+    "locked": false,
+    "my_turn": true,
+    "enemies_revealed": 5,
+    "enemy_picks_after_me": 0
+   },
+   "expected": {
+    "phase": "counter",
+    "headline": "Counter-pick window",
+    "detail": "Every enemy is revealed — safe to lock a hard counter."
+   }
+  },
+  {
+   "id": "blind_spot",
+   "ctx": {
+    "locked": false,
+    "my_turn": true,
+    "enemies_revealed": 2,
+    "enemy_picks_after_me": 2
+   },
+   "expected": {
+    "phase": "blind",
+    "headline": "2 enemy pick(s) come after you",
+    "detail": "Blind spot ahead — favour a flexible/safe pick over a greedy counter that can be countered back."
+   }
+  }
+ ]
+}

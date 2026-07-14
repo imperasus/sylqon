@@ -1,0 +1,1912 @@
+{
+ "bundle_version": 1,
+ "patch": "16.13.1",
+ "champions": {
+  "1": {
+   "name": "Annie",
+   "slug": "Annie",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "burst_ap"
+   ]
+  },
+  "2": {
+   "name": "Olaf",
+   "slug": "Olaf",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "3": {
+   "name": "Galio",
+   "slug": "Galio",
+   "tags": [
+    "Tank",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "4": {
+   "name": "Twisted Fate",
+   "slug": "TwistedFate",
+   "tags": [
+    "Mage",
+    "Marksman"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "5": {
+   "name": "Xin Zhao",
+   "slug": "XinZhao",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "6": {
+   "name": "Urgot",
+   "slug": "Urgot",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_cc",
+    "suppression"
+   ]
+  },
+  "7": {
+   "name": "LeBlanc",
+   "slug": "Leblanc",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "burst_ap"
+   ]
+  },
+  "8": {
+   "name": "Vladimir",
+   "slug": "Vladimir",
+   "tags": [
+    "Mage",
+    "Fighter"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "9": {
+   "name": "Fiddlesticks",
+   "slug": "Fiddlesticks",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "10": {
+   "name": "Kayle",
+   "slug": "Kayle",
+   "tags": [
+    "Mage",
+    "Marksman"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "11": {
+   "name": "Master Yi",
+   "slug": "MasterYi",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "12": {
+   "name": "Alistar",
+   "slug": "Alistar",
+   "tags": [
+    "Tank",
+    "Support"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "13": {
+   "name": "Ryze",
+   "slug": "Ryze",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "14": {
+   "name": "Sion",
+   "slug": "Sion",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc",
+    "tank"
+   ]
+  },
+  "15": {
+   "name": "Sivir",
+   "slug": "Sivir",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "16": {
+   "name": "Soraka",
+   "slug": "Soraka",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "17": {
+   "name": "Teemo",
+   "slug": "Teemo",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "18": {
+   "name": "Tristana",
+   "slug": "Tristana",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "19": {
+   "name": "Warwick",
+   "slug": "Warwick",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_cc",
+    "suppression",
+    "heavy_healing"
+   ]
+  },
+  "20": {
+   "name": "Nunu & Willump",
+   "slug": "Nunu",
+   "tags": [
+    "Tank",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "21": {
+   "name": "Miss Fortune",
+   "slug": "MissFortune",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "22": {
+   "name": "Ashe",
+   "slug": "Ashe",
+   "tags": [
+    "Marksman",
+    "Support"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "23": {
+   "name": "Tryndamere",
+   "slug": "Tryndamere",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "24": {
+   "name": "Jax",
+   "slug": "Jax",
+   "tags": [
+    "Fighter"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "25": {
+   "name": "Morgana",
+   "slug": "Morgana",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "26": {
+   "name": "Zilean",
+   "slug": "Zilean",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "27": {
+   "name": "Singed",
+   "slug": "Singed",
+   "tags": [
+    "Tank",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "28": {
+   "name": "Evelynn",
+   "slug": "Evelynn",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "burst_ap"
+   ]
+  },
+  "29": {
+   "name": "Twitch",
+   "slug": "Twitch",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "30": {
+   "name": "Karthus",
+   "slug": "Karthus",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "31": {
+   "name": "Cho'Gath",
+   "slug": "Chogath",
+   "tags": [
+    "Tank",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "tank"
+   ]
+  },
+  "32": {
+   "name": "Amumu",
+   "slug": "Amumu",
+   "tags": [
+    "Tank",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "tank"
+   ]
+  },
+  "33": {
+   "name": "Rammus",
+   "slug": "Rammus",
+   "tags": [
+    "Tank"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc",
+    "tank"
+   ]
+  },
+  "34": {
+   "name": "Anivia",
+   "slug": "Anivia",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "35": {
+   "name": "Shaco",
+   "slug": "Shaco",
+   "tags": [
+    "Assassin"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "36": {
+   "name": "Dr. Mundo",
+   "slug": "DrMundo",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_healing",
+    "tank"
+   ]
+  },
+  "37": {
+   "name": "Sona",
+   "slug": "Sona",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "38": {
+   "name": "Kassadin",
+   "slug": "Kassadin",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "39": {
+   "name": "Irelia",
+   "slug": "Irelia",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "40": {
+   "name": "Janna",
+   "slug": "Janna",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "41": {
+   "name": "Gangplank",
+   "slug": "Gangplank",
+   "tags": [
+    "Fighter"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "42": {
+   "name": "Corki",
+   "slug": "Corki",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "43": {
+   "name": "Karma",
+   "slug": "Karma",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "poke"
+   ]
+  },
+  "44": {
+   "name": "Taric",
+   "slug": "Taric",
+   "tags": [
+    "Support",
+    "Tank"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "45": {
+   "name": "Veigar",
+   "slug": "Veigar",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "burst_ap"
+   ]
+  },
+  "48": {
+   "name": "Trundle",
+   "slug": "Trundle",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "50": {
+   "name": "Swain",
+   "slug": "Swain",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "51": {
+   "name": "Caitlyn",
+   "slug": "Caitlyn",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "poke"
+   ]
+  },
+  "53": {
+   "name": "Blitzcrank",
+   "slug": "Blitzcrank",
+   "tags": [
+    "Tank",
+    "Support"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "54": {
+   "name": "Malphite",
+   "slug": "Malphite",
+   "tags": [
+    "Tank",
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "tank"
+   ]
+  },
+  "55": {
+   "name": "Katarina",
+   "slug": "Katarina",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "56": {
+   "name": "Nocturne",
+   "slug": "Nocturne",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "burst_ad"
+   ]
+  },
+  "57": {
+   "name": "Maokai",
+   "slug": "Maokai",
+   "tags": [
+    "Tank",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "heavy_healing",
+    "tank"
+   ]
+  },
+  "58": {
+   "name": "Renekton",
+   "slug": "Renekton",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "59": {
+   "name": "Jarvan IV",
+   "slug": "JarvanIV",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "60": {
+   "name": "Elise",
+   "slug": "Elise",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "61": {
+   "name": "Orianna",
+   "slug": "Orianna",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "62": {
+   "name": "Wukong",
+   "slug": "MonkeyKing",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "63": {
+   "name": "Brand",
+   "slug": "Brand",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "64": {
+   "name": "Lee Sin",
+   "slug": "LeeSin",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "67": {
+   "name": "Vayne",
+   "slug": "Vayne",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "68": {
+   "name": "Rumble",
+   "slug": "Rumble",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "69": {
+   "name": "Cassiopeia",
+   "slug": "Cassiopeia",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "72": {
+   "name": "Skarner",
+   "slug": "Skarner",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc",
+    "suppression"
+   ]
+  },
+  "74": {
+   "name": "Heimerdinger",
+   "slug": "Heimerdinger",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "75": {
+   "name": "Nasus",
+   "slug": "Nasus",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "76": {
+   "name": "Nidalee",
+   "slug": "Nidalee",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "poke"
+   ]
+  },
+  "77": {
+   "name": "Udyr",
+   "slug": "Udyr",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "78": {
+   "name": "Poppy",
+   "slug": "Poppy",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "79": {
+   "name": "Gragas",
+   "slug": "Gragas",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "80": {
+   "name": "Pantheon",
+   "slug": "Pantheon",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_cc",
+    "burst_ad"
+   ]
+  },
+  "81": {
+   "name": "Ezreal",
+   "slug": "Ezreal",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "poke"
+   ]
+  },
+  "82": {
+   "name": "Mordekaiser",
+   "slug": "Mordekaiser",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "83": {
+   "name": "Yorick",
+   "slug": "Yorick",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "84": {
+   "name": "Akali",
+   "slug": "Akali",
+   "tags": [
+    "Assassin"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "burst_ap"
+   ]
+  },
+  "85": {
+   "name": "Kennen",
+   "slug": "Kennen",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "86": {
+   "name": "Garen",
+   "slug": "Garen",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "89": {
+   "name": "Leona",
+   "slug": "Leona",
+   "tags": [
+    "Tank",
+    "Support"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "90": {
+   "name": "Malzahar",
+   "slug": "Malzahar",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "suppression"
+   ]
+  },
+  "91": {
+   "name": "Talon",
+   "slug": "Talon",
+   "tags": [
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "burst_ad"
+   ]
+  },
+  "92": {
+   "name": "Riven",
+   "slug": "Riven",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "96": {
+   "name": "Kog'Maw",
+   "slug": "KogMaw",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "98": {
+   "name": "Shen",
+   "slug": "Shen",
+   "tags": [
+    "Tank"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "tank"
+   ]
+  },
+  "99": {
+   "name": "Lux",
+   "slug": "Lux",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "poke"
+   ]
+  },
+  "101": {
+   "name": "Xerath",
+   "slug": "Xerath",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "poke"
+   ]
+  },
+  "102": {
+   "name": "Shyvana",
+   "slug": "Shyvana",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "103": {
+   "name": "Ahri",
+   "slug": "Ahri",
+   "tags": [
+    "Mage",
+    "Assassin"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "104": {
+   "name": "Graves",
+   "slug": "Graves",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "105": {
+   "name": "Fizz",
+   "slug": "Fizz",
+   "tags": [
+    "Assassin",
+    "Fighter"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "burst_ap"
+   ]
+  },
+  "106": {
+   "name": "Volibear",
+   "slug": "Volibear",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "107": {
+   "name": "Rengar",
+   "slug": "Rengar",
+   "tags": [
+    "Assassin",
+    "Fighter"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "burst_ad"
+   ]
+  },
+  "110": {
+   "name": "Varus",
+   "slug": "Varus",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_cc",
+    "poke"
+   ]
+  },
+  "111": {
+   "name": "Nautilus",
+   "slug": "Nautilus",
+   "tags": [
+    "Tank",
+    "Support"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "112": {
+   "name": "Viktor",
+   "slug": "Viktor",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "113": {
+   "name": "Sejuani",
+   "slug": "Sejuani",
+   "tags": [
+    "Tank"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc",
+    "tank"
+   ]
+  },
+  "114": {
+   "name": "Fiora",
+   "slug": "Fiora",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "115": {
+   "name": "Ziggs",
+   "slug": "Ziggs",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "poke"
+   ]
+  },
+  "117": {
+   "name": "Lulu",
+   "slug": "Lulu",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "119": {
+   "name": "Draven",
+   "slug": "Draven",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "120": {
+   "name": "Hecarim",
+   "slug": "Hecarim",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "121": {
+   "name": "Kha'Zix",
+   "slug": "Khazix",
+   "tags": [
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "burst_ad"
+   ]
+  },
+  "122": {
+   "name": "Darius",
+   "slug": "Darius",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "126": {
+   "name": "Jayce",
+   "slug": "Jayce",
+   "tags": [
+    "Fighter",
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "poke"
+   ]
+  },
+  "127": {
+   "name": "Lissandra",
+   "slug": "Lissandra",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "burst_ap"
+   ]
+  },
+  "131": {
+   "name": "Diana",
+   "slug": "Diana",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "burst_ap"
+   ]
+  },
+  "133": {
+   "name": "Quinn",
+   "slug": "Quinn",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "134": {
+   "name": "Syndra",
+   "slug": "Syndra",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "burst_ap"
+   ]
+  },
+  "136": {
+   "name": "Aurelion Sol",
+   "slug": "AurelionSol",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "141": {
+   "name": "Kayn",
+   "slug": "Kayn",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "burst_ad",
+    "heavy_healing"
+   ]
+  },
+  "142": {
+   "name": "Zoe",
+   "slug": "Zoe",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "burst_ap",
+    "poke"
+   ]
+  },
+  "143": {
+   "name": "Zyra",
+   "slug": "Zyra",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "145": {
+   "name": "Kai'Sa",
+   "slug": "Kaisa",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "147": {
+   "name": "Seraphine",
+   "slug": "Seraphine",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "150": {
+   "name": "Gnar",
+   "slug": "Gnar",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "154": {
+   "name": "Zac",
+   "slug": "Zac",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "heavy_healing",
+    "tank"
+   ]
+  },
+  "157": {
+   "name": "Yasuo",
+   "slug": "Yasuo",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "161": {
+   "name": "Vel'Koz",
+   "slug": "Velkoz",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "poke"
+   ]
+  },
+  "163": {
+   "name": "Taliyah",
+   "slug": "Taliyah",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "164": {
+   "name": "Camille",
+   "slug": "Camille",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "166": {
+   "name": "Akshan",
+   "slug": "Akshan",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "200": {
+   "name": "Bel'Veth",
+   "slug": "Belveth",
+   "tags": [
+    "Fighter"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "201": {
+   "name": "Braum",
+   "slug": "Braum",
+   "tags": [
+    "Tank",
+    "Support"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "202": {
+   "name": "Jhin",
+   "slug": "Jhin",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "poke"
+   ]
+  },
+  "203": {
+   "name": "Kindred",
+   "slug": "Kindred",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "221": {
+   "name": "Zeri",
+   "slug": "Zeri",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "222": {
+   "name": "Jinx",
+   "slug": "Jinx",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "223": {
+   "name": "Tahm Kench",
+   "slug": "TahmKench",
+   "tags": [
+    "Tank",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc",
+    "tank"
+   ]
+  },
+  "233": {
+   "name": "Briar",
+   "slug": "Briar",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "burst_ad",
+    "heavy_healing"
+   ]
+  },
+  "234": {
+   "name": "Viego",
+   "slug": "Viego",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "235": {
+   "name": "Senna",
+   "slug": "Senna",
+   "tags": [
+    "Support",
+    "Marksman"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "236": {
+   "name": "Lucian",
+   "slug": "Lucian",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "238": {
+   "name": "Zed",
+   "slug": "Zed",
+   "tags": [
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "burst_ad"
+   ]
+  },
+  "240": {
+   "name": "Kled",
+   "slug": "Kled",
+   "tags": [
+    "Fighter"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "245": {
+   "name": "Ekko",
+   "slug": "Ekko",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "246": {
+   "name": "Qiyana",
+   "slug": "Qiyana",
+   "tags": [
+    "Assassin"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "burst_ad"
+   ]
+  },
+  "254": {
+   "name": "Vi",
+   "slug": "Vi",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "266": {
+   "name": "Aatrox",
+   "slug": "Aatrox",
+   "tags": [
+    "Fighter"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "267": {
+   "name": "Nami",
+   "slug": "Nami",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "268": {
+   "name": "Azir",
+   "slug": "Azir",
+   "tags": [
+    "Mage",
+    "Marksman"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "350": {
+   "name": "Yuumi",
+   "slug": "Yuumi",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "360": {
+   "name": "Samira",
+   "slug": "Samira",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "412": {
+   "name": "Thresh",
+   "slug": "Thresh",
+   "tags": [
+    "Support",
+    "Tank"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "420": {
+   "name": "Illaoi",
+   "slug": "Illaoi",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "heavy_healing"
+   ]
+  },
+  "421": {
+   "name": "Rek'Sai",
+   "slug": "RekSai",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "427": {
+   "name": "Ivern",
+   "slug": "Ivern",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "429": {
+   "name": "Kalista",
+   "slug": "Kalista",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "432": {
+   "name": "Bard",
+   "slug": "Bard",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "497": {
+   "name": "Rakan",
+   "slug": "Rakan",
+   "tags": [
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "498": {
+   "name": "Xayah",
+   "slug": "Xayah",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "516": {
+   "name": "Ornn",
+   "slug": "Ornn",
+   "tags": [
+    "Tank"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc",
+    "tank"
+   ]
+  },
+  "517": {
+   "name": "Sylas",
+   "slug": "Sylas",
+   "tags": [
+    "Mage",
+    "Assassin"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "burst_ap",
+    "heavy_healing"
+   ]
+  },
+  "518": {
+   "name": "Neeko",
+   "slug": "Neeko",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "523": {
+   "name": "Aphelios",
+   "slug": "Aphelios",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "526": {
+   "name": "Rell",
+   "slug": "Rell",
+   "tags": [
+    "Tank",
+    "Support"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "555": {
+   "name": "Pyke",
+   "slug": "Pyke",
+   "tags": [
+    "Support",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "burst_ad"
+   ]
+  },
+  "711": {
+   "name": "Vex",
+   "slug": "Vex",
+   "tags": [
+    "Mage"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "burst_ap"
+   ]
+  },
+  "777": {
+   "name": "Yone",
+   "slug": "Yone",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "799": {
+   "name": "Ambessa",
+   "slug": "Ambessa",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "800": {
+   "name": "Mel",
+   "slug": "Mel",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "804": {
+   "name": "Yunara",
+   "slug": "Yunara",
+   "tags": [
+    "Marksman"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "805": {
+   "name": "Locke",
+   "slug": "Locke",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "875": {
+   "name": "Sett",
+   "slug": "Sett",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "876": {
+   "name": "Lillia",
+   "slug": "Lillia",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "887": {
+   "name": "Gwen",
+   "slug": "Gwen",
+   "tags": [
+    "Fighter"
+   ],
+   "damage_type": "Mixed",
+   "threats": []
+  },
+  "888": {
+   "name": "Renata Glasc",
+   "slug": "Renata",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "heavy_cc"
+   ]
+  },
+  "893": {
+   "name": "Aurora",
+   "slug": "Aurora",
+   "tags": [
+    "Mage",
+    "Assassin"
+   ],
+   "damage_type": "AP",
+   "threats": [
+    "burst_ap"
+   ]
+  },
+  "895": {
+   "name": "Nilah",
+   "slug": "Nilah",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "897": {
+   "name": "K'Sante",
+   "slug": "KSante",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "tank"
+   ]
+  },
+  "901": {
+   "name": "Smolder",
+   "slug": "Smolder",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "902": {
+   "name": "Milio",
+   "slug": "Milio",
+   "tags": [
+    "Support",
+    "Mage"
+   ],
+   "damage_type": "AP",
+   "threats": []
+  },
+  "904": {
+   "name": "Zaahen",
+   "slug": "Zaahen",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ],
+   "damage_type": "AD",
+   "threats": []
+  },
+  "910": {
+   "name": "Hwei",
+   "slug": "Hwei",
+   "tags": [
+    "Mage",
+    "Support"
+   ],
+   "damage_type": "Mixed",
+   "threats": [
+    "burst_ap",
+    "poke"
+   ]
+  },
+  "950": {
+   "name": "Naafiri",
+   "slug": "Naafiri",
+   "tags": [
+    "Assassin",
+    "Fighter"
+   ],
+   "damage_type": "AD",
+   "threats": [
+    "burst_ad"
+   ]
+  }
+ },
+ "heavy_poke": [
+  "Caitlyn",
+  "Ezreal",
+  "Hwei",
+  "Jayce",
+  "Jhin",
+  "Karma",
+  "Lux",
+  "Nidalee",
+  "Varus",
+  "Vel'Koz",
+  "Xerath",
+  "Ziggs",
+  "Zoe"
+ ],
+ "split_push": [
+  "Aatrox",
+  "Camille",
+  "Fiora",
+  "Gangplank",
+  "Illaoi",
+  "Jax",
+  "Jayce",
+  "Kayle",
+  "Nasus",
+  "Quinn",
+  "Renekton",
+  "Riven",
+  "Shen",
+  "Sion",
+  "Trundle",
+  "Tryndamere",
+  "Yone",
+  "Yorick"
+ ]
+}
