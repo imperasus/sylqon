@@ -27,8 +27,6 @@ from app.web import _DOWNLOAD_URL, _page
 
 router = APIRouter()
 
-_QUEUE_LABELS = {420: "Ranked Solo/Duo", 440: "Ranked Flex",
-                 400: "Normal Draft", 430: "Normal Blind"}
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 _TIER_VERDICTS = {
@@ -172,7 +170,7 @@ def _team_card(payload: dict, side: str) -> str:
 def _meta_line(payload: dict) -> str:
     m = payload["match"]
     bits = ["A real game from our dataset",
-            html.escape(_QUEUE_LABELS.get(m["queue_id"], "Summoner's Rift"))]
+            html.escape(puzzles.QUEUE_LABELS.get(m["queue_id"], "Summoner's Rift"))]
     if m["patch"]:
         bits.append(f'patch {html.escape(m["patch"])}')
     if m["rank_band"]:

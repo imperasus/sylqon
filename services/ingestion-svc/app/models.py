@@ -224,6 +224,19 @@ class DailyPuzzle(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class PuzzleDelivery(Base):
+    """One row per guild per puzzle day — the dedupe guard for the bot's
+    daily Daily-Draft embed. A separate table (not a guild_configs column)
+    because create_all never ALTERs the live table, while new tables are
+    free on deploy."""
+
+    __tablename__ = "puzzle_deliveries"
+
+    guild_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    puzzle_date: Mapped[str] = mapped_column(Text, primary_key=True)  # ISO "2026-07-15"
+    delivered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class LinkedAccount(Base):
     """Discord user ↔ Riot PUUID link (Riot-ID-based fallback linking; RSO
     OAuth replaces the verification story later, roadmap §4.1)."""

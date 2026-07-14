@@ -40,6 +40,8 @@ PUZZLE_SCHEMA = 1
 ROLES = ("TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY")
 ROLE_LABELS = {"TOP": "Top", "JUNGLE": "Jungle", "MIDDLE": "Mid",
                "BOTTOM": "Bot", "UTILITY": "Support"}
+QUEUE_LABELS = {420: "Ranked Solo/Duo", 440: "Ranked Flex",
+                400: "Normal Draft", 430: "Normal Blind"}
 CANDIDATE_COUNT = 6
 _TIER_LADDER = ("IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD",
                 "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER")
