@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.29.0](https://github.com/imperasus/sylqon/compare/v1.28.0...v1.29.0) (2026-07-14)
+
+
+### Features
+
+* **web:** Draft Gauntlet (/gym) — ten drafts, thirty points, honest board ([ef534a5](https://github.com/imperasus/sylqon/commit/ef534a531b65b87e388cd33c61b00577f0b6863b))
+
 ## [1.28.0](https://github.com/imperasus/sylqon/compare/v1.27.0...v1.28.0) (2026-07-14)
 
 

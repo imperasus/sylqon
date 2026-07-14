@@ -1,6 +1,6 @@
 {
   "name": "sylqon-desktop",
-  "version": "1.28.0",
+  "version": "1.29.0",
   "description": "Sylqon desktop shell — read-only Electron wrapper around the local Sylqon web UI, plus an always-on-top in-game overlay window.",
   "author": "Sylqon",
   "license": "UNLICENSED",
