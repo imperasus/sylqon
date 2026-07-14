@@ -1,5 +1,11 @@
 # Sylqon — LoL publikus webfelület fejlesztési terv
 
+> **MEGHALADOTT (2026-07-14):** a tulajdonosi döntés a webet Draft-gerincre pozicionálta
+> át (napi draft-rejtvény + Draft Lab + Coach-szárny, a generikus lookup-oldalak radikális
+> vágásával) — az érvényes terv a **`docs/WEB_DRAFT_TERV.md`**. Ebből a dokumentumból a §3
+> infrastruktúra-döntések (SSR-first FastAPI, domain/Caddy/TLS) és a §9 compliance-elvek
+> továbbra is érvényesek.
+
 > Készült: 2026-07-09 · Alap: a beérkezett „op.gg-stílusú LoL webfelület" brief +
 > a repo aktuális állapotának auditja (v1.22.0) + a meglévő `docs/FEJLESZTESI_TERV.md` (2026 H2 roadmap).
 >
