@@ -83,6 +83,15 @@ def identity(name: str | None) -> dict | None:
     return {"name": prof["name"], "slug": prof["slug"]} if prof else None
 
 
+def roster() -> list[dict]:
+    """Every champion as ``{key, name, slug}``, name-sorted — feeds pickers
+    and the permalink id codec (key = numeric Riot champion id as a string)."""
+    return sorted(
+        ({"key": key, "name": prof["name"], "slug": prof["slug"]}
+         for key, prof in _bundle()["champions"].items()),
+        key=lambda c: c["name"])
+
+
 # -- team summary (port of lobby.summarize_team) ------------------------------
 def summarize_team(picks: list) -> dict:
     """Aggregate the damage / threat profile of a list of pick dicts."""

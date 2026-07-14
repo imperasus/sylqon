@@ -170,8 +170,8 @@ def _page(title: str, body: str, description: str = "") -> HTMLResponse:
 <style>{_CSS}</style></head><body>
 <header><div class="wrap">
 <a class="brand" href="/">{_MARK}SYL<span>QON</span> <span class="muted small">pool coverage</span></a>
-<nav><a href="/daily">Daily Draft</a><a href="/audit">Pool audit</a>
-<a href="/download">Download</a></nav>
+<nav><a href="/daily">Daily Draft</a><a href="/draft">Draft Lab</a>
+<a href="/audit">Pool audit</a><a href="/download">Download</a></nav>
 </div></header>
 <main class="wrap">{body}</main>
 <footer><div class="wrap">Sylqon is an unofficial fan-made tool. Not endorsed by Riot Games.

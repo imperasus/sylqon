@@ -6,7 +6,7 @@ import threading
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query
 
 from app import config, db, regions
 from app.crawler import AccountNotFound, IngestService
@@ -68,9 +68,11 @@ app = FastAPI(title="Sylqon Ingestion Service", version="0.1.0", lifespan=lifesp
 from app.web import NOINDEX_PREFIXES  # noqa: E402
 from app.web import router as web_router  # noqa: E402
 from app.webdaily import router as daily_router  # noqa: E402
+from app.webdraft import router as draft_router  # noqa: E402
 
 app.include_router(web_router)  # public pages: /audit, /download + sunset lookup pages
 app.include_router(daily_router)  # Daily Draft: / (homepage), /daily, /daily/{date}
+app.include_router(draft_router)  # Draft Lab: /draft, /draft/panel, /d/{code}
 
 
 @app.middleware("http")
@@ -131,6 +133,52 @@ def pool_report(game_name: str, tag_line: str, refresh: bool = Query(default=Tru
         raise HTTPException(status_code=404, detail="no stored matches for this player yet")
     report["riot_id"] = f"{game_name}#{tag_line}"
     return report
+
+
+@app.post("/api/draft/analyze")
+def draft_analyze(payload: dict = Body(...)) -> dict:
+    """One engine pass over a draft board: comp reads, structure chips and the
+    [35, 65]-clamped balance; with ``pool`` the caller's champions are ranked
+    into the draft. Pure and instant — the Draft Lab's programmatic twin
+    (the desktop app's future "Share draft" export talks to this)."""
+    from app import draftlab
+
+    ally = draftlab.clean_names(payload.get("ally"))
+    enemy = draftlab.clean_names(payload.get("enemy"))
+    pool = draftlab.clean_names(payload.get("pool"), cap=30)
+    result = draftlab.analyze(ally, enemy)
+    result["permalink"] = f"/d/{draftlab.encode_state(ally, enemy)}"
+    if pool:
+        result["pool_ranking"] = draftlab.rank_pool(pool, ally, enemy)
+    return result
+
+
+@app.get("/api/draft/pool")
+def draft_pool(riot_id: str = Query(..., min_length=3)) -> dict:
+    """The stored champion pool for a Riot ID, most-played first — feeds the
+    Draft Lab's "which of my picks fits here" panel. Read-only and fast: no
+    ingest on this path (the pool audit is the ingesting entry point)."""
+    from app import pool as pool_mod
+
+    game_name, _, tag_line = riot_id.partition("#")
+    if not game_name.strip() or not tag_line.strip():
+        raise HTTPException(status_code=400, detail="Riot ID must be Name#TAG")
+    assert _ingest_service is not None
+    account = _ingest_service._riot.get_account_by_riot_id(
+        game_name.strip(), tag_line.strip())
+    if not account or not account.get("puuid"):
+        raise HTTPException(status_code=404, detail="Riot ID not found")
+    with db.open_session() as session:
+        report = pool_mod.analyze_pool(session, account["puuid"])
+    if report is None:
+        return {"riot_id": riot_id, "champions": []}
+    by_games: dict[str, int] = {}
+    for data in report["roles"].values():
+        for entry in data["current"]:
+            by_games[entry["champion"]] = max(by_games.get(entry["champion"], 0),
+                                              entry["games"])
+    champions = sorted(by_games, key=lambda n: -by_games[n])
+    return {"riot_id": riot_id, "champions": champions}
 
 
 @app.get("/api/summoner/{game_name}/{tag_line}")
