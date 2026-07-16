@@ -1,5 +1,11 @@
 # Sylqon.com — Draft-gerinc újrapozicionálási terv
 
+> **MEGHALADOTT (2026-07-16):** az Ü1 Daily Draft (napi rejtvény + Gauntlet) leszállt,
+> a tulajdonos kipróbálta és **elvetette** ("nem elég szórakoztató" + "nem látom a
+> közönségét") — kivezetve. Az érvényes terv a **`docs/WEB_WARROOM_TERV.md`**.
+> Ebből a dokumentumból **érvényben marad**: a draft-motor portja a paritás-híddal (§1),
+> az Ü2 Draft Lab (él), a §5 radikális vágás és a §6 ToS-őrség.
+
 > Készült: 2026-07-14 · Ez a dokumentum **felváltja** a `WEB_FELULET_TERV.md` irányát.
 > Alap: 3-ágú piaci/repo-kutatás + 6 független koncepció-irány kidolgozása és bírálata,
 > majd tulajdonosi döntés (2026-07-14): **Draft-gerinc + radikális vágás**.
