@@ -170,7 +170,7 @@ def _page(title: str, body: str, description: str = "") -> HTMLResponse:
 <style>{_CSS}</style></head><body>
 <header><div class="wrap">
 <a class="brand" href="/">{_MARK}SYL<span>QON</span> <span class="muted small">pool coverage</span></a>
-<nav><a href="/daily">Daily Draft</a><a href="/gym">Gauntlet</a><a href="/draft">Draft Lab</a>
+<nav><a href="/draft">Draft Lab</a>
 <a href="/audit">Pool audit</a><a href="/download">Download</a></nav>
 </div></header>
 <main class="wrap">{body}</main>
@@ -270,8 +270,40 @@ def _region_options(selected: str = regions.DEFAULT_PLATFORM) -> str:
     )
 
 
-# NOTE: the "/" homepage lives in webdaily.py — the daily puzzle IS the hero
-# (docs/WEB_DRAFT_TERV.md §5: the hero doesn't tell, it makes you play).
+@router.get("/", response_class=HTMLResponse)
+def home() -> HTMLResponse:
+    """Interim tool-first homepage (the Daily Draft direction was retired
+    2026-07-14; the next spine experience is being designed): the product
+    hero with the two live web tools as entry points."""
+    body = """
+<section class="hero">
+<p class="eyebrow">Counter-draft AI · League of Legends</p>
+<h1>Counter the enemy team <span class="hl">before you lock in.</span></h1>
+<p class="lead">Sylqon reads your live Champion Select, names the strongest pick from your own
+pool, then builds the items, runes and summoner spells that beat those specific five enemies —
+and writes the whole loadout into your client automatically.</p>
+<div class="cta-row">
+<a class="btn" href="/download">Download for Windows</a>
+<a class="btn ghost" href="/draft">Try the Draft Lab</a>
+</div>
+<p class="trust small muted">100% local — your credentials never leave your PC ·
+No Overwolf, no ads</p>
+</section>
+<h2>Tools on the web</h2>
+<div class="grid">
+<div class="card"><strong><a href="/draft">Draft Lab</a></strong><p class="muted small">
+A 5v5 draft simulator that talks back: comp reads, structure chips and a clamped balance on
+every pick — shareable as a permalink.</p></div>
+<div class="card"><strong><a href="/audit">Pool audit</a></strong><p class="muted small">
+Your personal difficulty map: which comps and threats your champion pool leaves uncovered,
+from our own aggregation of official Riot data.</p></div>
+<div class="card"><strong><a href="/download">Desktop app</a></strong><p class="muted small">
+The full counter-draft loop, live in your champ select — pick advice from your pool and an
+auto-injected loadout.</p></div>
+</div>"""
+    return _page("Sylqon — counter-draft AI for League of Legends", body,
+                 "Sylqon picks the strongest answer from your pool live in champ select and "
+                 "builds the counter-loadout. Try the Draft Lab and the pool audit on the web.")
 
 
 @router.get("/download", response_class=HTMLResponse)

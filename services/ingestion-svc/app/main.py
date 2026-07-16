@@ -67,14 +67,10 @@ app = FastAPI(title="Sylqon Ingestion Service", version="0.1.0", lifespan=lifesp
 
 from app.web import NOINDEX_PREFIXES  # noqa: E402
 from app.web import router as web_router  # noqa: E402
-from app.webdaily import router as daily_router  # noqa: E402
 from app.webdraft import router as draft_router  # noqa: E402
-from app.webgym import router as gym_router  # noqa: E402
 
-app.include_router(web_router)  # public pages: /audit, /download + sunset lookup pages
-app.include_router(daily_router)  # Daily Draft: / (homepage), /daily, /daily/{date}
+app.include_router(web_router)  # public pages: /, /audit, /download + sunset lookup pages
 app.include_router(draft_router)  # Draft Lab: /draft, /draft/panel, /d/{code}
-app.include_router(gym_router)  # Draft Gauntlet: /gym + run fragments
 
 
 @app.middleware("http")

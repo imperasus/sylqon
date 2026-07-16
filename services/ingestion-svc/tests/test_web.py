@@ -37,14 +37,15 @@ def client(monkeypatch):
     return TestClient(app, raise_server_exceptions=True)
 
 
-def test_home_is_puzzle_first(client):
-    # The fixture's 2-player lane matches can't freeze a puzzle → the homepage
-    # falls back to the hero alone; the CTAs point at the new spine pages.
+def test_home_is_tool_first(client):
+    # Interim homepage after the Daily Draft retirement: product hero + the
+    # two live web tools; no lookup form, no puzzle.
     r = client.get("/")
     assert r.status_code == 200
     assert "Download for Windows" in r.text
-    assert 'href="/audit"' in r.text and 'href="/download"' in r.text
+    assert 'href="/draft"' in r.text and 'href="/audit"' in r.text
     assert 'action="/search"' not in r.text  # the old lookup-first home is gone
+    assert "/daily" not in r.text and "/gym" not in r.text  # retired direction
 
 
 def test_radical_cut_nav_and_noindex(client):

@@ -53,17 +53,6 @@ _T = {
                         "covers-gaps": "rést fed", "meta-presence": "gyakori pick"},
         "vote_thanks": "Köszi a visszajelzést! 🙏",
         "vote_dupe": "Erre a tanácsra már szavaztál.",
-        "daily_title": "🧩 Napi Draft — {date}",
-        "daily_intro": "Valódi meccsből befagyasztott draft — egy pick hiányzik: "
-                       "a tiéd (**{role}**, {side} oldal).",
-        "daily_team": "A csapatod",
-        "daily_enemy": "Ellenfél",
-        "daily_read": "A motor olvasata az ellenfélről: **{comp}**",
-        "daily_candidates": "Jelöltek",
-        "daily_outro": "Mit választanál? A motor indoklása + ami a valóságban történt:",
-        "daily_play": "Játszd le →",
-        "daily_you": "❓ (te)",
-        "side_blue": "kék", "side_red": "piros",
         "build_title": "{champion} — saját meta ({games} meccs, {winrate_pct}% WR, {role})",
         "matchup_line": "**{a} vs {b}** (azonos lane): {games} meccs, {a} nyert {a_wins}-szer "
                         "(**{pct}%**) — saját adatból, nem globális statisztika.",
@@ -90,17 +79,6 @@ _T = {
                         "covers-gaps": "covers gaps", "meta-presence": "common pick"},
         "vote_thanks": "Thanks for the feedback! 🙏",
         "vote_dupe": "You already voted on this advice.",
-        "daily_title": "🧩 Daily Draft — {date}",
-        "daily_intro": "A draft frozen from a real game — one pick missing: "
-                       "yours (**{role}**, {side} side).",
-        "daily_team": "Your team",
-        "daily_enemy": "Enemy team",
-        "daily_read": "The engine's read on their comp: **{comp}**",
-        "daily_candidates": "Candidates",
-        "daily_outro": "What would you lock? The engine's reasoning + what actually happened:",
-        "daily_play": "Play →",
-        "daily_you": "❓ (you)",
-        "side_blue": "blue", "side_red": "red",
         "build_title": "{champion} — own meta ({games} games, {winrate_pct}% WR, {role})",
         "matchup_line": "**{a} vs {b}** (same lane): {games} games, {a} won {a_wins} "
                         "(**{pct}%**) — own data, not a global stat.",
@@ -131,76 +109,6 @@ def build_pool_embed_text(report: dict, lang: str, max_roles: int = 3) -> str:
             lines.append(t["pool_low_data"])
         lines.append("")
     return "\n".join(lines).strip()
-
-
-DAILY_PUZZLE_URL = "https://sylqon.com/daily"
-
-
-def build_daily_puzzle_payload(payload: dict, date_iso: str, lang: str) -> dict:
-    """Pure presentation: the Daily Draft teaser as an embed dict. Spoiler-free
-    by design — the six candidates appear (that IS the question), but never the
-    tiers, the engine's read on them or the real pick; the answer lives on the
-    site."""
-    from app import puzzles
-
-    t = _T[lang]
-    side = t["side_blue"] if payload["side"] == "blue" else t["side_red"]
-
-    def _team_lines(is_ally: bool) -> str:
-        lines, ally_iter = [], iter(payload["ally"])
-        for role in puzzles.ROLES:
-            label = puzzles.ROLE_LABELS[role]
-            if is_ally and role == payload["role"]:
-                lines.append(f"{label} — {t['daily_you']}")
-                continue
-            champ = next(ally_iter) if is_ally else \
-                payload["enemy"][puzzles.ROLES.index(role)]
-            lines.append(f"{label} — **{champ['name']}**")
-        return "\n".join(lines)
-
-    meta = [puzzles.QUEUE_LABELS.get(payload["match"]["queue_id"], "Summoner's Rift")]
-    if payload["match"]["patch"]:
-        meta.append(f'patch {payload["match"]["patch"]}')
-    if payload["match"]["rank_band"]:
-        meta.append(payload["match"]["rank_band"].title())
-    candidates = " · ".join(c["name"] for c in payload["candidates"])
-    description = "\n\n".join([
-        t["daily_intro"].format(role=payload["role_label"], side=side),
-        t["daily_read"].format(comp=payload["enemy_comp"]["label"]),
-        f'{t["daily_outro"]}\n{DAILY_PUZZLE_URL}',
-    ])
-    return {
-        "title": t["daily_title"].format(date=date_iso),
-        "description": description,
-        "color": 0xA3E635,
-        "fields": [
-            {"name": t["daily_team"], "value": _team_lines(True), "inline": True},
-            {"name": t["daily_enemy"], "value": _team_lines(False), "inline": True},
-            {"name": t["daily_candidates"], "value": candidates, "inline": False},
-        ],
-        "footer": {"text": " · ".join(meta)},
-    }
-
-
-def daily_puzzle_targets(session, today_iso: str) -> list[tuple[int, int, str, dict]]:
-    """(guild_id, channel_id, lang, payload) for every guild still due today's
-    puzzle embed. Target channel: the reports channel, falling back to the
-    advice channel — no new guild_configs column needed."""
-    from app import puzzles
-    from app.models import PuzzleDelivery
-
-    payload = puzzles.get_puzzle(session, today_iso)
-    if payload is None:
-        return []
-    out = []
-    for cfg in session.execute(select(GuildConfig)).scalars():
-        channel_id = cfg.reports_channel_id or cfg.advice_channel_id
-        if not channel_id:
-            continue
-        if session.get(PuzzleDelivery, (cfg.guild_id, today_iso)) is not None:
-            continue
-        out.append((cfg.guild_id, channel_id, cfg.lang or "hu", payload))
-    return out
 
 
 def _feedback_view(match_id: str, puuid: str) -> discord.ui.View:
@@ -258,50 +166,7 @@ class SylqonBot(discord.Client):
                 await self._maybe_weekly_reports()
             except Exception:
                 log.exception("weekly report cycle failed")
-            try:
-                await self._maybe_daily_puzzle()
-            except Exception:
-                log.exception("daily puzzle cycle failed")
             await asyncio.sleep(config.WATCH_POLL_SECONDS)
-
-    async def _maybe_daily_puzzle(self) -> None:
-        """Post today's Daily Draft teaser embed into each guild's channel,
-        once per day. The puzzle row comes from the server-side cron; if it is
-        not generated yet, the next watch cycle simply retries."""
-        import datetime as _dt
-
-        from app.models import PuzzleDelivery
-
-        today = _dt.datetime.now(_dt.timezone.utc).date().isoformat()
-
-        def _due():
-            with self.session_factory() as session:
-                return daily_puzzle_targets(session, today)
-
-        for guild_id, channel_id, lang, payload in await asyncio.to_thread(_due):
-            channel = self.get_channel(channel_id)
-            if channel is None:
-                continue
-            view = discord.ui.View(timeout=None)
-            view.add_item(discord.ui.Button(style=discord.ButtonStyle.link,
-                                            label=_T[lang]["daily_play"],
-                                            url=DAILY_PUZZLE_URL))
-            try:
-                await channel.send(
-                    embed=discord.Embed.from_dict(build_daily_puzzle_payload(payload, today, lang)),
-                    view=view,
-                )
-            except discord.DiscordException:
-                log.exception("daily puzzle post failed in %s", channel_id)
-                continue
-
-            def _stamp(guild_id=guild_id):
-                with self.session_factory() as session:
-                    session.merge(PuzzleDelivery(guild_id=guild_id, puzzle_date=today))
-                    session.commit()
-
-            await asyncio.to_thread(_stamp)
-            log.info("daily puzzle posted to guild %s", guild_id)
 
     async def _maybe_weekly_reports(self) -> None:
         """Post the weekly summary for every linked account into each guild's

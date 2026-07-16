@@ -88,21 +88,6 @@ CRAWL_RECRAWL_HOURS = float(_env("CRAWL_RECRAWL_HOURS", "72"))
 # churning — recomputing them per view costs seconds at crawled-dataset scale.
 WEB_CHAMPION_CACHE_TTL = float(_env("WEB_CHAMPION_CACHE_TTL", "21600"))
 
-# Daily Draft puzzle generation (/daily). Selection scans the newest stored SR
-# matches (bounded window, same no-unbounded-scan rule as the benchmarks),
-# skips games shorter than the duration floor (remakes/ff15 stomps make unfair
-# puzzles) and scores this many matchup-pool candidates per puzzle when
-# hunting the engine-top answer.
-PUZZLE_MIN_DURATION_S = int(_env("PUZZLE_MIN_DURATION_S", "900"))
-PUZZLE_SELECT_WINDOW = int(_env("PUZZLE_SELECT_WINDOW", "600"))
-PUZZLE_TRIES = int(_env("PUZZLE_TRIES", "40"))
-PUZZLE_CANDIDATE_POOL = int(_env("PUZZLE_CANDIDATE_POOL", "12"))
-
-# Draft Gauntlet (/gym): fixed-length runs keep every score comparable; the
-# pool is topped up to this size by the cron (`gym-pool`).
-GYM_RUN_LENGTH = int(_env("GYM_RUN_LENGTH", "10"))
-GYM_POOL_TARGET = int(_env("GYM_POOL_TARGET", "200"))
-
 # Discord delivery (webhook MVP — the JDA-style gateway/slash-commands come
 # later with account linking). Watcher polls tracked PUUIDs and posts the
 # post-game advice to the webhook channel.

@@ -18,11 +18,22 @@ from fastapi.responses import HTMLResponse
 
 from app import champions, draftintel, draftlab
 from app.web import _page
-from app.webdaily import _DAILY_CSS
 
 router = APIRouter()
 
 _LAB_CSS = """
+.dd-cols{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0}
+@media(max-width:680px){.dd-cols{grid-template-columns:1fr}}
+.dd-side{font-family:var(--font-display);font-weight:700;font-size:.8rem;
+letter-spacing:.08em;text-transform:uppercase;margin:0 0 .4rem}
+.dd-side.blue{color:var(--accent)}.dd-side.red{color:var(--red)}
+.dd-meta{color:var(--muted);font-size:.9rem;margin:.2rem 0 1rem}
+.slotrow{display:flex;align-items:center;gap:.65rem;padding:.28rem 0}
+.slotrow img{width:38px;height:38px;border-radius:8px;flex:none}
+.drv{display:inline-block;font-size:.74rem;font-family:var(--font-mono);
+padding:.12rem .5rem;border:1px solid var(--border);border-radius:999px;margin:.15rem .25rem 0 0}
+.drv.up{color:var(--accent)}.drv.dn{color:var(--red)}
+.sharebar{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin-top:.4rem}
 .lab-slot{display:flex;align-items:center;gap:.5rem;padding:.22rem 0}
 .lab-slot img{width:34px;height:34px;border-radius:8px;flex:none;background:var(--surface2)}
 .lab-slot img[src=""]{visibility:hidden}
@@ -194,7 +205,7 @@ def draft_lab(d: str | None = None) -> HTMLResponse:
     roster = draftintel.roster()
     options = "".join(f'<option value="{html.escape(c["name"])}">' for c in roster)
     champs_json = json.dumps(roster).replace("</", "<\\/")
-    body = f"""<style>{_DAILY_CSS}{_LAB_CSS}</style>
+    body = f"""<style>{_LAB_CSS}</style>
 <div id="lab">
 <section class="hero" style="padding-bottom:0">
 <p class="eyebrow">Draft Lab</p>
@@ -261,7 +272,7 @@ def shared_draft(code: str) -> HTMLResponse:
     result = draftlab.analyze(ally, enemy)
     vs = (f'{result["ally_comp"]["label"]} vs {result["enemy_comp"]["label"]} — '
           f'{result["balance"]["win_pct"]}% {result["balance"]["label"]}')
-    body = f"""<style>{_DAILY_CSS}{_LAB_CSS}</style>
+    body = f"""<style>{_LAB_CSS}</style>
 <section class="hero" style="padding-bottom:0">
 <p class="eyebrow">Draft Lab · shared board</p>
 <h1>{html.escape(vs)}</h1>
