@@ -1,5 +1,13 @@
 # Sylqon.com — War Room: Clash & 5-stack draft-prep
 
+> **ELVETVE (2026-07-16) — MÉG A KÓD ELŐTT, a saját §6 verifikációs lépése ölte meg.**
+> A ToS-feltevés igazolódott (a Clash-scouting hivatalos, 7 perces fázis), de a piaci
+> tézis megdőlt: három élő ingyenes eszköz (clash.tips, clashanalyzer.gg, wards.lol)
+> csinálja ezt — ban-ajánlással együtt —, a játékos-kártya réteget pedig **maga a Riot
+> adja a kliensben**. A „legközelebbi az op.gg multisearch, nulla szintézissel" állítás
+> téves volt. Az érvényes irány: **`docs/WEB_STRATEGIA.md`** (app-first, a web szolgál).
+> A dokumentum megmarad a bizonyíték és a tanulság kedvéért — ne kezdjük újra.
+
 > Készült: 2026-07-16 · Ez a dokumentum **felváltja** a `WEB_DRAFT_TERV.md` irányát.
 > Alap: a Daily Draft irány kivezetése utáni második koncepció-műhely (6 friss irány,
 > a tulajdonos két kifogása mint mérce), majd tulajdonosi döntés: **War Room**.

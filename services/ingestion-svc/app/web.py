@@ -1,9 +1,14 @@
-"""Public web pages — the S3 website MVP (roadmap §5.2).
+"""Public web pages — the app's shop window (docs/WEB_STRATEGIA.md).
 
-Server-rendered HTML straight from the service (no build step, no JS
-framework): a Riot-ID → pool-audit report page plus SEO-friendly champion
-pages computed from our own Match-V5 aggregation. Visual language follows
+The web is not a product of its own: it shows what the desktop app does,
+earns the trust to install it, and hands over. Server-rendered HTML straight
+from the service (no build step, no JS framework); visual language follows
 the landing page ("Graphite Volt" — neutral graphite, lime accent).
+
+Live surfaces: / (hero), /audit (pool coverage), /download (the trust story),
+plus the Draft Lab in webdraft.py — the no-install demo of the app's draft
+engine. The old lookup pages (summoner/match/leaderboard/champions) still
+serve but are noindex'd through their sunset window (NOINDEX_PREFIXES).
 
 ToS framing rule: every number on these pages measures *pool coverage* or
 champion presence in our dataset — never player skill. No MMR/ELO anywhere.
@@ -272,9 +277,9 @@ def _region_options(selected: str = regions.DEFAULT_PLATFORM) -> str:
 
 @router.get("/", response_class=HTMLResponse)
 def home() -> HTMLResponse:
-    """Interim tool-first homepage (the Daily Draft direction was retired
-    2026-07-14; the next spine experience is being designed): the product
-    hero with the two live web tools as entry points."""
+    """The homepage serves the desktop app — it is not a product of its own
+    (docs/WEB_STRATEGIA.md): product hero, then the two web tools as the
+    no-install taste of what the app does live in champ select."""
     body = """
 <section class="hero">
 <p class="eyebrow">Counter-draft AI · League of Legends</p>
