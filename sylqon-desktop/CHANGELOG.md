@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.30.0](https://github.com/imperasus/sylqon/compare/v1.29.3...v1.30.0) (2026-07-18)
+
+
+### Features
+
+* **loadout:** matchup-aware core-combo selection ([66a7b23](https://github.com/imperasus/sylqon/commit/66a7b237604a2bc402896e3edc1e6e104b92a3ca))
+
 ### [1.29.3](https://github.com/imperasus/sylqon/compare/v1.29.2...v1.29.3) (2026-07-16)
 
 ### [1.29.2](https://github.com/imperasus/sylqon/compare/v1.29.1...v1.29.2) (2026-07-16)
