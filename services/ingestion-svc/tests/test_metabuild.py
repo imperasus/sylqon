@@ -98,13 +98,48 @@ def test_payload_shape_and_modal_values(session_factory):
     assert p["secondary_rune_ids"] == [8139, 8135]
     assert p["stat_mod_ids"] == [5005, 5008, 5001]
     assert p["skill_order"] == ["Q", "W", "E"]
+    # all 10 games ran the same trio → one core option, matching the core
+    assert p["core_options"] == [{"ids": CORE[:3], "play": 10, "win": 10}]
     # every key the local opgg_to_build reads is present
     for key in ("role", "starter_item_ids", "boot_ids", "core_item_ids",
+                "core_options",
                 "fourth_item_ids", "fifth_item_ids", "sixth_item_ids",
                 "primary_page_id", "primary_rune_ids", "secondary_page_id",
                 "secondary_rune_ids", "stat_mod_ids", "summoner_spell_ids",
                 "summoner_spell_options", "skill_order"):
         assert key in p, key
+
+
+def test_core_options_aggregated_and_merged(session_factory):
+    """Per-game first-3-completed trios aggregate into core_options: purchase-
+    order permutations of one set merge (play/win summed, most-played ordering
+    kept), combos under MIN_COMBO_GAMES are dropped, ranking is by play."""
+    combo_a = CORE[:3]
+    combo_a_perm = [CORE[1], CORE[0], CORE[2]]   # same set, different order
+    combo_b = [CORE[0], CORE[1], CORE[3]]
+    combo_c = [CORE[0], CORE[2], CORE[3]]        # only 2 games → dropped
+    with session_factory() as s:
+        i = 0
+
+        def put(core, win, n):
+            nonlocal i
+            for _ in range(n):
+                m, t = jinx_match(f"EUN1_{i}", core=core, win=win)
+                store.insert_match_bundle(s, m, t, region="europe")
+                i += 1
+
+        put(combo_a, True, 4)
+        put(combo_a, False, 2)
+        put(combo_a_perm, True, 2)
+        put(combo_b, True, 3)
+        put(combo_b, False, 2)
+        put(combo_c, True, 2)
+        p = metabuild.compute_meta_build(s, "jinx", "BOTTOM")
+
+    opts = p["core_options"]
+    assert opts[0] == {"ids": list(combo_a), "play": 8, "win": 6}   # 6+2 merged
+    assert opts[1] == {"ids": list(combo_b), "play": 5, "win": 3}
+    assert len(opts) == 2                                           # C dropped
 
 
 def test_situational_pool_padded_to_minimum(session_factory):

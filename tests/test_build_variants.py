@@ -128,6 +128,32 @@ def test_valid_distinct_variant_is_kept():
     assert "Bloodthirster" not in alt_names     # dropped from the default order
 
 
+def test_variant_prompt_lists_alternative_core_combos():
+    """Real op.gg alternative combos (and the matchup-core note) reach the
+    variant prompt; without core_options the section is absent."""
+    ctx, candidate = _ctx(), _candidate()
+    assert "ALTERNATIVE CORE COMBOS" not in build_variants.compile_variant_prompt(
+        ctx, candidate, 3)
+
+    candidate["core_options"] = [
+        {"items": [{"id": 6672, "name": "Kraken Slayer"},
+                   {"id": 3031, "name": "Infinity Edge"},
+                   {"id": 3046, "name": "Phantom Dancer"}],   # = baseline core
+         "games": 1900, "win_rate": 0.59},
+        {"items": [{"id": 6672, "name": "Kraken Slayer"},
+                   {"id": 3031, "name": "Infinity Edge"},
+                   {"id": 3036, "name": "Lord Dominik's Regards"}],
+         "games": 130, "win_rate": 0.631},
+    ]
+    candidate["core_reason"] = "Anti-tank core: Lord Dominik's Regards covers percent_pen"
+    prompt = build_variants.compile_variant_prompt(ctx, candidate, 3)
+    assert "REAL ALTERNATIVE CORE COMBOS" in prompt
+    # Only the combo that differs from the baseline core is listed.
+    assert "Lord Dominik's Regards — 130 games, 63.1% WR" in prompt
+    assert "1900 games" not in prompt
+    assert "matchup-selected core" in prompt
+
+
 if __name__ == "__main__":
     import pytest
 

@@ -26,7 +26,7 @@ from sylqon.ai.pick_prompt import (
     heuristic_rank,
 )
 from sylqon.ai.prompts import compile_prompt
-from sylqon.analysis import build_archetype, draft_intel
+from sylqon.analysis import build_archetype, core_select, draft_intel
 from sylqon.analysis.scoring import ChampionScorer
 from sylqon.cache.store import MetaCache
 from sylqon.data import rune_pool, static
@@ -114,6 +114,7 @@ class PipelineRunner:
         self._mission_gen_lock = threading.Lock()
         self.last_ctx: MatchContext | None = None
         self.last_candidate: dict | None = None
+        self.last_meta_candidate: dict | None = None  # pre-core-selection page
         self.last_loadout: loadout_mod.Loadout | None = None
         self.last_standard: loadout_mod.Loadout | None = None
         self.last_variants: list[loadout_mod.Loadout] = []  # [0] = primary (auto-injected)
@@ -2029,8 +2030,15 @@ class PipelineRunner:
             if not source.startswith("seed-role") and source != "seed-any":
                 rune_pool.register_build(ctx.my_champion, candidate)
 
-            base = loadout_mod.from_candidate(candidate, ctx, source)
+            # "Standard" force-inject build: always the untouched meta page.
             self.last_standard = loadout_mod.from_candidate(candidate, ctx, source)
+            self.last_meta_candidate = candidate
+            # Matchup-aware core: when the enemy comp mandates counter coverage
+            # the meta combo misses, swap to the best real op.gg combo before
+            # anything downstream (AI, enforcement, variants) sees the build.
+            # No-op for balanced comps, hidden enemies, or single-combo builds.
+            candidate = core_select.apply_core_selection(candidate, ctx, self.catalog)
+            base = loadout_mod.from_candidate(candidate, ctx, source)
             ai_result = None
             if ctx.enemies and self.engine.available():
                 self.state.update("ollama", processing=True)
@@ -2074,7 +2082,10 @@ class PipelineRunner:
 
     def _publish_build(self, candidate: dict, final: loadout_mod.Loadout,
                        ctx: MatchContext) -> None:
-        std_names = {i["name"] for i in candidate.get("items", [])}
+        # "standard" is the untouched meta page; ``candidate`` may already carry
+        # the matchup-selected core, and the diff should make that visible.
+        std = self.last_meta_candidate or candidate
+        std_names = {i["name"] for i in std.get("items", [])}
         opt_names = {i["name"] for i in final.items}
         from sylqon.lcu.lobby import _damage_type
         my_info = self.catalog.champion_by_key(ctx.my_champion_id) or {}
@@ -2088,16 +2099,18 @@ class PipelineRunner:
 
         self.state.set("build", {
             "standard": {
-                "items": candidate.get("items", []),
-                "keystone": candidate.get("keystone"),
-                "primary_runes": candidate.get("primary_runes", []),
-                "secondary_style": candidate.get("secondary_style"),
-                "secondary_runes": candidate.get("secondary_runes", []),
-                "stat_shards": candidate.get("stat_shards", []),
-                "spell1": candidate.get("spell1", "Heal"),
+                "items": std.get("items", []),
+                "keystone": std.get("keystone"),
+                "primary_runes": std.get("primary_runes", []),
+                "secondary_style": std.get("secondary_style"),
+                "secondary_runes": std.get("secondary_runes", []),
+                "stat_shards": std.get("stat_shards", []),
+                "spell1": std.get("spell1", "Heal"),
                 "skill_order": skill,
-                "archetype": archetype_of(candidate.get("items", [])),
+                "archetype": archetype_of(std.get("items", [])),
             },
+            # Why the primary build's core deviates from meta (None = it doesn't).
+            "core_reason": candidate.get("core_reason"),
             "optimized": {**serialize_loadout(final), "skill_order": skill,
                           "archetype": archetype_of(final.items)},
             "diff": {

@@ -158,6 +158,10 @@ def compile_open_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) ->
 
     boots_line = (boots or {}).get("name", "unknown")
     core_lines = "\n".join(f"{i+1}. {item['name']}" for i, item in enumerate(core_items))
+    if candidate.get("core_reason"):
+        # The deterministic selector already swapped the meta combo for this
+        # matchup — tell the AI so it builds on it instead of undoing it.
+        core_lines += f"\n(matchup-selected core — {candidate['core_reason']}; do NOT swap it back)"
 
     fixed_ids: set[int] = set()
     if boots:

@@ -41,6 +41,11 @@ MIN_GAMES = 8            # below this we return None → caller falls back to op
 MAX_GAMES = 60           # newest N games are plenty for a build
 MIN_SITUATIONAL = 6      # the counter-pick pool the local AI chooses from
 STALE_AFTER_HOURS = 24
+# core_options: alternative core trios for the local matchup selector. A combo
+# needs this many games to be evidence rather than noise; top N are emitted in
+# the same {ids, play, win} shape the op.gg fetch produces.
+MIN_COMBO_GAMES = 5
+CORE_OPTION_LIMIT = 3
 _SKILL_KEYS = {1: "Q", 2: "W", 3: "E"}
 
 
@@ -99,6 +104,26 @@ def _role_item_pool(session: Session, role: str, limit: int = 1500) -> list[int]
     return [iid for iid, _ in counts.most_common(20)]
 
 
+def _core_options(combo_plays: Counter, combo_wins: Counter) -> list[dict]:
+    """Top core trios as {ids, play, win}, permutations merged by item set.
+
+    The same trio bought in a different order is one build — merge them,
+    summing play/win and keeping the most-played permutation's purchase order
+    (``most_common()`` iteration makes the first permutation seen per set the
+    most-played one). Mirrors the local ``opgg_fetch._core_options`` merge so
+    both sources feed the matchup selector identically shaped data."""
+    merged: dict[frozenset, dict] = {}
+    for combo, play in combo_plays.most_common():
+        key = frozenset(combo)
+        if key in merged:
+            merged[key]["play"] += play
+            merged[key]["win"] += combo_wins[combo]
+        else:
+            merged[key] = {"ids": list(combo), "play": play, "win": combo_wins[combo]}
+    ranked = sorted(merged.values(), key=lambda o: -o["play"])
+    return [o for o in ranked if o["play"] >= MIN_COMBO_GAMES][:CORE_OPTION_LIMIT]
+
+
 def compute_meta_build(session: Session, champion: str, role: str) -> dict | None:
     """Aggregate the op.gg-shaped build payload, or None below MIN_GAMES."""
     rows = list(
@@ -126,6 +151,8 @@ def compute_meta_build(session: Session, champion: str, role: str) -> dict | Non
     boots: Counter = Counter()
     core_seen: Counter = Counter()
     core_positions: dict[int, list[int]] = defaultdict(list)
+    combo_plays: Counter = Counter()   # per-game first-3-completed trio
+    combo_wins: Counter = Counter()
     spells: Counter = Counter()
     spell_pool: Counter = Counter()
     primary_pages: Counter = Counter()
@@ -170,6 +197,10 @@ def compute_meta_build(session: Session, champion: str, role: str) -> dict | Non
         for pos, iid in enumerate(completed_seen):
             core_seen[iid] += 1
             core_positions[iid].append(pos)
+        if len(completed_seen) >= 3:
+            trio = tuple(completed_seen[:3])
+            combo_plays[trio] += 1
+            combo_wins[trio] += 1 if participant.win else 0
         start_set = tuple(sorted({
             iid for iid in purchases[:4] if iid in benchmarks.STARTER_IDS
         }))
@@ -224,6 +255,7 @@ def compute_meta_build(session: Session, champion: str, role: str) -> dict | Non
         "starter_item_ids": list(_modal(starters) or ()),
         "boot_ids": [iid for iid, _ in boots.most_common(3)],
         "core_item_ids": core_ids,
+        "core_options": _core_options(combo_plays, combo_wins),
         "fourth_item_ids": situational[:2],
         "fifth_item_ids": situational[2:4],
         "sixth_item_ids": situational[4:6],

@@ -133,6 +133,47 @@ def test_opgg_converter():
     assert len(build_j["items"]) == 6, f"Non-ADC expected 6 items, got {len(build_j['items'])}"
 
 
+def test_opgg_converter_core_options():
+    """core_options resolve to named combos with win rates; combos with unknown
+    items are dropped whole; alt-core-only items enrich the situational pool;
+    a payload without the key (old cache / seed / MCP) yields an empty list."""
+    cat = FakeCatalog()
+    payload = {
+        "champion": "Jinx", "role": "bottom",
+        "boot_ids": [3006], "core_item_ids": [6672, 3046, 3031],
+        "core_options": [
+            {"ids": [6672, 3046, 3031], "play": 100, "win": 55},
+            {"ids": [6672, 3157, 3031], "play": 40, "win": 24},
+            {"ids": [6672, 9999, 3031], "play": 10, "win": 5},   # unknown item
+        ],
+        "fourth_item_ids": [3036, 3033], "fifth_item_ids": [3026, 3072],
+        "sixth_item_ids": [3072, 3156],
+        "primary_page_id": 8000, "primary_rune_ids": [8008, 9111, 9104, 8014],
+        "secondary_page_id": 8300, "secondary_rune_ids": [8313, 8321],
+        "stat_mod_ids": [5005, 5008, 5011],
+        "starter_item_ids": [], "summoner_spell_ids": [4, 21],
+    }
+    build = opgg_to_build(payload, cat)
+    assert build is not None
+    opts = build["core_options"]
+    assert len(opts) == 2                       # the 9999 combo was dropped whole
+    assert [i["name"] for i in opts[0]["items"]] == [
+        "Kraken Slayer", "Phantom Dancer", "Infinity Edge"]
+    assert opts[0]["games"] == 100 and opts[0]["win_rate"] == 0.55
+    assert opts[1]["win_rate"] == 0.6
+    # Zhonya's only appears in an alternative combo → lands in the pool
+    pool_names = {i["name"] for i in build["situational_pool"]}
+    assert "Zhonya's Hourglass" in pool_names
+    # Default items list is unchanged by the enrichment (appended at the back)
+    assert len(build["items"]) == 7
+    assert "Zhonya's Hourglass" not in [i["name"] for i in build["items"]]
+
+    # No core_options key → empty list, everything else as before
+    legacy = {k: v for k, v in payload.items() if k != "core_options"}
+    build2 = opgg_to_build(legacy, cat)
+    assert build2 is not None and build2["core_options"] == []
+
+
 def test_opgg_converter_under_resolved_returns_none():
     """A payload that resolves fewer than 4 items (e.g. a support whose op.gg
     core item ids aren't in the catalog) must return None — and the
@@ -568,6 +609,19 @@ def test_prompt_includes_doctrine_and_tags():
     assert "Guardian Angel [Survival]" in prompt
 
 
+def test_prompt_carries_matchup_core_note():
+    """When the deterministic selector already swapped the core, the prompt
+    says so and instructs the AI not to undo it; without a reason no note."""
+    ctx = make_ctx([threat("Ornn", damage_type="AD", threats=["tank"])])
+    build = _make_adc_build_with_pool()
+    assert "matchup-selected core" not in compile_prompt(ctx, build, FakeCatalog())
+    build["core_reason"] = "Anti-tank core: Lord Dominik's Regards covers percent_pen"
+    prompt = compile_prompt(ctx, build, FakeCatalog())
+    assert "matchup-selected core" in prompt
+    assert "do NOT swap it back" in prompt
+    assert "Lord Dominik's Regards covers percent_pen" in prompt
+
+
 def test_item_blocks_multiblock():
     """Pool builds split into phases + per-category ALT blocks for mid-game pivots."""
     from sylqon.lcu.injector import build_item_blocks
@@ -894,6 +948,53 @@ def test_opgg_live_payload_shaping():
     assert 3036 in situ and 6676 in situ and 3026 in situ
     # missing core or runes -> unusable
     assert _shape_payload({"runes": [{}]}, "bottom") is None
+
+
+def test_opgg_core_options_merge_permutations():
+    """op.gg lists purchase-order permutations of one trio as separate rows;
+    _core_options merges them by item set (summing play/win, keeping the
+    most-played ordering), skips non-trio rows, and caps at the limit."""
+    from sylqon.cache.opgg_fetch import _core_options
+    entries = [
+        {"ids": [1, 2, 3], "play": 1785, "win": 1051},
+        {"ids": [1, 4, 3], "play": 769, "win": 422},
+        {"ids": [1, 3, 2], "play": 204, "win": 130},   # permutation of row 1
+        {"ids": [1, 4], "play": 999, "win": 500},      # not a trio → skipped
+        "garbage",
+        {"ids": [5, 6, 7], "play": 50, "win": 20},
+        {"ids": [8, 9, 10], "play": 40, "win": 20},
+        {"ids": [11, 12, 13], "play": 30, "win": 20},  # beyond the limit
+    ]
+    opts = _core_options(entries)
+    assert len(opts) == 4
+    assert opts[0] == {"ids": [1, 2, 3], "play": 1989, "win": 1181}
+    assert opts[1]["ids"] == [1, 4, 3]
+    assert [o["ids"] for o in opts[2:]] == [[5, 6, 7], [8, 9, 10]]
+
+
+def test_shape_payload_carries_core_options():
+    """The shaped payload exposes the merged combos, and the default core is
+    the genuinely most-played item set (permutations merged), not just the
+    raw top row."""
+    from sylqon.cache.opgg_fetch import _shape_payload
+    data = {
+        "core_items": [
+            {"ids": [3031, 3094, 3072], "play": 10, "win": 6},
+            {"ids": [3031, 3094, 3036], "play": 9, "win": 5},
+            {"ids": [3031, 3072, 3094], "play": 8, "win": 3},  # permutation of row 1
+        ],
+        "boots": [{"ids": [3006]}],
+        "runes": [{
+            "primary_page_id": 8000, "primary_rune_ids": [8008, 8009, 9103, 8017],
+            "secondary_page_id": 8300, "secondary_rune_ids": [8233, 8236],
+            "stat_mod_ids": [5005, 5008, 5001],
+        }],
+        "last_items": [],
+    }
+    p = _shape_payload(data, "bottom")
+    assert p["core_item_ids"] == [3031, 3094, 3072]
+    assert p["core_options"][0] == {"ids": [3031, 3094, 3072], "play": 18, "win": 9}
+    assert p["core_options"][1] == {"ids": [3031, 3094, 3036], "play": 9, "win": 5}
 
 
 def test_my_turn_flag_drives_trigger():

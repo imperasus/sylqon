@@ -288,6 +288,15 @@ class TestCompileOpenPrompt:
         compile_open_prompt(_make_ctx(), self._candidate(), catalog)
         # If network was called, the test would time out or raise. Just assert no error.
 
+    def test_matchup_core_note(self):
+        """A core_reason set by the deterministic selector reaches the prompt."""
+        candidate = self._candidate()
+        assert "matchup-selected core" not in compile_open_prompt(
+            _make_ctx(), candidate, _make_catalog())
+        candidate["core_reason"] = "Anti-tank core: covers percent_pen"
+        prompt = compile_open_prompt(_make_ctx(), candidate, _make_catalog())
+        assert "matchup-selected core" in prompt and "do NOT swap it back" in prompt
+
 
 # ---------------------------------------------------------------------------
 # apply_ai_open_decision

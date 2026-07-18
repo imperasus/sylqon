@@ -49,6 +49,8 @@ def opgg_to_build(payload: dict, catalog: Catalog) -> dict | None:
       fourth_item_ids, fifth_item_ids, sixth_item_ids,
       primary_page_id, primary_rune_ids, secondary_page_id,
       secondary_rune_ids, stat_mod_ids, summoner_spell_ids, role
+    Optional: core_options — [{"ids": [3 ints], "play": int, "win": int}]
+      alternative core combos for the matchup core selector.
     """
     role = payload.get("role", "")
     # ADC eventually sells boots → 3 situational slots; other roles keep boots → 2
@@ -79,6 +81,24 @@ def opgg_to_build(payload: dict, catalog: Catalog) -> dict | None:
     core_items = resolve_items(core_ids)[:3]
     core_id_set = {item["id"] for item in core_items}
 
+    # Alternative core combos (input for the matchup core selector). A combo
+    # with any unresolvable item is dropped whole — a partial trio can't be
+    # injected. Absent key (old cache entry / seed / MCP path) → empty list,
+    # which downstream treats as "only the default core exists".
+    core_options: list[dict] = []
+    for opt in payload.get("core_options") or []:
+        if not isinstance(opt, dict):
+            continue
+        resolved = resolve_items(opt.get("ids", []))
+        if len(resolved) != 3:
+            continue
+        play = opt.get("play") or 0
+        core_options.append({
+            "items": resolved,
+            "games": play,
+            "win_rate": round((opt.get("win") or 0) / play, 3) if play else 0.0,
+        })
+
     # Situational pool: unique items from 4th ∪ 5th ∪ 6th slots, excluding boots & core
     seen_ids: set[int] = set(core_id_set)
     if boots:
@@ -91,6 +111,18 @@ def opgg_to_build(payload: dict, catalog: Catalog) -> dict | None:
                 if item:
                     situational_pool.append(item)
                     seen_ids.add(iid)
+
+    # Items that appear in alternative core combos but not in the default core
+    # are real, meta-proven picks on this champion — add them to the situational
+    # pool so the AI's swap budget and counter enforcement can reach them even
+    # when the default combo stays.
+    for opt in core_options:
+        for it in opt["items"]:
+            if it["id"] not in seen_ids:
+                item = resolve_item_with_desc(it["id"])
+                if item:
+                    situational_pool.append(item)
+                    seen_ids.add(it["id"])
 
     # Default items list: boots + core + first situational_count pool items
     # ADC: 1+3+3=7 items; other roles: 1+3+2=6 items
@@ -169,6 +201,7 @@ def opgg_to_build(payload: dict, catalog: Catalog) -> dict | None:
         "boots": boots,
         "boots_pool": boots_pool,
         "core_items": core_items,
+        "core_options": core_options,
         "situational_pool": situational_pool,
         "items": items,  # boots(1) + core(3) + situational(2 or 3)
         "keystone": keystone,

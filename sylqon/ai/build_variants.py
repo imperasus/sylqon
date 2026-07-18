@@ -38,6 +38,18 @@ def compile_variant_prompt(ctx: MatchContext, candidate: dict, max_variants: int
     needs to steer usefulness, not legality."""
     boots = (candidate.get("boots") or {}).get("name", "Boots")
     core = ", ".join(i["name"] for i in candidate.get("core_items", [])) or "—"
+    if candidate.get("core_reason"):
+        core += f"\n    (matchup-selected core — {candidate['core_reason']})"
+    # Real alternative core combos (op.gg data). A variant can anchor to one
+    # that differs by a single item via its ONE allowed core swap — the swapped
+    # item is guaranteed present in the situational pool by the converter.
+    core_names = [i["name"] for i in candidate.get("core_items", [])]
+    alt_combos = "\n".join(
+        f"  - {', '.join(i['name'] for i in o.get('items', []))} "
+        f"— {o.get('games', 0)} games, {round((o.get('win_rate') or 0) * 100, 1)}% WR"
+        for o in candidate.get("core_options") or []
+        if sorted(i["name"] for i in o.get("items", [])) != sorted(core_names)
+    )
     pool = "\n".join(
         f"  - {it['name']}: {it.get('description', '')}".rstrip()
         for it in candidate.get("situational_pool", [])
@@ -61,7 +73,11 @@ OP.GG BASELINE BUILD:
   Core (keep count = {len(candidate.get('core_items', []))}): {core}
   Situational pool (choose {situational_count} per variant, in order):
 {pool}
-
+{f'''
+REAL ALTERNATIVE CORE COMBOS (op.gg-proven; a variant may anchor to one that
+differs from the baseline core by a single item, using its ONE core swap):
+{alt_combos}
+''' if alt_combos else ''}
 TASK: Produce up to {max_variants} DISTINCT build variants optimised against this enemy team.
 RULES:
 1. Variant 1 must be the single BEST build vs this comp.

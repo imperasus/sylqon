@@ -98,8 +98,46 @@ def _top_ids(entries: list, key: str = "ids") -> list[int]:
     return []
 
 
+# How many distinct core combos to carry into the build payload. Enough for the
+# matchup selector to have real alternatives, small enough to keep prompts lean.
+CORE_OPTION_LIMIT = 4
+
+
+def _core_options(entries: list, limit: int = CORE_OPTION_LIMIT) -> list[dict]:
+    """Top core-item combos with their sample counts.
+
+    op.gg lists purchase-order permutations of the same trio as separate rows
+    (e.g. [A,B,C] and [A,C,B]); those are one build, so merge by item set —
+    summing play/win and keeping the most-played permutation's ordering. The
+    result is sorted by merged play count so the matchup selector's meta prior
+    reads true popularity, not per-permutation slices."""
+    merged: dict[frozenset, dict] = {}
+    first_seen: dict[frozenset, int] = {}
+    for idx, e in enumerate(entries):
+        if not isinstance(e, dict):
+            continue
+        ids = [i for i in e.get("ids", []) if isinstance(i, int)]
+        if len(ids) != 3:
+            continue
+        key = frozenset(ids)
+        play = e.get("play") or 0
+        win = e.get("win") or 0
+        if key in merged:
+            merged[key]["play"] += play
+            merged[key]["win"] += win
+        else:
+            merged[key] = {"ids": ids, "play": play, "win": win}
+            first_seen[key] = idx
+    ranked = sorted(merged, key=lambda k: (-merged[k]["play"], first_seen[k]))
+    return [merged[k] for k in ranked[:limit]]
+
+
 def _shape_payload(data: dict, role: str) -> dict | None:
-    core = _top_ids(data.get("core_items", []))
+    core_options = _core_options(data.get("core_items", []))
+    # Default core = the genuinely most-played combo (permutations merged);
+    # fall back to the raw top row for payloads _core_options can't read.
+    core = list(core_options[0]["ids"]) if core_options \
+        else _top_ids(data.get("core_items", []))
     boots = _top_ids(data.get("boots", []))
     starters = _top_ids(data.get("starter_items", []))
     spells = _top_ids(data.get("summoner_spells", []))
@@ -136,6 +174,7 @@ def _shape_payload(data: dict, role: str) -> dict | None:
         "starter_item_ids": starters,
         "boot_ids": boots,
         "core_item_ids": core,
+        "core_options": core_options,
         # spread the situational pool across the three slot keys the converter
         # iterates; the split is cosmetic — they're unioned and deduped.
         "fourth_item_ids": situational[:2],

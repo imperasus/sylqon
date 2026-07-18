@@ -322,7 +322,10 @@ function ItemsPanel({ build, patch, enemySummary, dense = false }) {
         {(opt.starting_items || []).length > 0 && (
           <ItemRow label="START" items={opt.starting_items} patch={patch} addedSet={added} small />
         )}
-        <ItemRow label="CORE" sub="fixed" items={core} patch={patch} addedSet={added} arrows />
+        <ItemRow label="CORE" sub={build.core_reason ? "matchup" : "fixed"} items={core} patch={patch} addedSet={added} arrows />
+        {build.core_reason && (
+          <div className="text-2xs leading-snug text-accent/70">{build.core_reason}</div>
+        )}
         <ItemRow label="SITUATIONAL" sub={enemySummary ? `vs ${enemySummary}` : ""} items={situational} patch={patch} addedSet={added} arrows />
         {!dense && alts.length > 0 && <ItemRow label="ALTERNATIVES" items={alts} patch={patch} small />}
 
@@ -507,7 +510,12 @@ export default function PostlockCockpit({ state, api }) {
       </div>
     );
   }
-  const activeBuild = { optimized: active, diff: activeIndex === 0 ? (build.diff ?? EMPTY_DIFF) : EMPTY_DIFF };
+  const activeBuild = {
+    optimized: active,
+    diff: activeIndex === 0 ? (build.diff ?? EMPTY_DIFF) : EMPTY_DIFF,
+    // The matchup-core explanation belongs to the primary build only.
+    core_reason: activeIndex === 0 ? build.core_reason : null,
+  };
 
   const header = (
     <div className="flex items-center gap-3">
