@@ -460,10 +460,38 @@ def deterministic_spells(build: dict, ctx: MatchContext,
         # Heavy poke comp chunks a mid carry before the fight — Barrier survives
         # the harass (only when op.gg actually runs it on the champion).
         spell1 = "Barrier"
+    elif _kill_pressure_ignite(ctx, role, allowed1):
+        # Winnable lane on a kill-threat champion: Ignite converts the lead into
+        # kills. Lower priority than every defensive branch — survival first.
+        spell1 = "Ignite"
     else:
         spell1 = base1 if base1 in static.ALLOWED_SPELL1 else \
             static.DEFAULT_SPELL1_BY_ROLE.get(role, "Heal")
     return spell1, spell2
+
+
+def _kill_pressure_ignite(ctx: MatchContext, role: str,
+                          allowed1: list[str]) -> bool:
+    """Whether to take Ignite for lane kill pressure.
+
+    True only when: the role is top/mid, our champion's wincon is kill pressure
+    (``IGNITE_KILL_LANERS``), op.gg actually runs Ignite on it (``allowed1``),
+    and the lane opponent is a killable target — NOT a heavy tank or a sustain
+    champion who laughs off the ignite-dive. Degrades to False on any stub ctx.
+    """
+    if role not in ("top", "middle") or "Ignite" not in allowed1:
+        return False
+    champ = getattr(ctx, "my_champion", "") or ""
+    if champ not in static.IGNITE_KILL_LANERS:
+        return False
+    from sylqon.analysis import lane_counter  # lazy: lane_counter imports us
+    opp = lane_counter.lane_opponent(ctx)
+    if opp is None:
+        return False  # blind pick / hidden lane — keep the safe op.gg default
+    opp_name = getattr(opp, "name", "")
+    # An unkillable lane (tank / heavy sustain) wants map pressure (TP), not a
+    # dive summoner.
+    return opp_name not in (static.HEAVY_TANK | static.HEAVY_HEALING)
 
 
 def _enemy_poke_count(ctx: MatchContext) -> int:

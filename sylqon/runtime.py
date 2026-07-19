@@ -26,7 +26,7 @@ from sylqon.ai.pick_prompt import (
     heuristic_rank,
 )
 from sylqon.ai.prompts import compile_prompt
-from sylqon.analysis import build_archetype, core_select, draft_intel
+from sylqon.analysis import build_archetype, core_select, draft_intel, rune_select
 from sylqon.analysis.scoring import ChampionScorer
 from sylqon.cache.store import MetaCache
 from sylqon.data import rune_pool, static
@@ -2038,6 +2038,10 @@ class PipelineRunner:
             # anything downstream (AI, enforcement, variants) sees the build.
             # No-op for balanced comps, hidden enemies, or single-combo builds.
             candidate = core_select.apply_core_selection(candidate, ctx, self.catalog)
+            # Matchup-aware rune page: swap to the best real op.gg page when the
+            # enemy damage skew mandates a defensive rune the meta page misses.
+            # No-op for balanced comps or single-page builds.
+            candidate = rune_select.apply_rune_selection(candidate, ctx)
             base = loadout_mod.from_candidate(candidate, ctx, source)
             ai_result = None
             if ctx.enemies and self.engine.available():

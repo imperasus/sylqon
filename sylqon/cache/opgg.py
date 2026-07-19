@@ -41,6 +41,56 @@ def slot_spells(spell_ids: list[int], role: str) -> tuple[str, str]:
 ADC_ROLES = {"bottom"}
 
 
+def resolve_rune_page(page: dict) -> dict | None:
+    """Resolve one rune page (id lists) into name fields, or ``None`` when any
+    id is unknown. Shared by the primary build resolution and the alternative
+    ``rune_page_options`` the matchup rune selector consumes."""
+    primary_rune_ids: list[int] = page.get("primary_rune_ids", [])
+    if len(primary_rune_ids) < 4:
+        return None
+    keystone = static.RUNE_BY_ID.get(primary_rune_ids[0])
+    if not keystone:
+        return None
+    primary_runes = [static.RUNE_BY_ID.get(rid) for rid in primary_rune_ids[1:4]]
+    if any(r is None for r in primary_runes):
+        return None
+    secondary_style = static.STYLE_BY_ID.get(page.get("secondary_page_id", 0))
+    if not secondary_style:
+        return None
+    secondary_rune_ids: list[int] = page.get("secondary_rune_ids", [])
+    secondary_runes = [static.RUNE_BY_ID.get(rid) for rid in secondary_rune_ids[:2]]
+    if any(r is None for r in secondary_runes) or len(secondary_runes) < 2:
+        return None
+    stat_mod_ids: list[int] = page.get("stat_mod_ids", [])
+    stat_shards = [static.SHARD_BY_ID.get(sid) for sid in stat_mod_ids[:3]]
+    if any(s is None for s in stat_shards) or len(stat_shards) < 3:
+        stat_shards = list(static.DEFAULT_SHARDS)
+    return {
+        "keystone": keystone,
+        "primary_runes": primary_runes,
+        "secondary_style": secondary_style,
+        "secondary_runes": secondary_runes,
+        "stat_shards": stat_shards,
+    }
+
+
+def _rune_page_options(payload: dict) -> list[dict]:
+    """Alternative op.gg-observed rune pages with sample counts, for the matchup
+    rune selector. Unresolvable pages are dropped whole; absent key → []."""
+    out: list[dict] = []
+    for page in payload.get("rune_page_options") or []:
+        if not isinstance(page, dict):
+            continue
+        resolved = resolve_rune_page(page)
+        if resolved is None:
+            continue
+        play = page.get("play") or 0
+        resolved["games"] = play
+        resolved["win_rate"] = round((page.get("win") or 0) / play, 3) if play else 0.0
+        out.append(resolved)
+    return out
+
+
 def opgg_to_build(payload: dict, catalog: Catalog) -> dict | None:
     """Convert OP.GG MCP payload to MetaCache build dict.
 
@@ -209,8 +259,29 @@ def opgg_to_build(payload: dict, catalog: Catalog) -> dict | None:
         "secondary_style": secondary_style,
         "secondary_runes": secondary_runes,
         "stat_shards": stat_shards,
+        "rune_page_options": _rune_page_options(payload),
         "spell1": spell1,
         "spell2": spell2,
         "spell_options": spell_options,
+        "spell_combo_options": _spell_combo_options(payload, role),
         "skill_order": skill_order,
     }
+
+
+def _spell_combo_options(payload: dict, role: str) -> list[dict]:
+    """op.gg-observed summoner-spell COMBOS with sample counts, slotted D+F, for
+    the matchup spell selector. Absent key → []."""
+    out: list[dict] = []
+    for combo in payload.get("summoner_spell_combos") or []:
+        if not isinstance(combo, dict):
+            continue
+        ids = combo.get("ids") or []
+        s1, s2 = slot_spells(ids, role)
+        play = combo.get("play") or 0
+        out.append({
+            "spell1": s1,
+            "spell2": s2,
+            "games": play,
+            "win_rate": round((combo.get("win") or 0) / play, 3) if play else 0.0,
+        })
+    return out

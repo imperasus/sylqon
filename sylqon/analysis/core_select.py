@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 
 from sylqon.analysis.lane_counter import combined_requirements
+from sylqon.analysis.select_util import adaptive_floor, confidently_worse
 from sylqon.data import static
 from sylqon.lcu.lobby import MatchContext
 from sylqon.loadout import _item_eligible_for_champion
@@ -33,7 +34,6 @@ log = logging.getLogger(__name__)
 MIN_COMBO_GAMES = 20
 MIN_COMBO_GAMES_FLOOR = 8
 MIN_COMBO_SHARE = 0.03   # ...and at least this share of all combo games
-WIN_RATE_SLACK = 0.05    # challenger may not be >5pp worse than the meta combo
 URGENT_WEIGHT = 2        # urgent counter tags (anti-heal/%pen/anti-CC/anti-burst)
 SOFT_WEIGHT = 1          # defensive preferences (armor/mr)
 
@@ -90,13 +90,15 @@ def select_core(candidate: dict, ctx: MatchContext) -> tuple[dict | None, str]:
     baseline = _coverage(default_core, reqs)
 
     total_games = sum(o.get("games") or 0 for o in options)
-    min_games = max(MIN_COMBO_GAMES_FLOOR,
-                    min(MIN_COMBO_GAMES, int(total_games * 0.10)))
-    meta_wr = next(
-        (o.get("win_rate") for o in options
+    min_games = adaptive_floor(total_games, cap=MIN_COMBO_GAMES,
+                               floor=MIN_COMBO_GAMES_FLOOR)
+    meta_opt = next(
+        (o for o in options
          if {it.get("id") for it in o.get("items", [])} == default_ids),
         None,
     )
+    meta_wr = meta_opt.get("win_rate") if meta_opt else None
+    meta_games = (meta_opt.get("games") or 0) if meta_opt else 0
 
     champion = getattr(ctx, "my_champion", "") or ""
     best: dict | None = None
@@ -114,7 +116,10 @@ def select_core(candidate: dict, ctx: MatchContext) -> tuple[dict | None, str]:
                    for it in items):
             continue
         wr = opt.get("win_rate") or 0.0
-        if meta_wr is not None and wr < meta_wr - WIN_RATE_SLACK:
+        # Win rate is only a veto when the challenger is *confidently* worse
+        # (Wilson interval below the meta combo's) — a small-sample dip that is
+        # statistically indistinguishable never blocks a coverage-justified swap.
+        if meta_wr is not None and confidently_worse(wr, games, meta_wr, meta_games):
             continue
         score = _coverage(items, reqs)
         # Strictly-better rule: ties (and worse) keep the meta combo. Among

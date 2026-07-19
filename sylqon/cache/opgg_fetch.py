@@ -146,14 +146,33 @@ def _shape_payload(data: dict, role: str) -> dict | None:
     # combos). This is the ONLY set the AI may pick spells from — so it can
     # never suggest a spell nobody runs on the champion.
     spell_options: list[int] = []
+    spell_combos: list[dict] = []
     for combo in (data.get("summoner_spells") or [])[:4]:
         if isinstance(combo, dict):
             for sid in combo.get("ids", []):
                 if sid not in spell_options:
                     spell_options.append(sid)
+            if combo.get("ids"):
+                spell_combos.append({"ids": list(combo["ids"]),
+                                     "play": combo.get("play") or 0,
+                                     "win": combo.get("win") or 0})
 
     runes_list = data.get("runes") or []
     runes = runes_list[0] if runes_list and isinstance(runes_list[0], dict) else {}
+    # Alternative rune pages (top rows) with sample counts for the matchup rune
+    # selector; the shape mirrors the primary page's id fields.
+    rune_page_options: list[dict] = []
+    for page in runes_list[:4]:
+        if isinstance(page, dict) and page.get("primary_rune_ids"):
+            rune_page_options.append({
+                "primary_page_id": page.get("primary_page_id", 0),
+                "primary_rune_ids": page.get("primary_rune_ids", []),
+                "secondary_page_id": page.get("secondary_page_id", 0),
+                "secondary_rune_ids": page.get("secondary_rune_ids", []),
+                "stat_mod_ids": page.get("stat_mod_ids", []),
+                "play": page.get("play") or 0,
+                "win": page.get("win") or 0,
+            })
 
     # last_items is a flat, pick-rate-ranked list of single completed items; use
     # it as the situational pool (opgg_to_build dedupes against boots + core).
@@ -185,6 +204,8 @@ def _shape_payload(data: dict, role: str) -> dict | None:
         "secondary_page_id": runes.get("secondary_page_id", 0),
         "secondary_rune_ids": runes.get("secondary_rune_ids", []),
         "stat_mod_ids": runes.get("stat_mod_ids", []),
+        "rune_page_options": rune_page_options,
         "summoner_spell_ids": spells,
         "summoner_spell_options": spell_options,
+        "summoner_spell_combos": spell_combos,
     }

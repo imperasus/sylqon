@@ -69,6 +69,9 @@ class TestChampionNames:
     def test_rune_archetypes(self):
         _assert_champions(static.CHAMPION_RUNE_ARCHETYPES, "CHAMPION_RUNE_ARCHETYPES")
 
+    def test_ignite_kill_laners(self):
+        _assert_champions(static.IGNITE_KILL_LANERS, "IGNITE_KILL_LANERS")
+
     def test_suppression_is_subset_of_heavy_cc(self):
         # A suppressor is by definition a heavy-CC threat too.
         assert static.SUPPRESSION_CHAMPS <= static.HEAVY_CC_CHAMPS
@@ -139,6 +142,15 @@ class TestRuneAndShardConsistency:
 
     def test_every_minor_rune_has_a_style(self):
         assert set(static.MINOR_RUNES) == set(static.RUNE_STYLE_OF_MINOR)
+
+    def test_rune_counter_tag_names_are_real_runes(self):
+        unknown = sorted(set(static.RUNE_COUNTER_TAGS) - set(static.MINOR_RUNES))
+        assert not unknown, f"RUNE_COUNTER_TAGS names not in MINOR_RUNES: {unknown}"
+
+    def test_rune_requirement_rules_reference_known_tags(self):
+        known_tags = {t for tags in static.RUNE_COUNTER_TAGS.values() for t in tags}
+        for _threat_key, tag in static.RUNE_REQUIREMENT_RULES:
+            assert tag in known_tags, f"rune requirement tag '{tag}' unmapped"
 
     def test_shard_rows_are_known_shards(self):
         for row in (static.SHARD_ROW_OFFENSE, static.SHARD_ROW_FLEX,

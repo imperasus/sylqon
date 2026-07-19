@@ -363,6 +363,32 @@ CHAMPION_RUNE_ARCHETYPES: dict[str, dict] = {
     },
 }
 
+# --- Rune matchup-counter tags -------------------------------------------------
+# Minor runes that DEFEND against a specific matchup, keyed by rune name. Used by
+# the deterministic rune-page selector (analysis/rune_select.py) to score an
+# op.gg-observed alternative page against the enemy damage skew — a page that
+# carries the resist rune the comp demands can beat the meta page even at a
+# slightly lower win rate (Wilson-guarded). Absent runes contribute no coverage.
+RUNE_COUNTER_TAGS: dict[str, tuple[str, ...]] = {
+    "Second Wind": ("anti_poke",),          # regen after taking damage — vs poke/DoT
+    "Bone Plating": ("anti_burst",),        # flat reduction of a burst combo
+    "Nullifying Orb": ("magic_shield",),    # shield when low vs magic — vs AP burst
+    "Conditioning": ("resist_scaling",),    # bonus armor+MR mid-game — vs balanced
+    "Overgrowth": ("resist_scaling",),      # HP scaling — vs sustained damage
+    "Unflinching": ("tenacity",),           # tenacity — vs chain CC
+    "Revitalize": ("sustain",),             # heal/shield amp
+    "Shield Bash": ("anti_burst",),         # vs burst on a shielding champ
+}
+
+# threat-key -> the rune counter tag that answers it (checked in select order).
+# Mirrors rune_directives' doctrine but as machine-checkable coverage.
+RUNE_REQUIREMENT_RULES: list[tuple[str, str]] = [
+    ("burst_ap", "magic_shield"),
+    ("burst_ad", "anti_burst"),
+    ("poke", "anti_poke"),
+    ("heavy_cc", "tenacity"),
+]
+
 RUNE_STYLE_OF_MINOR = {
     name: style
     for style, names in {
@@ -443,6 +469,19 @@ HEAVY_TANK = {
     "Ornn", "Sion", "Malphite", "Rammus", "Zac", "Sejuani", "Cho'Gath",
     "Dr. Mundo", "Tahm Kench", "Shen", "K'Sante", "Maokai", "Amumu",
 }
+# Champions whose laning win condition is KILL PRESSURE — favour Ignite over
+# Teleport when the lane is winnable (all-in bruisers/duelists + burst laners).
+# Consumed by loadout.deterministic_spells' kill-pressure branch, role-gated to
+# top/mid, and only ever when op.gg actually observes Ignite on the champion.
+IGNITE_KILL_LANERS = {
+    "Darius", "Renekton", "Garen", "Riven", "Camille", "Sett", "Aatrox",
+    "Mordekaiser", "Pantheon", "Jayce", "Kled", "Irelia", "Fiora", "Gangplank",
+    "Kennen", "Teemo", "Quinn", "Wukong", "Yasuo", "Yone",
+    # burst mid laners share the kill-pressure profile
+    "Zed", "Talon", "Qiyana", "Naafiri", "Syndra", "LeBlanc", "Annie", "Akali",
+    "Fizz", "Diana", "Sylas", "Ahri", "Vex",
+}
+
 # Champions whose strongest win condition is 1-v-1 side-lane pressure. Used by
 # the draft comp classifier to flag a split-push archetype.
 SPLIT_PUSH_CHAMPS = {
