@@ -175,6 +175,700 @@
   "Zoe",
   "Zyra"
  ],
+ "champion_info": {
+  "Aatrox": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Ahri": {
+   "attack": 3,
+   "magic": 8
+  },
+  "Akali": {
+   "attack": 5,
+   "magic": 8
+  },
+  "Akshan": {
+   "attack": 0,
+   "magic": 0
+  },
+  "Alistar": {
+   "attack": 6,
+   "magic": 5
+  },
+  "Ambessa": {
+   "attack": 9,
+   "magic": 0
+  },
+  "Amumu": {
+   "attack": 2,
+   "magic": 8
+  },
+  "Anivia": {
+   "attack": 1,
+   "magic": 10
+  },
+  "Annie": {
+   "attack": 2,
+   "magic": 10
+  },
+  "Aphelios": {
+   "attack": 6,
+   "magic": 1
+  },
+  "Ashe": {
+   "attack": 7,
+   "magic": 2
+  },
+  "Aurelion Sol": {
+   "attack": 2,
+   "magic": 8
+  },
+  "Aurora": {
+   "attack": 3,
+   "magic": 8
+  },
+  "Azir": {
+   "attack": 6,
+   "magic": 8
+  },
+  "Bard": {
+   "attack": 4,
+   "magic": 5
+  },
+  "Bel'Veth": {
+   "attack": 4,
+   "magic": 7
+  },
+  "Blitzcrank": {
+   "attack": 4,
+   "magic": 5
+  },
+  "Brand": {
+   "attack": 2,
+   "magic": 9
+  },
+  "Braum": {
+   "attack": 3,
+   "magic": 4
+  },
+  "Briar": {
+   "attack": 9,
+   "magic": 3
+  },
+  "Caitlyn": {
+   "attack": 8,
+   "magic": 2
+  },
+  "Camille": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Cassiopeia": {
+   "attack": 2,
+   "magic": 9
+  },
+  "Cho'Gath": {
+   "attack": 3,
+   "magic": 7
+  },
+  "Corki": {
+   "attack": 8,
+   "magic": 6
+  },
+  "Darius": {
+   "attack": 9,
+   "magic": 1
+  },
+  "Diana": {
+   "attack": 7,
+   "magic": 8
+  },
+  "Dr. Mundo": {
+   "attack": 5,
+   "magic": 6
+  },
+  "Draven": {
+   "attack": 9,
+   "magic": 1
+  },
+  "Ekko": {
+   "attack": 5,
+   "magic": 7
+  },
+  "Elise": {
+   "attack": 6,
+   "magic": 7
+  },
+  "Evelynn": {
+   "attack": 4,
+   "magic": 7
+  },
+  "Ezreal": {
+   "attack": 7,
+   "magic": 6
+  },
+  "Fiddlesticks": {
+   "attack": 2,
+   "magic": 9
+  },
+  "Fiora": {
+   "attack": 10,
+   "magic": 2
+  },
+  "Fizz": {
+   "attack": 6,
+   "magic": 7
+  },
+  "Galio": {
+   "attack": 1,
+   "magic": 6
+  },
+  "Gangplank": {
+   "attack": 7,
+   "magic": 4
+  },
+  "Garen": {
+   "attack": 7,
+   "magic": 1
+  },
+  "Gnar": {
+   "attack": 6,
+   "magic": 5
+  },
+  "Gragas": {
+   "attack": 4,
+   "magic": 6
+  },
+  "Graves": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Gwen": {
+   "attack": 7,
+   "magic": 5
+  },
+  "Hecarim": {
+   "attack": 8,
+   "magic": 4
+  },
+  "Heimerdinger": {
+   "attack": 2,
+   "magic": 8
+  },
+  "Hwei": {
+   "attack": 7,
+   "magic": 8
+  },
+  "Illaoi": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Irelia": {
+   "attack": 7,
+   "magic": 5
+  },
+  "Ivern": {
+   "attack": 3,
+   "magic": 7
+  },
+  "Janna": {
+   "attack": 3,
+   "magic": 7
+  },
+  "Jarvan IV": {
+   "attack": 6,
+   "magic": 3
+  },
+  "Jax": {
+   "attack": 7,
+   "magic": 7
+  },
+  "Jayce": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Jhin": {
+   "attack": 10,
+   "magic": 6
+  },
+  "Jinx": {
+   "attack": 9,
+   "magic": 4
+  },
+  "K'Sante": {
+   "attack": 8,
+   "magic": 7
+  },
+  "Kai'Sa": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Kalista": {
+   "attack": 8,
+   "magic": 4
+  },
+  "Karma": {
+   "attack": 1,
+   "magic": 8
+  },
+  "Karthus": {
+   "attack": 2,
+   "magic": 10
+  },
+  "Kassadin": {
+   "attack": 3,
+   "magic": 8
+  },
+  "Katarina": {
+   "attack": 4,
+   "magic": 9
+  },
+  "Kayle": {
+   "attack": 6,
+   "magic": 7
+  },
+  "Kayn": {
+   "attack": 10,
+   "magic": 1
+  },
+  "Kennen": {
+   "attack": 6,
+   "magic": 7
+  },
+  "Kha'Zix": {
+   "attack": 9,
+   "magic": 3
+  },
+  "Kindred": {
+   "attack": 8,
+   "magic": 2
+  },
+  "Kled": {
+   "attack": 8,
+   "magic": 2
+  },
+  "Kog'Maw": {
+   "attack": 8,
+   "magic": 5
+  },
+  "LeBlanc": {
+   "attack": 1,
+   "magic": 10
+  },
+  "Lee Sin": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Leona": {
+   "attack": 4,
+   "magic": 3
+  },
+  "Lillia": {
+   "attack": 0,
+   "magic": 10
+  },
+  "Lissandra": {
+   "attack": 2,
+   "magic": 8
+  },
+  "Locke": {
+   "attack": 6,
+   "magic": 2
+  },
+  "Lucian": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Lulu": {
+   "attack": 4,
+   "magic": 7
+  },
+  "Lux": {
+   "attack": 2,
+   "magic": 9
+  },
+  "Malphite": {
+   "attack": 5,
+   "magic": 7
+  },
+  "Malzahar": {
+   "attack": 2,
+   "magic": 9
+  },
+  "Maokai": {
+   "attack": 3,
+   "magic": 6
+  },
+  "Master Yi": {
+   "attack": 10,
+   "magic": 2
+  },
+  "Mel": {
+   "attack": 2,
+   "magic": 9
+  },
+  "Milio": {
+   "attack": 2,
+   "magic": 8
+  },
+  "Miss Fortune": {
+   "attack": 8,
+   "magic": 5
+  },
+  "Mordekaiser": {
+   "attack": 4,
+   "magic": 7
+  },
+  "Morgana": {
+   "attack": 1,
+   "magic": 8
+  },
+  "Naafiri": {
+   "attack": 9,
+   "magic": 0
+  },
+  "Nami": {
+   "attack": 4,
+   "magic": 7
+  },
+  "Nasus": {
+   "attack": 7,
+   "magic": 6
+  },
+  "Nautilus": {
+   "attack": 4,
+   "magic": 6
+  },
+  "Neeko": {
+   "attack": 1,
+   "magic": 9
+  },
+  "Nidalee": {
+   "attack": 5,
+   "magic": 7
+  },
+  "Nilah": {
+   "attack": 8,
+   "magic": 4
+  },
+  "Nocturne": {
+   "attack": 9,
+   "magic": 2
+  },
+  "Nunu & Willump": {
+   "attack": 4,
+   "magic": 7
+  },
+  "Olaf": {
+   "attack": 9,
+   "magic": 3
+  },
+  "Orianna": {
+   "attack": 4,
+   "magic": 9
+  },
+  "Ornn": {
+   "attack": 5,
+   "magic": 3
+  },
+  "Pantheon": {
+   "attack": 9,
+   "magic": 3
+  },
+  "Poppy": {
+   "attack": 6,
+   "magic": 2
+  },
+  "Pyke": {
+   "attack": 9,
+   "magic": 1
+  },
+  "Qiyana": {
+   "attack": 0,
+   "magic": 4
+  },
+  "Quinn": {
+   "attack": 9,
+   "magic": 2
+  },
+  "Rakan": {
+   "attack": 2,
+   "magic": 8
+  },
+  "Rammus": {
+   "attack": 4,
+   "magic": 5
+  },
+  "Rek'Sai": {
+   "attack": 8,
+   "magic": 2
+  },
+  "Rell": {
+   "attack": 0,
+   "magic": 0
+  },
+  "Renata Glasc": {
+   "attack": 2,
+   "magic": 9
+  },
+  "Renekton": {
+   "attack": 8,
+   "magic": 2
+  },
+  "Rengar": {
+   "attack": 7,
+   "magic": 2
+  },
+  "Riven": {
+   "attack": 8,
+   "magic": 1
+  },
+  "Rumble": {
+   "attack": 3,
+   "magic": 8
+  },
+  "Ryze": {
+   "attack": 2,
+   "magic": 10
+  },
+  "Samira": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Sejuani": {
+   "attack": 5,
+   "magic": 6
+  },
+  "Senna": {
+   "attack": 7,
+   "magic": 6
+  },
+  "Seraphine": {
+   "attack": 0,
+   "magic": 0
+  },
+  "Sett": {
+   "attack": 8,
+   "magic": 1
+  },
+  "Shaco": {
+   "attack": 8,
+   "magic": 6
+  },
+  "Shen": {
+   "attack": 3,
+   "magic": 3
+  },
+  "Shyvana": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Singed": {
+   "attack": 4,
+   "magic": 7
+  },
+  "Sion": {
+   "attack": 5,
+   "magic": 3
+  },
+  "Sivir": {
+   "attack": 9,
+   "magic": 1
+  },
+  "Skarner": {
+   "attack": 7,
+   "magic": 5
+  },
+  "Smolder": {
+   "attack": 8,
+   "magic": 5
+  },
+  "Sona": {
+   "attack": 5,
+   "magic": 8
+  },
+  "Soraka": {
+   "attack": 2,
+   "magic": 7
+  },
+  "Swain": {
+   "attack": 2,
+   "magic": 9
+  },
+  "Sylas": {
+   "attack": 3,
+   "magic": 8
+  },
+  "Syndra": {
+   "attack": 2,
+   "magic": 9
+  },
+  "Tahm Kench": {
+   "attack": 3,
+   "magic": 6
+  },
+  "Taliyah": {
+   "attack": 1,
+   "magic": 8
+  },
+  "Talon": {
+   "attack": 9,
+   "magic": 1
+  },
+  "Taric": {
+   "attack": 4,
+   "magic": 5
+  },
+  "Teemo": {
+   "attack": 5,
+   "magic": 7
+  },
+  "Thresh": {
+   "attack": 5,
+   "magic": 6
+  },
+  "Tristana": {
+   "attack": 9,
+   "magic": 5
+  },
+  "Trundle": {
+   "attack": 7,
+   "magic": 2
+  },
+  "Tryndamere": {
+   "attack": 10,
+   "magic": 2
+  },
+  "Twisted Fate": {
+   "attack": 6,
+   "magic": 6
+  },
+  "Twitch": {
+   "attack": 9,
+   "magic": 3
+  },
+  "Udyr": {
+   "attack": 8,
+   "magic": 4
+  },
+  "Urgot": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Varus": {
+   "attack": 7,
+   "magic": 4
+  },
+  "Vayne": {
+   "attack": 10,
+   "magic": 1
+  },
+  "Veigar": {
+   "attack": 2,
+   "magic": 10
+  },
+  "Vel'Koz": {
+   "attack": 2,
+   "magic": 10
+  },
+  "Vex": {
+   "attack": 0,
+   "magic": 0
+  },
+  "Vi": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Viego": {
+   "attack": 6,
+   "magic": 2
+  },
+  "Viktor": {
+   "attack": 2,
+   "magic": 10
+  },
+  "Vladimir": {
+   "attack": 2,
+   "magic": 8
+  },
+  "Volibear": {
+   "attack": 7,
+   "magic": 4
+  },
+  "Warwick": {
+   "attack": 9,
+   "magic": 3
+  },
+  "Wukong": {
+   "attack": 8,
+   "magic": 2
+  },
+  "Xayah": {
+   "attack": 10,
+   "magic": 1
+  },
+  "Xerath": {
+   "attack": 1,
+   "magic": 10
+  },
+  "Xin Zhao": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Yasuo": {
+   "attack": 8,
+   "magic": 4
+  },
+  "Yone": {
+   "attack": 8,
+   "magic": 4
+  },
+  "Yorick": {
+   "attack": 6,
+   "magic": 4
+  },
+  "Yunara": {
+   "attack": 9,
+   "magic": 0
+  },
+  "Yuumi": {
+   "attack": 5,
+   "magic": 8
+  },
+  "Zaahen": {
+   "attack": 8,
+   "magic": 1
+  },
+  "Zac": {
+   "attack": 3,
+   "magic": 7
+  },
+  "Zed": {
+   "attack": 9,
+   "magic": 1
+  },
+  "Zeri": {
+   "attack": 8,
+   "magic": 3
+  },
+  "Ziggs": {
+   "attack": 2,
+   "magic": 9
+  },
+  "Zilean": {
+   "attack": 2,
+   "magic": 8
+  },
+  "Zoe": {
+   "attack": 1,
+   "magic": 8
+  },
+  "Zyra": {
+   "attack": 4,
+   "magic": 8
+  }
+ },
  "items": {
   "Abyssal Mask": 8020,
   "Actualizer": 2522,

@@ -100,6 +100,17 @@ def _tag_label(item: dict) -> str:
     return " [" + "/".join(static.COUNTER_TAG_INFO[t][0] for t in tags) + "]"
 
 
+def _spike_label(item: dict) -> str:
+    """A purchase-timing hint for non-default spikes, so the model orders early
+    game-changers before late scaling."""
+    spike = static.ITEM_SPIKE.get(item.get("id", 0))
+    if spike == "early":
+        return " (spike: EARLY — buy first)"
+    if spike == "late":
+        return " (spike: LATE — order last)"
+    return ""
+
+
 def compile_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) -> str:
     from sylqon import loadout as loadout_mod
     from sylqon.analysis import lane_counter
@@ -141,7 +152,7 @@ def compile_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) -> str:
         # matchup — tell the AI so it builds on it instead of undoing it.
         core_lines += f"\n(matchup-selected core — {candidate['core_reason']}; do NOT swap it back)"
     pool_lines = "\n".join(
-        f"- {item['name']}{_tag_label(item)}: "
+        f"- {item['name']}{_tag_label(item)}{_spike_label(item)}: "
         f"{item.get('description') or 'see in-game tooltip'}"
         for item in situational_pool
     ) or "- (no situational options available)"

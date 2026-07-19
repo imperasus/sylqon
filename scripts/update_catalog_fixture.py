@@ -30,7 +30,13 @@ def main() -> int:
         return 1
     # Load through Catalog so DDRAGON_ID_CORRECTIONS self-healing applies.
     data = Catalog()._data
-    champions = sorted(info["name"] for info in data.get("champions", {}).values())
+    champ_data = data.get("champions", {})
+    champions = sorted(info["name"] for info in champ_data.values())
+    # attack/magic base scores per champion → the damage-type cross-check
+    champion_info = {
+        info["name"]: {"attack": info.get("attack", 0), "magic": info.get("magic", 0)}
+        for info in sorted(champ_data.values(), key=lambda c: c["name"])
+    }
     items = {name: it["id"] for name, it in sorted(data.get("items", {}).items())}
     if not champions or not items:
         print("Catalog cache is empty; refusing to write a hollow fixture.")
@@ -41,6 +47,7 @@ def main() -> int:
     out.write_text(json.dumps({
         "patch": data.get("patch", "unknown"),
         "champions": champions,
+        "champion_info": champion_info,
         "items": items,
     }, indent=1), encoding="utf-8")
     print(f"Wrote {out} (patch {data.get('patch')}, "

@@ -27,8 +27,15 @@ _SNAP = json.loads(
     (Path(__file__).parent / "fixtures" / "catalog_snapshot.json").read_text(encoding="utf-8")
 )
 CHAMPIONS: set[str] = set(_SNAP["champions"])
+CHAMPION_INFO: dict = _SNAP.get("champion_info", {})
 ITEM_NAMES: set[str] = set(_SNAP["items"])
 ITEM_IDS: set[int] = set(_SNAP["items"].values())
+
+# Champions whose hand-authored damage type intentionally disagrees with Data
+# Dragon's base attack/magic scores, because those scores don't reflect what the
+# champion actually BUILDS. Qiyana is an AD assassin (lethality/AD items) whose
+# DDragon magic score is an artefact of her magic-flagged ability damage.
+DAMAGE_TYPE_CATALOG_EXCEPTIONS = {"Qiyana"}
 
 # Consumables/starters are filtered out of the catalog snapshot (the runtime
 # catalog drops Trinket/Consumable tags), so they are pinned here explicitly.
@@ -127,6 +134,59 @@ class TestItemTables:
 
     def test_champion_damage_type_values_legal(self):
         assert set(static.CHAMPION_DAMAGE_TYPE.values()) <= {"ad", "ap", "mixed"}
+
+    def test_champion_damage_type_not_contradicted_by_catalog(self):
+        """An 'ad' champion whose catalog base is decisively magic (or vice
+        versa) is almost certainly a stale/renamed entry — flag it unless it's
+        a documented hybrid-scaling exception."""
+        contradictions = []
+        for champ, dt in static.CHAMPION_DAMAGE_TYPE.items():
+            info = CHAMPION_INFO.get(champ)
+            if not info or champ in DAMAGE_TYPE_CATALOG_EXCEPTIONS:
+                continue
+            a, m = info.get("attack", 0), info.get("magic", 0)
+            if dt == "ad" and m >= a + 3:
+                contradictions.append(f"{champ} typed 'ad' but catalog magic={m} attack={a}")
+            if dt == "ap" and a >= m + 3:
+                contradictions.append(f"{champ} typed 'ap' but catalog attack={a} magic={m}")
+        assert not contradictions, contradictions
+
+
+# ---------------------------------------------------------------------------
+# Generated (catalog-derived) counter tags
+# ---------------------------------------------------------------------------
+
+class TestGeneratedItemTags:
+    def test_generated_ids_exist_in_catalog(self):
+        gen = static._load_generated_item_tags()
+        unknown = sorted(iid for iid in gen
+                         if iid not in ITEM_IDS and iid not in KNOWN_NON_CATALOG_ITEM_IDS)
+        assert not unknown, (
+            f"generated_item_tags.json ids missing from catalog: {unknown}"
+        )
+
+    def test_generated_tags_are_high_precision_only(self):
+        gen = static._load_generated_item_tags()
+        used = {t for tags in gen.values() for t in tags}
+        assert used <= {"armor", "mr", "anti_cc"}, (
+            f"generation must stay to the precise defensive layer, got: {used}"
+        )
+
+    def test_merge_never_drops_a_manual_tag(self):
+        for iid, manual in static.ITEM_COUNTER_TAGS_MANUAL.items():
+            merged = static.ITEM_COUNTER_TAGS[iid]
+            assert set(manual) <= set(merged), iid
+            # manual tags keep their leading (display-priority) position
+            assert merged[:len(manual)] == manual, iid
+
+    def test_merge_adds_generated_coverage(self):
+        # Locket of the Iron Solari (3190) is generated-only armor/mr — present
+        # in the merged table though absent from the hand table.
+        gen = static._load_generated_item_tags()
+        gen_only = set(gen) - set(static.ITEM_COUNTER_TAGS_MANUAL)
+        assert gen_only, "expected generation to add items beyond the hand table"
+        for iid in gen_only:
+            assert set(static.ITEM_COUNTER_TAGS[iid]) == set(gen[iid])
 
 
 # ---------------------------------------------------------------------------

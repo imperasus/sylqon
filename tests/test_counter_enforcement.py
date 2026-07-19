@@ -501,6 +501,57 @@ class TestDamageTypeAwareEnforcement:
         assert "Lord Dominik's Regards" not in [i["name"] for i in out.items]
 
 
+# ---------------------------------------------------------------------------
+# Spike-aware situational ordering
+# ---------------------------------------------------------------------------
+
+class TestSpikeOrdering:
+    def _build_with_spikes(self):
+        # Two greedy (no counter tag) situational defaults: one LATE (Phantom
+        # Dancer 3046), one EARLY (Black Cleaver 3071). Pool has an anti-heal.
+        boots = {"id": 3006, "name": "Berserker's Greaves"}
+        core = [{"id": 3031, "name": "Infinity Edge"},
+                {"id": 3153, "name": "Blade of The Ruined King"},
+                {"id": 6672, "name": "Kraken Slayer"}]
+        default_situ = [{"id": 3046, "name": "Phantom Dancer"},   # late
+                        {"id": 3071, "name": "Black Cleaver"}]    # early
+        pool = [{"id": 3033, "name": "Mortal Reminder"}]
+        return {
+            "boots": boots, "boots_pool": [boots],
+            "core_items": core, "situational_pool": pool,
+            "items": [boots] + core + default_situ,
+            "starting_items": [],
+            "keystone": "Conqueror",
+            "primary_runes": ["Triumph", "Legend: Alacrity", "Last Stand"],
+            "secondary_style": "Resolve",
+            "secondary_runes": ["Second Wind", "Overgrowth"],
+            "stat_shards": ["Adaptive Force", "Adaptive Force", "Health"],
+            "spell1": "Ghost", "spell2": "Flash",
+        }
+
+    def test_early_spike_ordered_before_late(self):
+        # A lane tank creates a (soft) requirement, so ordering runs; the two
+        # greedy picks reorder by spike — Black Cleaver (early) before Phantom
+        # Dancer (late).
+        ctx = _ctx([_enemy("Ornn", role="top", damage_type="AD",
+                           threats=["tank"])], role="top", champion="Garen")
+        build = self._build_with_spikes()
+        base = loadout_mod.from_candidate(build, ctx, "seed")
+        out = loadout_mod.apply_ai_decision(base, None, ctx, _StubCatalog(), build)
+        names = [i["name"] for i in out.items]
+        assert names.index("Black Cleaver") < names.index("Phantom Dancer")
+
+    def test_required_counter_stays_ahead_of_greed(self):
+        ctx = _ctx([_enemy("Soraka", threats=["heavy_healing"])])
+        build = self._build_with_spikes()
+        base = loadout_mod.from_candidate(build, ctx, "seed")
+        out = loadout_mod.apply_ai_decision(base, None, ctx, _StubCatalog(), build)
+        names = [i["name"] for i in out.items[4:]]  # situational tail
+        # The enforced anti-heal (a required counter) precedes the pure-greed
+        # Phantom Dancer regardless of its own spike.
+        assert names.index("Mortal Reminder") < names.index("Phantom Dancer")
+
+
 if __name__ == "__main__":
     import pytest
 

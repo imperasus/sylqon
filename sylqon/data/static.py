@@ -589,7 +589,14 @@ SKILL_MAX_ORDER: dict[str, list[str]] = {
 # the primary purpose. Used to annotate the AI prompt's situational pool and to
 # label alternative blocks in the injected item set, so the player can re-route
 # mid-game ("2 tanks got fed -> grab the % pen block").
-ITEM_COUNTER_TAGS: dict[int, tuple[str, ...]] = {
+#
+# This HAND table carries the effect-level tags DDragon's stat categories can't
+# identify (anti_heal, percent_pen, tank_shred, anti_burst, anti_suppression,
+# mobility, anti_shield). The defensive-resist + tenacity layer (armor / mr /
+# anti_cc) is generated from the catalog (scripts/generate_item_tags.py ->
+# generated_item_tags.json) and UNIONED in below, so those precise tags no
+# longer have to be enumerated by hand and can't rot silently across patches.
+ITEM_COUNTER_TAGS_MANUAL: dict[int, tuple[str, ...]] = {
     # Grievous Wounds (anti-heal)
     3033: ("anti_heal", "percent_pen"),   # Mortal Reminder
     3165: ("anti_heal",),                 # Morellonomicon
@@ -644,6 +651,42 @@ ITEM_COUNTER_TAGS: dict[int, tuple[str, ...]] = {
     6662: ("anti_burst", "armor"),        # Iceborn Gauntlet
 }
 
+
+def _load_generated_item_tags() -> dict[int, tuple[str, ...]]:
+    """Catalog-generated armor/mr/anti_cc tags (scripts/generate_item_tags.py).
+    Absent/corrupt file → empty (the hand table alone still works)."""
+    import json
+    from pathlib import Path
+    path = Path(__file__).with_name("generated_item_tags.json")
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    out: dict[int, tuple[str, ...]] = {}
+    for k, tags in raw.items():
+        try:
+            out[int(k)] = tuple(tags)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _merge_counter_tags() -> dict[int, tuple[str, ...]]:
+    """Union the generated tags into the hand table. Manual tags come first
+    (dict order = display priority), generated tags append only what's new, so
+    generation can widen coverage but never drop or reorder a hand tag."""
+    generated = _load_generated_item_tags()
+    merged: dict[int, tuple[str, ...]] = {}
+    for iid in {*ITEM_COUNTER_TAGS_MANUAL, *generated}:
+        manual = ITEM_COUNTER_TAGS_MANUAL.get(iid, ())
+        gen = tuple(t for t in generated.get(iid, ()) if t not in manual)
+        merged[iid] = manual + gen
+    return merged
+
+
+# The runtime table every consumer imports. Union of hand + generated.
+ITEM_COUNTER_TAGS: dict[int, tuple[str, ...]] = _merge_counter_tags()
+
 # tag -> (short label, when-to-buy guidance). Dict order doubles as display
 # priority for the alternative blocks in the item set. Keep the strings short:
 # they end up in LCU block titles and the whole item-set collection must stay
@@ -661,6 +704,38 @@ COUNTER_TAG_INFO: dict[str, tuple[str, str]] = {
     "mobility":    ("Mobility", "extra MS for kiting / positioning"),
     "damage":      ("Damage / Greed", "when ahead or no dominant threat"),
 }
+
+# --- Item spike timing ---------------------------------------------------------
+# When an item's value peaks in the build, used to order the situational block:
+# "early"  — a component/cheap item that swings the game the moment it's bought
+#            (buy it first among situational picks);
+# "two_item" — a counter/survival item that matters around the 2nd-3rd purchase
+#            (the default for most situational picks);
+# "late"   — pure scaling greed that only pays off fully deep into the game
+#            (order it LAST, after the matchup is stabilised).
+# Absent items default to "two_item". Consumed by SPIKE_RANK / loadout ordering
+# and surfaced in the AI prompt + coach panel.
+ITEM_SPIKE: dict[int, str] = {
+    # Late-game scaling greed → order last
+    3089: "late",   # Rabadon's Deathcap
+    3031: "late",   # Infinity Edge
+    3072: "late",   # Bloodthirster
+    3046: "late",   # Phantom Dancer
+    3094: "late",   # Rapid Firecannon
+    3036: "late",   # Lord Dominik's Regards (needs a crit base first)
+    # Early game-changers → order first
+    3071: "early",  # Black Cleaver (shred + haste spikes immediately)
+    3078: "early",  # Trinity Force (Sheen spike)
+    3859: "early",  # Sheen-line / early support spikes (generic)
+    6653: "early",  # Liandry's Torment (DoT online at once vs HP)
+    3123: "early",  # Executioner's Calling (anti-heal component)
+    3916: "early",  # Oblivion Orb (anti-heal component)
+}
+SPIKE_ORDER = {"early": 0, "two_item": 1, "late": 2}
+
+
+def spike_rank(item_id: int | None) -> int:
+    return SPIKE_ORDER.get(ITEM_SPIKE.get(item_id or 0, "two_item"), 1)
 
 # Item damage-class restriction, keyed by Data Dragon item NAME:
 #   "ad_only"   — scales with / itemises AD (lethality, armor pen, crit, AD on-hit)

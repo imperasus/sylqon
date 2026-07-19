@@ -270,6 +270,13 @@ def _enforce_counter_items(base: Loadout, items: list[dict], build: dict,
         else:
             situ.append(replacement)
 
+    # Spike-aware ordering of the situational tail: keep every item that
+    # carries a still-required counter tag ahead of the greed (its urgency is
+    # unchanged), then break ties by item spike so early game-changers precede
+    # late scaling. Stable, so equal-key items keep their enforced order.
+    situ.sort(key=lambda it: (0 if tags_of(it.get("id")) & required_union else 1,
+                              static.spike_rank(it.get("id"))))
+
     result = head + situ
     if len(result) != len(items):  # pragma: no cover - defensive invariant
         log.debug("Counter enforcement changed item count; keeping original build")
