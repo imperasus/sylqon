@@ -102,6 +102,7 @@ def _tag_label(item: dict) -> str:
 
 def compile_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) -> str:
     from sylqon import loadout as loadout_mod
+    from sylqon.analysis import lane_counter
     threat = ctx.team_threat_summary()
     a1, a2 = loadout_mod.allowed_spells(candidate, ctx.my_role)
     def_spell1, def_spell2 = loadout_mod.deterministic_spells(candidate, ctx, a1)
@@ -110,6 +111,20 @@ def compile_prompt(ctx: MatchContext, candidate: dict, catalog: Catalog) -> str:
     doctrine_lines = "\n".join(f"- {d}" for d in threat_directives(threat))
     rune_lines = "\n".join(f"- {d}" for d in rune_directives(threat))
     rune_pool = rune_pool_for_champion(ctx.my_champion)
+
+    # Lane matchup: the direct opponent decides the laning phase — surface
+    # them and the first-back plan as their own doctrine block.
+    opp = lane_counter.lane_opponent(ctx)
+    lane_section = ""
+    if opp is not None:
+        lane_dir = "\n".join(f"- {d}" for d in lane_counter.lane_directives(ctx))
+        fb = ", ".join(i["name"] for i in lane_counter.first_back_items(ctx))
+        lane_section = (
+            f"\nLANE MATCHUP (your direct opponent — the laning phase is decided here):\n"
+            f"- {opp.describe()}\n"
+            + (f"{lane_dir}\n" if lane_dir else "")
+            + (f"- First-back priorities (already planned): {fb}\n" if fb else "")
+        )
 
     # --- Item sections -------------------------------------------------------
     boots = candidate.get("boots")
@@ -190,7 +205,7 @@ MY TEAM (already locked — note their summoners for combo potential):
 
 ENEMY TEAM (their summoners change how you trade — e.g. enemy Cleanse/QSS beats your CC, enemy Heal/Barrier shifts all-ins):
 {enemy_lines}
-
+{lane_section}
 TEAM THREAT SUMMARY: {json.dumps(threat)}
 
 TACTICAL DOCTRINE (derived from the enemy comp — these directives override default damage-greedy ordering; [tags] match the labels on pool items):

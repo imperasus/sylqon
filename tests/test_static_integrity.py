@@ -99,6 +99,20 @@ class TestItemTables:
                 f"{const['name']} id/name pair out of sync with the catalog"
             )
 
+    def test_lane_layer_items_match_catalog(self):
+        consts = [static.DORANS_BLADE, static.DORANS_SHIELD, static.DORANS_RING]
+        consts += [v for by_class in static.COUNTER_COMPONENTS.values()
+                   for v in by_class.values()]
+        consts += list(static.LANE_RESIST_COMPONENT.values())
+        for const in consts:
+            assert _SNAP["items"].get(const["name"]) == const["id"], (
+                f"{const['name']} id/name pair out of sync with the catalog"
+            )
+
+    def test_counter_components_cover_damage_classes(self):
+        for tag, by_class in static.COUNTER_COMPONENTS.items():
+            assert set(by_class) == {"ad", "ap", "mixed"}, tag
+
     def test_counter_tags_have_display_info(self):
         used = {t for tags in static.ITEM_COUNTER_TAGS.values() for t in tags}
         missing = sorted(used - set(static.COUNTER_TAG_INFO))

@@ -19,13 +19,10 @@ from __future__ import annotations
 
 import logging
 
+from sylqon.analysis.lane_counter import combined_requirements
 from sylqon.data import static
 from sylqon.lcu.lobby import MatchContext
-from sylqon.loadout import (
-    _counter_requirements,
-    _item_eligible_for_champion,
-    _safe_threat,
-)
+from sylqon.loadout import _item_eligible_for_champion
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +80,9 @@ def select_core(candidate: dict, ctx: MatchContext) -> tuple[dict | None, str]:
     if len(options) < 2 or len(default_core) != 3:
         return None, ""
 
-    reqs = _counter_requirements(_safe_threat(ctx))
+    # Lane + team mandates, lane first — a core combo that answers the direct
+    # lane opponent outweighs one that only answers the aggregate comp.
+    reqs = combined_requirements(ctx)
     if not reqs:
         return None, ""  # balanced comp: nothing mandated, meta stays
 

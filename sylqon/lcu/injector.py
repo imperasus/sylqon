@@ -77,7 +77,13 @@ def build_item_blocks(loadout: Loadout) -> list[dict]:
 
     blocks = []
     if loadout.starting_items:
-        blocks.append(block("Starting Items", loadout.starting_items))
+        title = "Starting Items"
+        if loadout.starter_reason:
+            title = f"Starting Items — {loadout.starter_reason}"[:80]
+        blocks.append(block(title, loadout.starting_items))
+    if loadout.first_back:
+        opp = loadout.lane_opponent_name or "lane"
+        blocks.append(block(f"First Back — counter {opp}"[:80], loadout.first_back))
 
     core_len = len(loadout.core_items)
     if not (core_len and loadout.situational_pool and loadout.boots is not None

@@ -96,6 +96,45 @@ CONTROL_WARD: dict = {"id": 2055, "name": "Control Ward"}
 ELIXIR_OF_IRON: dict = {"id": 2138, "name": "Elixir of Iron"}       # tanks / hybrids
 ELIXIR_OF_SORCERY: dict = {"id": 2139, "name": "Elixir of Sorcery"}  # AP builds
 ELIXIR_OF_WRATH: dict = {"id": 2140, "name": "Elixir of Wrath"}      # AD builds
+
+# --- Lane-counter layer --------------------------------------------------------
+# Swappable lane starters. The matchup-starter logic only ever swaps WITHIN
+# this set — jungle pets and the support quest item are handled separately and
+# never touched.
+DORANS_BLADE: dict = {"id": 1055, "name": "Doran's Blade"}
+DORANS_SHIELD: dict = {"id": 1054, "name": "Doran's Shield"}
+DORANS_RING: dict = {"id": 1056, "name": "Doran's Ring"}
+SWAPPABLE_STARTER_IDS: frozenset[int] = frozenset({1054, 1055, 1056})
+
+# First-back counter COMPONENTS by counter tag, keyed by the champion's damage
+# class ("ad" / "ap" / "mixed" — see CHAMPION_DAMAGE_TYPE). These are the cheap
+# early pieces a coach tells you to grab on the first recall, long before the
+# completed counter item exists.
+COUNTER_COMPONENTS: dict[str, dict[str, dict]] = {
+    "anti_heal": {
+        "ad":    {"id": 3123, "name": "Executioner's Calling"},
+        "ap":    {"id": 3916, "name": "Oblivion Orb"},
+        "mixed": {"id": 3123, "name": "Executioner's Calling"},
+    },
+    "percent_pen": {
+        "ad":    {"id": 3035, "name": "Last Whisper"},
+        "ap":    {"id": 4630, "name": "Blighting Jewel"},
+        "mixed": {"id": 3035, "name": "Last Whisper"},
+    },
+    # QSS is cheap enough to BE the first-back answer to a suppression lane.
+    "anti_suppression": {
+        "ad":    {"id": 3140, "name": "Quicksilver Sash"},
+        "ap":    {"id": 3140, "name": "Quicksilver Sash"},
+        "mixed": {"id": 3140, "name": "Quicksilver Sash"},
+    },
+}
+
+# Cheap resist component vs a bursty LANE opponent (first back only — full
+# defensive items stay the counter-enforcement layer's job).
+LANE_RESIST_COMPONENT: dict[str, dict] = {
+    "burst_ad": {"id": 1031, "name": "Chain Vest"},
+    "burst_ap": {"id": 1057, "name": "Negatron Cloak"},
+}
 # Smart-swap thresholds: only override op.gg's meta boot when the threat is
 # clearly dominant, so we never over-build defence into a balanced comp.
 BOOT_SWAP_AP_CC_MIN = 3   # >=3 AP threats OR >=3 heavy-CC enemies -> Mercury's

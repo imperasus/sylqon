@@ -39,6 +39,11 @@ class Loadout:
     boots: dict | None = None
     core_items: list[dict] = field(default_factory=list)
     situational_pool: list[dict] = field(default_factory=list)
+    # Lane-counter layer (populated by from_candidate when a lane opponent is
+    # identifiable): cheap first-recall counter components + display context.
+    first_back: list[dict] = field(default_factory=list)
+    lane_opponent_name: str = ""
+    starter_reason: str = ""
 
 
 def _with_role_starter(starting_items: list[dict], role: str) -> list[dict]:
@@ -201,8 +206,10 @@ def _enforce_counter_items(base: Loadout, items: list[dict], build: dict,
     ``_select_boots``' job. Returns ``items`` unchanged whenever no threat
     mandates a swap, the build has no editable situational structure, or the
     pool can't satisfy a tag — so the result is never illegal or shorter."""
-    threat = _safe_threat(ctx)
-    reqs = _counter_requirements(threat)
+    # Lane requirements come first (the laning phase is decided early), then
+    # the team-level mandates. Lazy import: lane_counter imports this module.
+    from sylqon.analysis.lane_counter import combined_requirements
+    reqs = combined_requirements(ctx)
     if not reqs:
         return items
 
@@ -489,9 +496,13 @@ def from_candidate(build: dict, ctx: MatchContext, source: str) -> Loadout:
             and chosen_boots["id"] != default_boots["id"]):
         items[0] = {"id": chosen_boots["id"], "name": chosen_boots["name"]}
 
-    # Opener: role starter (jungle pet / support item) + a guaranteed consumable.
+    # Opener: role starter (jungle pet / support item) + a guaranteed consumable,
+    # then the lane-matchup starter swap (poke lane → Doran's Shield etc.).
+    from sylqon.analysis import lane_counter  # lazy: lane_counter imports us
     starting = _with_starter_consumable(
         _with_role_starter(build.get("starting_items", []), ctx.my_role))
+    starting, starter_reason = lane_counter.matchup_starting_items(starting, ctx)
+    opp = lane_counter.lane_opponent(ctx)
 
     return Loadout(
         items=items,
@@ -510,6 +521,9 @@ def from_candidate(build: dict, ctx: MatchContext, source: str) -> Loadout:
         boots=chosen_boots if chosen_boots is not None else default_boots,
         core_items=build.get("core_items", []),
         situational_pool=build.get("situational_pool", []),
+        first_back=lane_counter.first_back_items(ctx),
+        lane_opponent_name=getattr(opp, "name", "") if opp is not None else "",
+        starter_reason=starter_reason,
     )
 
 
