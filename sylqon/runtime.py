@@ -2083,6 +2083,7 @@ class PipelineRunner:
             self.last_candidate, self.last_loadout = candidate, final
             self.last_variants = [final]  # primary only until alternatives generate
             self._publish_build(candidate, final, ctx)
+            self._record_decision_telemetry(ctx, final)
         # Generate alternative variants off-thread (a second Ollama call) so the
         # primary build/injection is never delayed; covers both live and demo.
         threading.Thread(target=self._generate_variants, args=(ctx,),
@@ -2092,6 +2093,24 @@ class PipelineRunner:
         threading.Thread(target=self._generate_lane_plan, args=(ctx,),
                          name="ag-lane-plan", daemon=True).start()
         return final
+
+    def _record_decision_telemetry(self, ctx: MatchContext,
+                                   final: loadout_mod.Loadout) -> None:
+        """Persist the compiled loadout's coach decisions (closed-loop eval
+        foundation). Best-effort — a telemetry failure must never touch the
+        injection path, so all errors are swallowed."""
+        try:
+            from sylqon.db import queries
+            from sylqon.db.session import get_session
+            session = get_session()
+            try:
+                queries.record_decision(
+                    session, champion=ctx.my_champion, role=ctx.my_role, loadout=final)
+                session.commit()
+            finally:
+                session.close()
+        except Exception:  # pragma: no cover - telemetry is strictly optional
+            log.debug("loadout decision telemetry failed", exc_info=True)
 
     def _publish_build(self, candidate: dict, final: loadout_mod.Loadout,
                        ctx: MatchContext) -> None:

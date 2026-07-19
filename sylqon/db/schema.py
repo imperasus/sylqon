@@ -228,6 +228,31 @@ class MatchAnalysis(Base):
     match = relationship("MatchHistory", back_populates="analysis")
 
 
+class LoadoutDecision(Base):
+    """Telemetry for the coach layer: one row per compiled loadout, recording
+    what the matchup pipeline deviated from the meta build and why. This is the
+    closed-loop foundation — correlating what was recommended (here) with what
+    the player actually built and how the game went (Match-V5 post-game) is what
+    lets the advice engine say "the %pen you were told to rush landed 2 items
+    late". Display/eval only; never injected. Kept small (one row per draft)."""
+    __tablename__ = "loadout_decisions"
+    __table_args__ = (
+        Index("ix_loadout_decision_champ_role", "champion", "role"),
+        Index("ix_loadout_decision_created", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    champion = Column(String, nullable=False)
+    role = Column(String)
+    source = Column(String)                 # "opgg+ollama" | "seed" | ...
+    enemy_summary = Column(String)
+    lane_opponent = Column(String)
+    item_ids = Column(JSON)                 # final injected item ids, in order
+    first_back = Column(JSON)               # [{id, name}] recommended first-back
+    decisions = Column(JSON)                # the full decisions why-list
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class MacroCoachReport(Base):
     """Cached account-level coaching synthesis (the AI Macro Coach "top 3").
     Regenerated when ``based_on_game_id`` no longer matches the newest stored

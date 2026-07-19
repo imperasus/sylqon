@@ -14,6 +14,7 @@ from sylqon.db.schema import (
     ChampionBuild,
     ChampionCounter,
     ChampionSynergy,
+    LoadoutDecision,
     MatchHistory,
 )
 
@@ -144,6 +145,33 @@ def recent_matches(session: Session, limit: int = 10) -> list[MatchHistory]:
     return (
         session.query(MatchHistory)
         .order_by(MatchHistory.played_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def record_decision(session: Session, *, champion: str, role: str, loadout) -> LoadoutDecision:
+    """Persist the coach decisions for ``champion``/``role`` from a compiled
+    loadout. Best-effort; caller commits and swallows errors."""
+    row = LoadoutDecision(
+        champion=champion,
+        role=role,
+        source=getattr(loadout, "source", ""),
+        enemy_summary=getattr(loadout, "enemy_summary", ""),
+        lane_opponent=getattr(loadout, "lane_opponent_name", ""),
+        item_ids=[i.get("id") for i in getattr(loadout, "items", [])],
+        first_back=[{"id": i.get("id"), "name": i.get("name")}
+                    for i in getattr(loadout, "first_back", [])],
+        decisions=list(getattr(loadout, "decisions", [])),
+    )
+    session.add(row)
+    return row
+
+
+def recent_loadout_decisions(session: Session, limit: int = 20) -> list[LoadoutDecision]:
+    return (
+        session.query(LoadoutDecision)
+        .order_by(LoadoutDecision.created_at.desc())
         .limit(limit)
         .all()
     )

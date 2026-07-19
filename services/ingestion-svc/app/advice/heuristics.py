@@ -23,6 +23,10 @@ class PlayerContext:
     assists: int
     wards_placed: int
     control_wards_bought: int
+    # Enemy champion names — feeds the counter-item coverage heuristic (the
+    # post-game half of the draft loadout coach's closed loop). Default empty so
+    # existing callers/tests keep working.
+    enemy_champions: tuple = ()
 
 
 @dataclass
@@ -285,13 +289,18 @@ def objective_presence(view: TimelineView, ctx: PlayerContext, tun: dict) -> Fin
     )
 
 
-ALL_HEURISTICS = (death_context, cs_benchmark, item_timing, vision, objective_presence)
+def _all_heuristics():
+    # Imported lazily so counters.py can import Finding/PlayerContext from here
+    # without a circular import at module load.
+    from app.advice.counters import counter_item_coverage
+    return (death_context, cs_benchmark, item_timing, vision,
+            objective_presence, counter_item_coverage)
 
 
 def run_all(view: TimelineView, ctx: PlayerContext, tun: dict | None = None) -> list[Finding]:
     tun = tun or benchmarks.tuning()
     findings = []
-    for heuristic in ALL_HEURISTICS:
+    for heuristic in _all_heuristics():
         finding = heuristic(view, ctx, tun)
         if finding is not None:
             findings.append(finding)

@@ -96,6 +96,31 @@ _TEMPLATES: dict[str, dict[str, str]] = {
             "seconds before the spawn, not at the last moment."
         ),
     },
+    "counter_no_antiheal": {
+        "hu": (
+            "Az ellenfélben {healers} sebző-gyógyuló champ volt ({enemies}), de te egyetlen "
+            "Grievous Wounds (anti-heal) itemet sem vettél. Egy Executioner's Calling / "
+            "Morellonomicon már a korai fázisban felezi a gyógyulásukat — ezt a meccset a "
+            "sustained harcokban valószínűleg emiatt bukod."
+        ),
+        "en": (
+            "The enemy had {healers} healing threats ({enemies}) but you never bought a single "
+            "Grievous Wounds (anti-heal) item. An early Executioner's Calling / Morellonomicon "
+            "halves their healing — this game was likely lost in sustained fights for want of it."
+        ),
+    },
+    "counter_no_pen": {
+        "hu": (
+            "Az ellenfélben {tanks} tank volt ({enemies}), de nem építettél %-páncéltörő itemet. "
+            "Egy fed frontline ellen a nyers sebzés lepattan — a Lord Dominik's / Void Staff / "
+            "Serylda a 3-4. itemre kötelező, különben nem tudod megölni őket."
+        ),
+        "en": (
+            "The enemy fielded {tanks} tanks ({enemies}) but you built no % penetration item. "
+            "Raw damage bounces off a fed frontline — Lord Dominik's / Void Staff / Serylda by "
+            "your 3rd-4th item is mandatory, or you simply can't kill them."
+        ),
+    },
     "clean_game": {
         "hu": (
             "Ezen a meccsen egyik fő mutatód sem lógott ki negatívan — a halálaid, a farmod, a "

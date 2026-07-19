@@ -72,11 +72,17 @@ def generate_findings(session: Session, match_id: str, puuid: str):
     if participant is None:
         raise AdviceNotPossible(f"player {puuid} not found in match {match_id}")
 
+    raw_participants = bundle[0].raw.get("participants", [])
     team_ids = {
         p.get("participantId")
-        for p in bundle[0].raw.get("participants", [])
+        for p in raw_participants
         if p.get("teamId") == participant.team_id
     }
+    enemy_champions = tuple(
+        p.get("championName", "")
+        for p in raw_participants
+        if p.get("teamId") not in (participant.team_id, None) and p.get("championName")
+    )
     view = TimelineView(
         timeline.payload,
         participant_id=participant.participant_id,
@@ -92,6 +98,7 @@ def generate_findings(session: Session, match_id: str, puuid: str):
         assists=participant.assists or 0,
         wards_placed=participant.wards_placed or 0,
         control_wards_bought=participant.control_wards_bought or 0,
+        enemy_champions=enemy_champions,
     )
     return participant, run_all(view, ctx, _tuning_with_own_benchmarks(session, puuid))
 

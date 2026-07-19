@@ -71,6 +71,10 @@ _DEFAULT_TUNING: dict = {
     "objective_participation_floor": 0.5,
     "objective_radius": 4000.0,
     "min_team_objectives": 2,
+    # counter-item coverage (closed-loop tie-in with the draft loadout coach)
+    "counter_min_game_min": 22.0,       # need time to have completed a counter
+    "counter_healing_min": 2,           # 2+ enemy healers → anti-heal expected
+    "counter_tank_min": 2,              # 2+ enemy tanks → %pen expected
 }
 
 

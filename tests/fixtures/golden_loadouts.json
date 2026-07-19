@@ -1,0 +1,277 @@
+{
+ "adc|Jinx|balanced": {
+  "decision_slots": [
+   "Meta"
+  ],
+  "first_back": [],
+  "items": [
+   3006,
+   3031,
+   3094,
+   3072,
+   3036,
+   3033,
+   3026
+  ],
+  "keystone": "Lethal Tempo",
+  "shards": [
+   "Attack Speed",
+   "Adaptive Force",
+   "Health"
+  ],
+  "spell1": "Heal",
+  "spell2": "Flash",
+  "starter": [
+   1055,
+   2003
+  ]
+ },
+ "adc|Jinx|burst": {
+  "decision_slots": [
+   "Runes"
+  ],
+  "first_back": [],
+  "items": [
+   3006,
+   3031,
+   3094,
+   3072,
+   3026,
+   3033,
+   3036
+  ],
+  "keystone": "Lethal Tempo",
+  "shards": [
+   "Attack Speed",
+   "Adaptive Force",
+   "Health"
+  ],
+  "spell1": "Heal",
+  "spell2": "Flash",
+  "starter": [
+   1055,
+   2003
+  ]
+ },
+ "adc|Jinx|healing": {
+  "decision_slots": [
+   "Meta"
+  ],
+  "first_back": [],
+  "items": [
+   3006,
+   3031,
+   3094,
+   3072,
+   3033,
+   3026,
+   3036
+  ],
+  "keystone": "Lethal Tempo",
+  "shards": [
+   "Attack Speed",
+   "Adaptive Force",
+   "Health"
+  ],
+  "spell1": "Heal",
+  "spell2": "Flash",
+  "starter": [
+   1055,
+   2003
+  ]
+ },
+ "adc|Jinx|tanks": {
+  "decision_slots": [
+   "Core",
+   "Items"
+  ],
+  "first_back": [],
+  "items": [
+   3006,
+   3031,
+   3094,
+   3036,
+   3033,
+   3026,
+   3139
+  ],
+  "keystone": "Lethal Tempo",
+  "shards": [
+   "Attack Speed",
+   "Adaptive Force",
+   "Health"
+  ],
+  "spell1": "Heal",
+  "spell2": "Flash",
+  "starter": [
+   1055,
+   2003
+  ]
+ },
+ "bruiser|Darius|burst": {
+  "decision_slots": [
+   "First Back"
+  ],
+  "first_back": [
+   "Negatron Cloak"
+  ],
+  "items": [
+   3047,
+   3078,
+   3053,
+   3071,
+   3075,
+   3065
+  ],
+  "keystone": "Conqueror",
+  "shards": [
+   "Adaptive Force",
+   "Adaptive Force",
+   "Health"
+  ],
+  "spell1": "Ignite",
+  "spell2": "Flash",
+  "starter": [
+   1055,
+   2003
+  ]
+ },
+ "bruiser|Darius|healing": {
+  "decision_slots": [
+   "First Back"
+  ],
+  "first_back": [
+   "Executioner's Calling"
+  ],
+  "items": [
+   3047,
+   3078,
+   3053,
+   3071,
+   3075,
+   3065
+  ],
+  "keystone": "Conqueror",
+  "shards": [
+   "Adaptive Force",
+   "Adaptive Force",
+   "Health"
+  ],
+  "spell1": "Teleport",
+  "spell2": "Flash",
+  "starter": [
+   1055,
+   2003
+  ]
+ },
+ "bruiser|Darius|tanks": {
+  "decision_slots": [
+   "First Back"
+  ],
+  "first_back": [
+   "Last Whisper"
+  ],
+  "items": [
+   3047,
+   3078,
+   3053,
+   3071,
+   3075,
+   3065
+  ],
+  "keystone": "Conqueror",
+  "shards": [
+   "Adaptive Force",
+   "Adaptive Force",
+   "Health"
+  ],
+  "spell1": "Teleport",
+  "spell2": "Flash",
+  "starter": [
+   1055,
+   2003
+  ]
+ },
+ "mage|Syndra|burst": {
+  "decision_slots": [
+   "First Back"
+  ],
+  "first_back": [
+   "Chain Vest"
+  ],
+  "items": [
+   3020,
+   3089,
+   3157,
+   3135,
+   3102,
+   3165
+  ],
+  "keystone": "Electrocute",
+  "shards": [
+   "Adaptive Force",
+   "Adaptive Force",
+   "Health"
+  ],
+  "spell1": "Barrier",
+  "spell2": "Flash",
+  "starter": [
+   1056,
+   2003
+  ]
+ },
+ "mage|Syndra|healing": {
+  "decision_slots": [
+   "Meta"
+  ],
+  "first_back": [],
+  "items": [
+   3020,
+   3089,
+   3157,
+   3135,
+   3165,
+   3102
+  ],
+  "keystone": "Electrocute",
+  "shards": [
+   "Adaptive Force",
+   "Adaptive Force",
+   "Health"
+  ],
+  "spell1": "Ignite",
+  "spell2": "Flash",
+  "starter": [
+   1056,
+   2003
+  ]
+ },
+ "mage|Syndra|tanks": {
+  "decision_slots": [
+   "First Back"
+  ],
+  "first_back": [
+   "Blighting Jewel"
+  ],
+  "items": [
+   3020,
+   3089,
+   3157,
+   3135,
+   3165,
+   3102
+  ],
+  "keystone": "Electrocute",
+  "shards": [
+   "Adaptive Force",
+   "Adaptive Force",
+   "Health"
+  ],
+  "spell1": "Ignite",
+  "spell2": "Flash",
+  "starter": [
+   1056,
+   2003
+  ]
+ }
+}
