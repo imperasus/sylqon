@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.31.0](https://github.com/imperasus/sylqon/compare/v1.30.0...v1.31.0) (2026-07-19)
+
+
+### Features
+
+* **loadout:** closed-loop eval — golden set, invariants, telemetry, post-game tie-in ([ecf5fb2](https://github.com/imperasus/sylqon/commit/ecf5fb21a3ddd6fe99befedae624d2b48e88d023))
+* **loadout:** coach layer — structured why-list + post-lock delta panel ([df013cc](https://github.com/imperasus/sylqon/commit/df013cc8dc75af7f26f5af3d2939164dc34f1759))
+* **loadout:** generated counter-tag layer + spike-aware ordering ([a3f7f03](https://github.com/imperasus/sylqon/commit/a3f7f03f0ef7ba65e19b0e5579db5d80bbc036c1))
+* **loadout:** lane-matchup counter layer ([db05f44](https://github.com/imperasus/sylqon/commit/db05f44f8d6f35101b94e00699736c53f95816ba))
+* **loadout:** matchup rune-page + spell selectors, Wilson-guarded ([963a9c8](https://github.com/imperasus/sylqon/commit/963a9c8a378da1f47e58ebe713a3e582122611e4))
+
+
+### Bug Fixes
+
+* **loadout:** domain-correct suppression handling + static-table integrity ([211f2b3](https://github.com/imperasus/sylqon/commit/211f2b366880db419b4c11034d91ec71858de392))
+
 ## [1.30.0](https://github.com/imperasus/sylqon/compare/v1.29.3...v1.30.0) (2026-07-18)
 
 
