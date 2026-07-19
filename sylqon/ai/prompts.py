@@ -41,9 +41,11 @@ def threat_directives(threat: dict) -> list[str]:
     elif tanks == 1:
         d.append("1 tank: a [% Pen] or [%HP Damage] item is a strong later pick.")
     if threat.get("suppression"):
-        d.append("Suppression on enemy team: an [Anti-CC] item (QSS/Mercurial, or "
-                 "Mercury's Treads) is mandatory (enforced) for a carry.")
-    elif threat.get("heavy_cc_count", 0) >= 3:
+        d.append("Suppression on enemy team: an [Anti-suppression] item (QSS or "
+                 "Mercurial Scimitar) is mandatory (enforced) for a carry — "
+                 "tenacity, Mercury's Treads and the Cleanse summoner do NOT "
+                 "work against suppression.")
+    if threat.get("heavy_cc_count", 0) >= 3:
         d.append("3+ heavy-CC enemies: an [Anti-CC] / tenacity option is mandatory "
                  "(enforced).")
     if threat.get("burst_ad") or threat.get("burst_ap"):
@@ -207,7 +209,7 @@ RULES:
 - Apply the TACTICAL DOCTRINE first; fill any remaining slots with the highest-damage pool options.
 - situational_items: pick EXACTLY {situational_count} from the pool; order by purchase priority (counters the doctrine marks urgent come first).
 - core_items: output unchanged unless 1 swap with a pool item clearly counters a dominant threat.
-- SUMMONER SPELLS: these are op.gg's spells for {ctx.my_champion} — keep spell1="{def_spell1}" and spell2="{def_spell2}" by DEFAULT. Only change a spell in a genuinely exceptional case (e.g. Cleanse into chain suppression on a squishy carry), and even then pick ONLY from the op.gg-observed options: spell1 ∈ {a1}, spell2 ∈ {a2}. When unsure, keep the defaults. (For junglers spell1 is locked to Smite and ignored here.)
+- SUMMONER SPELLS: these are op.gg's spells for {ctx.my_champion} — keep spell1="{def_spell1}" and spell2="{def_spell2}" by DEFAULT. Only change a spell in a genuinely exceptional case (e.g. Cleanse into chain CC on a squishy carry — but NEVER as a suppression answer: Cleanse cannot remove suppression, only the QSS item can), and even then pick ONLY from the op.gg-observed options: spell1 ∈ {a1}, spell2 ∈ {a2}. When unsure, keep the defaults. (For junglers spell1 is locked to Smite and ignored here.)
 - Use only exact names that appear in the pools above.
 
 Respond with raw JSON only, exactly this shape:

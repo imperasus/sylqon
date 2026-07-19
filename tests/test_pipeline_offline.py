@@ -212,11 +212,18 @@ def test_stat_shard_tail_routing():
 
 def test_spell_guardrails():
     build = _make_adc_build_with_pool()
-    # suppression on the enemy team -> Cleanse on the D-key for a squishy role
-    ctx = make_ctx([threat("Malzahar", threats=["heavy_cc", "suppression"])], role="bottom")
+    # genuine chain CC (3+ heavy-CC enemies) -> Cleanse on the D-key for a squishy role
+    ctx = make_ctx([threat(n, threats=["heavy_cc"])
+                    for n in ("Leona", "Sejuani", "Amumu")], role="bottom")
     spell1, spell2 = loadout_mod.deterministic_spells(build, ctx)
     assert spell1 == "Cleanse"
     assert spell2 in static.ALLOWED_SPELL2          # F-key is a mobility spell
+    # a lone suppressor is NOT a Cleanse trigger — Cleanse cannot remove
+    # suppression; that threat is answered item-side (QSS mandate).
+    ctx_supp = make_ctx([threat("Malzahar", threats=["heavy_cc", "suppression"])],
+                        role="bottom")
+    s1_supp, _ = loadout_mod.deterministic_spells(build, ctx_supp)
+    assert s1_supp != "Cleanse"
     # no extreme threat -> D-key is a utility spell, never Flash/mobility
     ctx2 = make_ctx([threat("Garen", damage_type="AD")], role="top")
     s1, s2 = loadout_mod.deterministic_spells(build, ctx2)
@@ -236,9 +243,10 @@ def test_spell_options_restrict_deviation():
     build["spell_options"] = ["Flash", "Heal"]          # op.gg never runs Cleanse here
     a1, _ = loadout_mod.allowed_spells(build, "bottom")
     assert "Heal" in a1 and "Cleanse" not in a1
-    # Heavy CC + suppression would normally trigger Cleanse — but op.gg doesn't
+    # 3+ heavy-CC enemies would normally trigger Cleanse — but op.gg doesn't
     # run it, so the default Heal is kept.
-    ctx = make_ctx([threat("Malzahar", threats=["heavy_cc", "suppression"])], role="bottom")
+    ctx = make_ctx([threat(n, threats=["heavy_cc"])
+                    for n in ("Leona", "Sejuani", "Amumu")], role="bottom")
     s1, _ = loadout_mod.deterministic_spells(build, ctx, a1)
     assert s1 == "Heal"
     # The AI forcing Cleanse is rejected; a default-set spell is kept.
@@ -581,8 +589,11 @@ def test_threat_directives():
     # heavy healing → anti-heal mandate
     d = threat_directives({"heavy_healing": True})
     assert any("Anti-heal" in x for x in d)
-    # suppression → anti-CC
+    # suppression → QSS/Mercurial only (Cleanse/tenacity explicitly excluded)
     d = threat_directives({"suppression": True})
+    assert any("Anti-suppression" in x and "QSS" in x for x in d)
+    # chain CC → anti-CC / tenacity
+    d = threat_directives({"heavy_cc_count": 3})
     assert any("Anti-CC" in x for x in d)
     # burst → survival ordered mid-build
     d = threat_directives({"burst_ad": True})

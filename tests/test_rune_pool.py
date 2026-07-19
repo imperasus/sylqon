@@ -126,14 +126,22 @@ def _candidate() -> dict:
 # static.py — deprecated keystones
 # ---------------------------------------------------------------------------
 
-class TestDeathfireTouch:
-    def test_deathfire_touch_in_keystones(self):
-        assert "Deathfire Touch" in static.KEYSTONES
-        assert static.KEYSTONES["Deathfire Touch"] == 8992
+class TestDeprecatedKeystones:
+    def test_deathfire_touch_removed(self):
+        """Deathfire Touch left the game with Runes Reforged; keeping it in
+        KEYSTONES let the AI pick it, and the LCU silently drops the unknown
+        perk id — a broken injected page. It must stay out."""
+        assert "Deathfire Touch" not in static.KEYSTONES
+        assert "Deathfire Touch" not in static.KEYSTONE_STYLE
 
-    def test_deathfire_touch_in_keystone_style_as_sorcery(self):
-        assert "Deathfire Touch" in static.KEYSTONE_STYLE
-        assert static.KEYSTONE_STYLE["Deathfire Touch"] == "Sorcery"
+    def test_deathfire_touch_block_rejected(self):
+        from sylqon.loadout import _valid_rune_block
+        assert not _valid_rune_block(
+            "Deathfire Touch",
+            ["Manaflow Band", "Transcendence", "Scorch"],
+            ["Taste of Blood", "Treasure Hunter"],
+            "Domination",
+        )
 
     def test_keystones_and_keystone_style_match(self):
         """Every entry in KEYSTONES must have a style mapping."""

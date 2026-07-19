@@ -158,7 +158,12 @@ def _counter_requirements(threat: dict) -> list[tuple[set[str], bool]]:
     if threat.get("tanks", 0) >= 2:
         # %Pen or %HP shred must arrive early vs a stacked frontline.
         reqs.append(({"percent_pen", "tank_shred"}, True))
-    if threat.get("suppression") or threat.get("heavy_cc_count", 0) >= 3:
+    if threat.get("suppression"):
+        # Only the QSS/Mercurial active removes suppression — tenacity boots,
+        # Mikael's and the Cleanse summoner do not, so this requirement accepts
+        # the narrow anti_suppression tag only.
+        reqs.append(({"anti_suppression"}, True))
+    if threat.get("heavy_cc_count", 0) >= 3:
         reqs.append(({"anti_cc"}, True))
     if threat.get("burst_ad") or threat.get("burst_ap"):
         reqs.append(({"anti_burst"}, True))
@@ -286,7 +291,9 @@ def _acceptable_defense_shards(threat: dict) -> set[str]:
     Scaling replace Tenacity into chain-CC / suppression)."""
     ap = threat.get("magic_threats", 0)
     ad = threat.get("physical_threats", 0)
-    heavy_cc = threat.get("heavy_cc_count", 0) >= 3 or bool(threat.get("suppression"))
+    # Tenacity does nothing against suppression, so only real chain CC forces
+    # the tenacity shard; a lone suppressor is answered item-side (QSS).
+    heavy_cc = threat.get("heavy_cc_count", 0) >= 3
     ap_heavy = ap >= 3 and ap > ad
     ad_heavy = ad >= 4 and ad >= ap
     if heavy_cc:
@@ -307,7 +314,10 @@ def _compute_default_shards(threat: dict, base_shards: list[str]) -> list[str]:
     off, flex, dfn = base_shards[0], base_shards[1], base_shards[2]
     ap = threat.get("magic_threats", 0)
     ad = threat.get("physical_threats", 0)
-    heavy_cc = threat.get("heavy_cc_count", 0) >= 3 or bool(threat.get("suppression"))
+    # Suppression deliberately does NOT force tenacity here: tenacity has no
+    # effect on suppression duration — that threat is answered by the QSS item
+    # mandate in _counter_requirements.
+    heavy_cc = threat.get("heavy_cc_count", 0) >= 3
     ap_heavy = ap >= 3 and ap > ad
     ad_heavy = ad >= 4 and ad >= ap
 
@@ -428,8 +438,11 @@ def deterministic_spells(build: dict, ctx: MatchContext,
     squishy = role in ("middle", "bottom", "utility")
     # Override only when op.gg shows the counter-spell being used on the champ;
     # otherwise keep op.gg's default spell.
-    if (threats["suppression"] or threats["heavy_cc_count"] >= 3) and squishy \
-            and "Cleanse" in allowed1:
+    # Cleanse does NOT remove suppression (Malzahar/Warwick/Urgot/Skarner R) —
+    # only the QSS/Mercurial item active does, and that is guaranteed by the
+    # item-side anti_suppression mandate. Cleanse is only worth the summoner
+    # slot into genuine chain CC (3+ heavy-CC enemies).
+    if threats["heavy_cc_count"] >= 3 and squishy and "Cleanse" in allowed1:
         spell1 = "Cleanse"
     elif threats["burst_ad"] and role == "utility" and "Exhaust" in allowed1:
         spell1 = "Exhaust"
@@ -654,7 +667,13 @@ def _apply_shards(out: Loadout, ai: dict, ctx: MatchContext,
     rows = [static.SHARD_ROW_OFFENSE, static.SHARD_ROW_FLEX, static.SHARD_ROW_DEFENSE]
     if (isinstance(shards, list) and len(shards) == 3
             and all(s in rows[i] for i, s in enumerate(shards))):
-        final[0], final[1] = shards[0], shards[1]          # trust within-row offense/flex
+        # Offense/flex are only honoured on the op.gg pick or the universally
+        # safe Adaptive Force — a within-row but champion-alien pick (e.g.
+        # Attack Speed on a burst mage) never overrides the meta page.
+        if shards[0] in {base_shards[0], "Adaptive Force"}:
+            final[0] = shards[0]
+        if shards[1] in {base_shards[1], "Adaptive Force"}:
+            final[1] = shards[1]
         if shards[2] in _acceptable_defense_shards(threat):
             final[2] = shards[2]                            # honour a threat-consistent defense
 

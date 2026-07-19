@@ -111,9 +111,11 @@ class TestCounterItemEnforcement:
         out, _ = _final(enemies)
         assert _has_tag(out.items, "percent_pen") or _has_tag(out.items, "tank_shred")
 
-    def test_suppression_forces_anti_cc(self):
+    def test_suppression_forces_qss_specifically(self):
+        # Only QSS/Mercurial answer suppression — tenacity items don't count.
         out, _ = _final([_enemy("Malzahar", threats=["suppression"])])
-        assert _has_tag(out.items, "anti_cc")
+        assert _has_tag(out.items, "anti_suppression")
+        assert "Quicksilver Sash" in [i["name"] for i in out.items]
 
     def test_burst_forces_survival_item(self):
         out, _ = _final([_enemy("Zed", damage_type="AD", threats=["burst_ad"])])
@@ -165,9 +167,11 @@ class TestThreatAwareShards:
         out = self._shards({"heavy_cc_count": 3})
         assert out[2] == "Tenacity and Slow Resist"
 
-    def test_suppression_defense_tenacity(self):
+    def test_suppression_alone_keeps_base_defense(self):
+        # Tenacity has no effect on suppression duration — a lone suppressor
+        # must NOT flip the defense shard (the QSS item mandate answers it).
         out = self._shards({"suppression": True})
-        assert out[2] == "Tenacity and Slow Resist"
+        assert out[2] == "Health"
 
     def test_ad_heavy_defense_health(self):
         out = self._shards({"physical_threats": 5, "magic_threats": 0})
@@ -208,6 +212,26 @@ class TestThreatAwareShards:
                               "Tenacity and Slow Resist"]}
         out = loadout_mod.apply_ai_decision(base, ai, ctx, _StubCatalog(), build)
         assert out.shard_ids[2] == static.STAT_SHARDS["Tenacity and Slow Resist"]
+
+    def test_ai_offense_flex_clamped_to_meta_or_adaptive(self):
+        # Within-row but champion-alien offense/flex picks (e.g. Attack Speed
+        # when the meta page runs Adaptive) never override the op.gg shards.
+        ctx = _ctx([_enemy("Garen", damage_type="AD")])
+        build = _build()  # base shards: Adaptive / Adaptive / Health
+        base = loadout_mod.from_candidate(build, ctx, "seed")
+        ai = {"stat_shards": ["Attack Speed", "Move Speed", "Health"]}
+        out = loadout_mod.apply_ai_decision(base, ai, ctx, _StubCatalog(), build)
+        assert out.shard_ids[0] == static.STAT_SHARDS["Adaptive Force"]
+        assert out.shard_ids[1] == static.STAT_SHARDS["Adaptive Force"]
+
+    def test_ai_offense_matching_meta_page_kept(self):
+        ctx = _ctx([_enemy("Garen", damage_type="AD")])
+        build = _build()
+        build["stat_shards"] = ["Attack Speed", "Adaptive Force", "Health"]
+        base = loadout_mod.from_candidate(build, ctx, "seed")
+        ai = {"stat_shards": ["Attack Speed", "Adaptive Force", "Health"]}
+        out = loadout_mod.apply_ai_decision(base, ai, ctx, _StubCatalog(), build)
+        assert out.shard_ids[0] == static.STAT_SHARDS["Attack Speed"]
 
 
 # ---------------------------------------------------------------------------

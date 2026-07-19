@@ -28,6 +28,12 @@ EXCLUDED_ITEM_TAGS = {"Trinket", "Consumable"}
 # Map: wrong DDragon int ID → correct in-game int ID.
 DDRAGON_ID_CORRECTIONS: dict[int, int] = {
     667666: 6676,  # The Collector — DDragon 16.x bug
+    # DDragon 16.x "32"-prefixed garbage ids; the in-game ids are unchanged.
+    # Without the correction these items resolve to ids the LCU silently
+    # drops, and op.gg payloads (which carry the real ids) fail to resolve.
+    323075: 3075,  # Thornmail
+    323110: 3110,  # Frozen Heart
+    323222: 3222,  # Mikael's Blessing
 }
 
 
@@ -42,6 +48,23 @@ class Catalog:
             self._data = json.loads(config.CATALOG_CACHE_PATH.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             self._data = {}
+        self._normalize_ids()
+
+    def _normalize_ids(self) -> None:
+        """Self-heal a cached catalog fetched before an entry landed in
+        DDRAGON_ID_CORRECTIONS — corrections apply on every load, not only at
+        refresh, so users in the field don't need a refetch."""
+        changed = False
+        for it in self._data.get("items", {}).values():
+            corrected = DDRAGON_ID_CORRECTIONS.get(it.get("id"))
+            if corrected is not None:
+                it["id"] = corrected
+                changed = True
+        if changed:
+            try:
+                self._save_disk()
+            except OSError:  # read-only cache dir: corrected in memory only
+                pass
 
     def _save_disk(self) -> None:
         tmp = config.CATALOG_CACHE_PATH.with_suffix(".tmp")

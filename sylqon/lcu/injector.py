@@ -38,6 +38,26 @@ def merge_stat_shards(rune_perk_ids: list[int], shard_ids: list[int]) -> list[in
     return runes_only + shards
 
 
+def _elixir_for(loadout: Loadout) -> dict:
+    """The elixir matching the build's damage class: Wrath for AD-item builds,
+    Sorcery for AP, Iron otherwise (tanks/supports/hybrids get more from the
+    tenacity + size)."""
+    ad = ap = 0
+    for it in loadout.items:
+        cls = static.ITEM_CLASS_RESTRICTION.get(it.get("name", ""), "universal")
+        ad += cls == "ad_only"
+        ap += cls == "ap_only"
+    if ad >= 2 and ad > ap:
+        return static.ELIXIR_OF_WRATH
+    if ap >= 2 and ap > ad:
+        return static.ELIXIR_OF_SORCERY
+    return static.ELIXIR_OF_IRON
+
+
+def _consumables_block_items(loadout: Loadout) -> list[dict]:
+    return [static.CONTROL_WARD, dict(static.STARTER_CONSUMABLE), _elixir_for(loadout)]
+
+
 def build_item_blocks(loadout: Loadout) -> list[dict]:
     """LCU item-set blocks for the injected set.
 
@@ -45,10 +65,15 @@ def build_item_blocks(loadout: Loadout) -> list[dict]:
     items, boots + core, the picks chosen for THIS game, then the unused pool
     items grouped by tactical purpose ("ALT % Pen: vs 2+ tanks", "ALT
     Anti-heal: ...") — so the player can re-route mid-game without leaving the
-    shop. Legacy builds (no pool) keep the original single core block.
+    shop. Legacy builds (no pool) keep the original single core block. Every
+    set ends with a consumables block (Control Ward each back + the elixir
+    matching the build's damage class).
     """
     def block(title: str, items: list[dict]) -> dict:
         return {"type": title, "items": [{"id": str(i["id"]), "count": 1} for i in items]}
+
+    consumables = block("Consumables: Control Ward every back; Elixir at 3+ items",
+                        _consumables_block_items(loadout))
 
     blocks = []
     if loadout.starting_items:
@@ -59,6 +84,7 @@ def build_item_blocks(loadout: Loadout) -> list[dict]:
             and len(loadout.items) > core_len + 1):
         # No pool structure — show all items in one block
         blocks.append(block(f"Core Build vs {loadout.enemy_summary}", loadout.items))
+        blocks.append(consumables)
         return blocks
 
     # items = [boots, core..., situational picks...] (the AI may have swapped
@@ -79,6 +105,7 @@ def build_item_blocks(loadout: Loadout) -> list[dict]:
     for tag, (label, when) in static.COUNTER_TAG_INFO.items():
         if tag in groups:
             blocks.append(block(f"ALT {label}: {when}", groups[tag]))
+    blocks.append(consumables)
     return blocks
 
 

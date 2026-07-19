@@ -49,7 +49,7 @@ SPELL_INFO: dict[str, tuple[str, str]] = {
     "Ghost":    ("Mobility", "Sustained move speed; for champions that kite/chase on foot rather than blink."),
     "Ignite":   ("Utility",  "True-damage DoT + Grievous Wounds; kill pressure and anti-heal in lane."),
     "Exhaust":  ("Utility",  "Slows a target and cuts its damage ~40%; best vs a single fed AD carry / assassin."),
-    "Cleanse":  ("Utility",  "Removes most CC and summoner debuffs; vs chain CC or suppression on a carry."),
+    "Cleanse":  ("Utility",  "Removes most CC and summoner debuffs; vs chain CC on a carry. Does NOT remove suppression (Malzahar/Warwick/Urgot/Skarner R) — only QSS/Mercurial does."),
     "Barrier":  ("Utility",  "Brief self shield; vs burst when you only need to survive one combo."),
     "Heal":     ("Utility",  "Self + ally heal and burst MS; default ADC sustain and 2v2 dueling."),
     "Teleport": ("Utility",  "Global reposition; top-lane map pressure, recoveries and flanks."),
@@ -88,6 +88,14 @@ STARTER_CONSUMABLE_IDS: frozenset[int] = frozenset({
 # enemy threat. Both are universal (fit any role/class), so a smart swap is safe.
 MERCURYS_TREADS: dict = {"id": 3111, "name": "Mercury's Treads"}    # vs AP / heavy CC
 PLATED_STEELCAPS: dict = {"id": 3047, "name": "Plated Steelcaps"}   # vs AD / auto-attackers
+
+# Consumables surfaced as the final item-set block ("buy on backs"). The
+# Control Ward is non-negotiable macro discipline on every role; the elixir is
+# matched to the build's damage class once the player hits 3+ items.
+CONTROL_WARD: dict = {"id": 2055, "name": "Control Ward"}
+ELIXIR_OF_IRON: dict = {"id": 2138, "name": "Elixir of Iron"}       # tanks / hybrids
+ELIXIR_OF_SORCERY: dict = {"id": 2139, "name": "Elixir of Sorcery"}  # AP builds
+ELIXIR_OF_WRATH: dict = {"id": 2140, "name": "Elixir of Wrath"}      # AD builds
 # Smart-swap thresholds: only override op.gg's meta boot when the threat is
 # clearly dominant, so we never over-build defence into a balanced comp.
 BOOT_SWAP_AP_CC_MIN = 3   # >=3 AP threats OR >=3 heavy-CC enemies -> Mercury's
@@ -113,7 +121,6 @@ KEYSTONES = {
     "Summon Aery": 8214,
     "Arcane Comet": 8229,
     "Phase Rush": 8230,
-    "Deathfire Touch": 8992,
     "Grasp of the Undying": 8437,
     "Aftershock": 8439,
     "Guardian": 8465,
@@ -185,7 +192,7 @@ KEYSTONE_STYLE = {
     "Fleet Footwork": "Precision", "Conqueror": "Precision",
     "Electrocute": "Domination", "Dark Harvest": "Domination",
     "Hail of Blades": "Domination",
-    "Summon Aery": "Sorcery", "Arcane Comet": "Sorcery", "Phase Rush": "Sorcery", "Deathfire Touch": "Sorcery",
+    "Summon Aery": "Sorcery", "Arcane Comet": "Sorcery", "Phase Rush": "Sorcery",
     "Grasp of the Undying": "Resolve", "Aftershock": "Resolve", "Guardian": "Resolve",
     "Glacial Augment": "Inspiration", "Unsealed Spellbook": "Inspiration",
     "First Strike": "Inspiration",
@@ -387,7 +394,7 @@ HIGH_BURST_AP = {
 HEAVY_HEALING = {
     "Soraka", "Aatrox", "Dr. Mundo", "Vladimir", "Sylas", "Swain", "Yuumi",
     "Sona", "Nami", "Warwick", "Fiora", "Illaoi", "Briar", "Zac", "Maokai",
-    "Kayn", "Rhaast", "Olaf", "Trundle",
+    "Kayn", "Olaf", "Trundle",
 }
 HEAVY_POKE = {
     "Xerath", "Vel'Koz", "Ziggs", "Lux", "Jayce", "Zoe", "Varus", "Ezreal",
@@ -395,7 +402,7 @@ HEAVY_POKE = {
 }
 HEAVY_TANK = {
     "Ornn", "Sion", "Malphite", "Rammus", "Zac", "Sejuani", "Cho'Gath",
-    "Mundo", "Dr. Mundo", "Tahm Kench", "Shen", "K'Sante", "Maokai", "Amumu",
+    "Dr. Mundo", "Tahm Kench", "Shen", "K'Sante", "Maokai", "Amumu",
 }
 # Champions whose strongest win condition is 1-v-1 side-lane pressure. Used by
 # the draft comp classifier to flag a split-push archetype.
@@ -531,9 +538,11 @@ ITEM_COUNTER_TAGS: dict[int, tuple[str, ...]] = {
     6333: ("anti_burst", "armor"),        # Death's Dance
     3053: ("anti_burst",),                # Sterak's Gage
     6673: ("anti_burst",),                # Immortal Shieldbow
-    # On-demand CC removal vs suppression / chain CC
-    3140: ("anti_cc",),                   # Quicksilver Sash
-    3139: ("anti_cc", "mr"),              # Mercurial Scimitar
+    # On-demand CC removal vs suppression / chain CC. Only QSS/Mercurial's
+    # active removes suppression — tenacity (Mercs) and Mikael's do not, hence
+    # the narrower anti_suppression tag on exactly those two.
+    3140: ("anti_cc", "anti_suppression"),        # Quicksilver Sash
+    3139: ("anti_cc", "anti_suppression", "mr"),  # Mercurial Scimitar
     3111: ("anti_cc", "mr"),              # Mercury's Treads
     3222: ("anti_cc",),                   # Mikael's Blessing
     # Magic resist (vs AP-heavy comps)
@@ -552,9 +561,8 @@ ITEM_COUNTER_TAGS: dict[int, tuple[str, ...]] = {
     3046: ("mobility",),                  # Phantom Dancer
     4629: ("mobility",),                  # Cosmic Drive
     # OpenBuild additions
-    3179: ("percent_pen",),               # Opportunity
     3161: ("tank_shred", "percent_pen"),  # Spear of Shojin
-    3094: ("mobility",),                  # Rapidfire Cannon
+    3094: ("mobility",),                  # Rapid Firecannon
     6662: ("anti_burst", "armor"),        # Iceborn Gauntlet
 }
 
@@ -565,7 +573,8 @@ ITEM_COUNTER_TAGS: dict[int, tuple[str, ...]] = {
 COUNTER_TAG_INFO: dict[str, tuple[str, str]] = {
     "anti_heal":   ("Anti-heal", "vs heavy healing — early component is enough"),
     "percent_pen": ("% Pen", "vs 2+ tanks — buy 3rd-4th item"),
-    "anti_cc":     ("Anti-CC", "vs suppression / chain CC"),
+    "anti_cc":     ("Anti-CC", "vs chain CC — tenacity / on-demand cleanse"),
+    "anti_suppression": ("Anti-suppression", "QSS/Mercurial active — the ONLY answer to suppression"),
     "anti_burst":  ("Survival", "vs assassins / burst"),
     "mr":          ("Magic Resist", "vs fed AP / 3+ AP threats"),
     "armor":       ("Armor", "vs fed AD / 4+ AD threats"),
@@ -599,8 +608,8 @@ ITEM_CLASS_RESTRICTION: dict[str, str] = {
     "Mercurial Scimitar": "ad_only",
     "Serpent's Fang": "ad_only",
     "Phantom Dancer": "ad_only",
-    "Rapidfire Cannon": "ad_only",
-    "Opportunity": "ad_only",
+    "Rapid Firecannon": "ad_only",
+    "Umbral Glaive": "ad_only",
     "Spear of Shojin": "ad_only",
     "Infinity Edge": "ad_only",
     "Kraken Slayer": "ad_only",
@@ -626,7 +635,7 @@ ITEM_CLASS_RESTRICTION: dict[str, str] = {
     "Mikael's Blessing": "ap_only",
     "Cosmic Drive": "ap_only",
     "Rabadon's Deathcap": "ap_only",
-    "Luden's Companion": "ap_only",
+    "Luden's Echo": "ap_only",
     "Shadowflame": "ap_only",
     "Blackfire Torch": "ap_only",
     "Rylai's Crystal Scepter": "ap_only",
