@@ -2071,6 +2071,15 @@ class PipelineRunner:
                 final = loadout_mod.apply_ai_decision(
                     base, ai_result, ctx, self.catalog, candidate)
             final.name = final.name or "Recommended"
+            # Coach layer: the structured why-list of every deviation from the
+            # untouched meta build (last_standard). Best-effort — never blocks.
+            try:
+                from sylqon.analysis import decisions as decisions_mod
+                final.decisions = decisions_mod.build_decisions(
+                    final, self.last_standard, candidate, ctx)
+            except Exception:  # pragma: no cover - defensive: coaching is optional
+                log.debug("decision layer failed; publishing build without it",
+                          exc_info=True)
             self.last_candidate, self.last_loadout = candidate, final
             self.last_variants = [final]  # primary only until alternatives generate
             self._publish_build(candidate, final, ctx)

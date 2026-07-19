@@ -139,4 +139,9 @@ def serialize_loadout(l: loadout_mod.Loadout) -> dict:
         # situational alternatives not chosen for the default order — shown as
         # "other options" in the item panel.
         "situational_pool": l.situational_pool,
+        # Coach layer: structured why-list of every deviation from meta, plus
+        # the lane-counter context the post-lock panel and overlay surface.
+        "decisions": l.decisions,
+        "first_back": l.first_back,
+        "lane_opponent_name": l.lane_opponent_name,
     }

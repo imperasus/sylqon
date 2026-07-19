@@ -1,7 +1,8 @@
 import { Fragment, useState } from "react";
 import {
   ArrowLeftRight, Brain, Check, CheckCircle2, ChevronDown, ChevronRight, Gauge,
-  Loader2, Lock, Package, ShieldHalf, Skull, Sparkles, Sword, Swords, Target, Users,
+  GraduationCap, Loader2, Lock, Package, ShieldCheck, ShieldHalf, Skull, Sparkles,
+  Sword, Swords, Target, Users,
 } from "lucide-react";
 import { usePerkIcons } from "../api.js";
 import { DAMAGE_COLORS, ROLE_LABELS, TIER_STYLE, itemUrl, spellUrl } from "../assets.js";
@@ -487,6 +488,77 @@ function AIInsight({ build }) {
   );
 }
 
+/* -------------------------------------------------------------- coach strip */
+
+const DECISION_TONE = {
+  swap: "border-accent/40 bg-accent/10 text-accent-bright",
+  add: "border-good/40 bg-good/10 text-good",
+  tune: "border-mana/40 bg-mana/10 text-mana",
+  note: "border-white/15 bg-white/5 text-white/70",
+  keep: "border-good/30 bg-good/8 text-good",
+};
+
+function DeltaBadge({ decision }) {
+  const tone = DECISION_TONE[decision.kind] || DECISION_TONE.swap;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-2xs font-semibold ${tone}`}
+          title={decision.reason}>
+      <span className="tracking-[0.08em] opacity-70">{decision.slot?.toUpperCase()}</span>
+      <span className="font-normal opacity-95">{decision.summary}</span>
+    </span>
+  );
+}
+
+/* Always-visible coaching read of what the loadout changed vs the meta build
+   (and why, on hover) — or a calm "meta is optimal" confirmation. */
+function CoachStrip({ optimized, patch }) {
+  const [open, setOpen] = useState(false);
+  const decisions = optimized?.decisions || [];
+  const firstBack = optimized?.first_back || [];
+  if (!decisions.length) return null;
+  const isMeta = decisions.length === 1 && decisions[0].kind === "keep";
+  const count = isMeta ? 0 : decisions.filter((d) => d.kind !== "note").length;
+
+  return (
+    <div className="surface surface-accent px-2.5 py-1.5">
+      <button onClick={() => setOpen((v) => !v)}
+              className="flex w-full cursor-pointer items-center gap-2 text-left">
+        {isMeta ? <ShieldCheck className="h-4 w-4 shrink-0 text-good" />
+                : <GraduationCap className="h-4 w-4 shrink-0 text-accent-bright" />}
+        <SectionTitle accent="accent">COACH</SectionTitle>
+        <span className="text-xs font-semibold text-white/75">
+          {isMeta ? "Meta build is optimal here" : `${count} adjustment${count === 1 ? "" : "s"} vs the meta build`}
+        </span>
+        {firstBack.length > 0 && (
+          <span className="ml-1 hidden items-center gap-1 sm:flex" title="Buy these on your first back">
+            <span className="text-2xs tracking-wide text-white/35">1ST BACK</span>
+            {firstBack.map((it) => (
+              <img key={it.id} src={itemUrl(patch, it.id)} alt={it.name}
+                   className="h-5 w-5 rounded ring-1 ring-good/40" draggable={false} title={it.name} />
+            ))}
+          </span>
+        )}
+        <ChevronDown className={`ml-auto h-4 w-4 shrink-0 text-white/40 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {/* Collapsed: a single badge row. Expanded: every decision + its reason. */}
+      {!open ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {decisions.filter((d) => d.kind !== "note").map((d, i) => <DeltaBadge key={i} decision={d} />)}
+        </div>
+      ) : (
+        <div className="mt-1.5 flex flex-col gap-1.5">
+          {decisions.map((d, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <DeltaBadge decision={d} />
+              <span className="min-w-0 flex-1 text-xs leading-snug text-white/60">{d.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PostlockCockpit({ state, api }) {
   const build = state?.build;
   const patch = state?.cache?.patch || "16.12.1";
@@ -532,6 +604,7 @@ export default function PostlockCockpit({ state, api }) {
     return (
       <div className="flex h-full min-h-0 flex-col gap-3">
         {header}
+        <CoachStrip optimized={active} patch={patch} />
         <div className="grid min-h-0 flex-1 grid-cols-[1.3fr_1fr] gap-3">
           <ItemsPanel build={activeBuild} patch={patch} enemySummary={enemySummary} />
           <RunesPanel build={activeBuild} />
@@ -544,6 +617,7 @@ export default function PostlockCockpit({ state, api }) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-2.5">
       {header}
+      <CoachStrip optimized={active} patch={patch} />
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(14rem,0.85fr)_minmax(0,1.25fr)_minmax(15rem,0.95fr)] gap-2.5">
         {/* Left rail — scorecard + per-champ synergy & counter values. */}
         <div className="flex min-h-0 flex-col gap-2.5 overflow-hidden pr-0.5">

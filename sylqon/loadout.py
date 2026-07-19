@@ -44,6 +44,9 @@ class Loadout:
     first_back: list[dict] = field(default_factory=list)
     lane_opponent_name: str = ""
     starter_reason: str = ""
+    # Coach layer: the structured why-list of every deviation from the meta
+    # build (populated post-compile by analysis.decisions.build_decisions).
+    decisions: list[dict] = field(default_factory=list)
 
 
 def _with_role_starter(starting_items: list[dict], role: str) -> list[dict]:
