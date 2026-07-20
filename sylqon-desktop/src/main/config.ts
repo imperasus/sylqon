@@ -119,9 +119,11 @@ export function getClickThroughHotkey(): string {
 }
 
 /**
- * Whether the overlay starts in click-through mode. Default false (interactive,
- * so you can click/drag it). Env: SYLQON_CLICK_THROUGH ("1"/"true" to start
- * pass-through), file: clickThrough.
+ * Whether the overlay starts in click-through mode. Default true (clicks pass to
+ * the game, so the overlay can never be clicked or dragged by accident) — toggle
+ * to interactive with the click-through hotkey (F9) when you want to reposition
+ * it. Env: SYLQON_CLICK_THROUGH ("0"/"false" to start interactive), file:
+ * clickThrough.
  */
 export function getClickThroughDefault(): boolean {
   const raw = process.env.SYLQON_CLICK_THROUGH?.trim().toLowerCase();
@@ -129,7 +131,7 @@ export function getClickThroughDefault(): boolean {
   if (raw === "0" || raw === "false" || raw === "no") return false;
   const fileVal = getFileConfig().clickThrough;
   if (typeof fileVal === "boolean") return fileVal;
-  return false;
+  return true;
 }
 
 /**
