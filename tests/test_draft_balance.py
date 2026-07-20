@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sylqon.analysis import draft_intel
+from sylqon.analysis import draft_intel, win_model
 from sylqon.lcu.lobby import summarize_team
 
 
@@ -83,13 +83,18 @@ def test_symmetric_comps_stay_near_even():
     assert 45 <= out["win_pct"] <= 55
 
 
-def test_win_pct_clamped_to_band():
-    # Pile on every positive signal incl. a maxed lane lead -> capped at the ceil.
+def test_win_pct_strong_but_softly_bounded():
+    # A strongly favoured draft reads high but the logistic model never claims a
+    # blowout — it stays within the soft [floor, ceil] band.
     hi = _balance(_engage(), _poke(), lane_advantage=10)
-    assert hi["win_pct"] == 65
-    # Mirror it -> capped at the floor.
+    assert hi["win_pct"] > 65
+    assert hi["win_pct"] <= win_model.WIN_PCT_CEIL
+    assert hi["label"] == "FAVOURED"
+    # Mirror it -> a strong deficit, likewise bounded below.
     lo = _balance(_poke(), _engage(), lane_advantage=-10)
-    assert lo["win_pct"] == 35
+    assert lo["win_pct"] < 35
+    assert lo["win_pct"] >= win_model.WIN_PCT_FLOOR
+    assert lo["label"] == "BEHIND"
 
 
 def test_sparse_draft_is_low_confidence_and_even():

@@ -12,6 +12,7 @@ full dataclass.
 """
 from __future__ import annotations
 
+from sylqon.analysis import win_model
 from sylqon.data import static
 
 
@@ -174,11 +175,11 @@ _ARCH_MATCHUP = {
     ("protect_carry", "poke_siege"),   # out-sustain the poke
 }
 
-# Mapping from total accumulated edge to a win-probability point spread. The
-# band is intentionally narrow — this is a draft heuristic, not a real model, so
-# it must never claim a blowout.
-_EDGE_TO_PCT = 6.0
-_WIN_PCT_FLOOR, _WIN_PCT_CEIL = 35, 65
+# The signed edge is mapped to a win probability by a calibratable logistic model
+# (:mod:`sylqon.analysis.win_model`) rather than a raw linear ramp — the correct
+# functional form for a bounded probability, with a slope coefficient that can be
+# fit from real drafted-game outcomes. The model softly bounds the output so a
+# draft-time read never claims a blowout.
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
@@ -263,7 +264,7 @@ def draft_balance(ally_comp: dict, enemy_comp: dict,
         drivers.append((lane, "Lane lead" if lane > 0 else "Lane deficit"))
         edge += lane
 
-    win_pct = int(round(_clamp(50 + edge * _EDGE_TO_PCT, _WIN_PCT_FLOOR, _WIN_PCT_CEIL)))
+    win_pct = win_model.edge_to_win_pct(edge)
     if win_pct >= 55:
         label, tone = "FAVOURED", "good"
     elif win_pct <= 45:

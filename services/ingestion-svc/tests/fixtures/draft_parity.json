@@ -1,7 +1,7 @@
 {
  "generated_by": "python -m sylqon.tools.export_draft_tables",
  "bundle_version": 1,
- "patch": "16.13.1",
+ "patch": "16.14.1",
  "comp_cases": [
   {
    "id": "engage_vs_poke",
@@ -27,7 +27,7 @@
      "confidence": 100,
      "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
      "signals": [
-      "3 hard-engage frontline",
+      "4 hard-engage frontline",
       "3 tanks"
      ]
     },
@@ -37,36 +37,37 @@
      "confidence": 100,
      "counter_plan": "Force engage onto them — they fold once you close the gap; stack sustain/shields and look for hard-engage angles.",
      "signals": [
-      "5 poke/siege threats"
+      "5 poke/siege threats",
+      "enchanter + carry peel core"
      ]
     },
     "ally_summary": {
      "physical_threats": 2,
      "magic_threats": 1,
      "mixed_threats": 2,
-     "heavy_cc_count": 3,
+     "heavy_cc_count": 4,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": false,
-     "tanks": 2,
+     "tanks": 3,
      "frontline": 4
     },
     "enemy_summary": {
      "physical_threats": 2,
      "magic_threats": 3,
      "mixed_threats": 0,
-     "heavy_cc_count": 0,
+     "heavy_cc_count": 4,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
-     "heavy_healing": false,
+     "heavy_healing": true,
      "tanks": 0,
      "frontline": 1
     },
     "balance": {
-     "win_pct": 61,
-     "edge": 1.8,
+     "win_pct": 58,
+     "edge": 1.4,
      "label": "FAVOURED",
      "tone": "good",
      "confidence": 100,
@@ -77,10 +78,6 @@
       },
       {
        "text": "Mixed damage",
-       "sign": 1
-      },
-      {
-       "text": "CC edge",
        "sign": 1
       }
      ]
@@ -111,6 +108,7 @@
      "confidence": 100,
      "counter_plan": "Never walk alone: ward deep, group, and bring a Zhonya/GA/QSS to survive the first burst.",
      "signals": [
+      "1 hard-engage frontline",
       "5 burst/assassin threats"
      ]
     },
@@ -129,11 +127,11 @@
      "physical_threats": 3,
      "magic_threats": 2,
      "mixed_threats": 0,
-     "heavy_cc_count": 0,
+     "heavy_cc_count": 4,
      "suppression": false,
      "burst_ad": true,
      "burst_ap": true,
-     "heavy_healing": false,
+     "heavy_healing": true,
      "tanks": 0,
      "frontline": 1
     },
@@ -141,17 +139,17 @@
      "physical_threats": 1,
      "magic_threats": 2,
      "mixed_threats": 2,
-     "heavy_cc_count": 1,
+     "heavy_cc_count": 2,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": true,
-     "tanks": 1,
+     "tanks": 2,
      "frontline": 2
     },
     "balance": {
-     "win_pct": 57,
-     "edge": 1.24,
+     "win_pct": 60,
+     "edge": 1.64,
      "label": "FAVOURED",
      "tone": "good",
      "confidence": 100,
@@ -162,6 +160,10 @@
       },
       {
        "text": "Mixed damage",
+       "sign": 1
+      },
+      {
+       "text": "CC edge",
        "sign": 1
       }
      ]
@@ -192,6 +194,7 @@
      "confidence": 100,
      "counter_plan": "Match their side-laner or force 5v4 mid; track the splitter and trade objectives, don't chase.",
      "signals": [
+      "2 hard-engage frontline",
       "2 burst/assassin threats",
       "3 side-lane threats"
      ]
@@ -209,7 +212,7 @@
      "physical_threats": 3,
      "magic_threats": 1,
      "mixed_threats": 1,
-     "heavy_cc_count": 0,
+     "heavy_cc_count": 2,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
@@ -221,7 +224,7 @@
      "physical_threats": 2,
      "magic_threats": 1,
      "mixed_threats": 2,
-     "heavy_cc_count": 1,
+     "heavy_cc_count": 2,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
@@ -296,7 +299,7 @@
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": true,
-     "tanks": 0,
+     "tanks": 4,
      "frontline": 4
     },
     "enemy_summary": {
@@ -307,8 +310,8 @@
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
-     "heavy_healing": false,
-     "tanks": 0,
+     "heavy_healing": true,
+     "tanks": 1,
      "frontline": 1
     },
     "balance": {
@@ -376,12 +379,12 @@
      "physical_threats": 1,
      "magic_threats": 2,
      "mixed_threats": 2,
-     "heavy_cc_count": 4,
+     "heavy_cc_count": 5,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": true,
      "heavy_healing": false,
-     "tanks": 2,
+     "tanks": 3,
      "frontline": 3
     },
     "enemy_summary": {
@@ -393,7 +396,7 @@
      "burst_ad": false,
      "burst_ap": true,
      "heavy_healing": true,
-     "tanks": 2,
+     "tanks": 3,
      "frontline": 3
     },
     "balance": {
@@ -448,7 +451,7 @@
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": false,
-     "tanks": 0,
+     "tanks": 1,
      "frontline": 1
     },
     "enemy_summary": {
@@ -460,7 +463,7 @@
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": false,
-     "tanks": 0,
+     "tanks": 1,
      "frontline": 1
     },
     "balance": {
@@ -570,7 +573,7 @@
      "physical_threats": 2,
      "magic_threats": 1,
      "mixed_threats": 0,
-     "heavy_cc_count": 0,
+     "heavy_cc_count": 1,
      "suppression": false,
      "burst_ad": true,
      "burst_ap": false,
@@ -587,12 +590,12 @@
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": true,
-     "tanks": 1,
+     "tanks": 2,
      "frontline": 2
     },
     "balance": {
-     "win_pct": 46,
-     "edge": -0.6,
+     "win_pct": 49,
+     "edge": -0.2,
      "label": "EVEN",
      "tone": "amber",
      "confidence": 50,
@@ -604,10 +607,6 @@
       {
        "text": "Mixed damage",
        "sign": 1
-      },
-      {
-       "text": "CC deficit",
-       "sign": -1
       }
      ]
     }
@@ -637,6 +636,7 @@
      "confidence": 100,
      "counter_plan": "Match their side-laner or force 5v4 mid; track the splitter and trade objectives, don't chase.",
      "signals": [
+      "2 hard-engage frontline",
       "2 burst/assassin threats",
       "3 side-lane threats"
      ]
@@ -647,14 +647,15 @@
      "confidence": 100,
      "counter_plan": "Force engage onto them — they fold once you close the gap; stack sustain/shields and look for hard-engage angles.",
      "signals": [
-      "5 poke/siege threats"
+      "5 poke/siege threats",
+      "enchanter + carry peel core"
      ]
     },
     "ally_summary": {
      "physical_threats": 3,
      "magic_threats": 1,
      "mixed_threats": 1,
-     "heavy_cc_count": 0,
+     "heavy_cc_count": 2,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
@@ -666,17 +667,17 @@
      "physical_threats": 2,
      "magic_threats": 3,
      "mixed_threats": 0,
-     "heavy_cc_count": 0,
+     "heavy_cc_count": 4,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
-     "heavy_healing": false,
+     "heavy_healing": true,
      "tanks": 0,
      "frontline": 1
     },
     "balance": {
-     "win_pct": 49,
-     "edge": -0.2,
+     "win_pct": 46,
+     "edge": -0.6,
      "label": "EVEN",
      "tone": "amber",
      "confidence": 100,
@@ -688,6 +689,10 @@
       {
        "text": "Mixed damage",
        "sign": 1
+      },
+      {
+       "text": "CC deficit",
+       "sign": -1
       },
       {
        "text": "Lane lead",
@@ -721,7 +726,7 @@
      "confidence": 100,
      "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
      "signals": [
-      "3 hard-engage frontline",
+      "4 hard-engage frontline",
       "3 tanks"
      ]
     },
@@ -731,6 +736,7 @@
      "confidence": 100,
      "counter_plan": "Never walk alone: ward deep, group, and bring a Zhonya/GA/QSS to survive the first burst.",
      "signals": [
+      "1 hard-engage frontline",
       "5 burst/assassin threats"
      ]
     },
@@ -738,29 +744,29 @@
      "physical_threats": 2,
      "magic_threats": 1,
      "mixed_threats": 2,
-     "heavy_cc_count": 3,
+     "heavy_cc_count": 4,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": false,
-     "tanks": 2,
+     "tanks": 3,
      "frontline": 4
     },
     "enemy_summary": {
      "physical_threats": 3,
      "magic_threats": 2,
      "mixed_threats": 0,
-     "heavy_cc_count": 0,
+     "heavy_cc_count": 4,
      "suppression": false,
      "burst_ad": true,
      "burst_ap": true,
-     "heavy_healing": false,
+     "heavy_healing": true,
      "tanks": 0,
      "frontline": 1
     },
     "balance": {
-     "win_pct": 51,
-     "edge": 0.15,
+     "win_pct": 49,
+     "edge": -0.25,
      "label": "EVEN",
      "tone": "amber",
      "confidence": 100,
@@ -771,10 +777,6 @@
       },
       {
        "text": "Mixed damage",
-       "sign": 1
-      },
-      {
-       "text": "CC edge",
        "sign": 1
       }
      ]
@@ -830,19 +832,19 @@
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": true,
-     "tanks": 0,
+     "tanks": 4,
      "frontline": 4
     },
     "enemy_summary": {
      "physical_threats": 1,
      "magic_threats": 2,
      "mixed_threats": 2,
-     "heavy_cc_count": 1,
+     "heavy_cc_count": 2,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": true,
-     "tanks": 1,
+     "tanks": 2,
      "frontline": 2
     },
     "balance": {
@@ -889,10 +891,10 @@
     "ally_comp": {
      "archetype": "hard_engage",
      "label": "Hard Engage / Dive",
-     "confidence": 72,
+     "confidence": 100,
      "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
      "signals": [
-      "2 hard-engage frontline",
+      "3 hard-engage frontline",
       "2 burst/assassin threats",
       "2 tanks"
      ]
@@ -910,19 +912,19 @@
      "physical_threats": 2,
      "magic_threats": 1,
      "mixed_threats": 2,
-     "heavy_cc_count": 2,
+     "heavy_cc_count": 5,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": false,
-     "tanks": 1,
+     "tanks": 2,
      "frontline": 3
     },
     "enemy_summary": {
      "physical_threats": 0,
      "magic_threats": 5,
      "mixed_threats": 0,
-     "heavy_cc_count": 2,
+     "heavy_cc_count": 4,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": true,
@@ -931,8 +933,8 @@
      "frontline": 0
     },
     "balance": {
-     "win_pct": 62,
-     "edge": 1.92,
+     "win_pct": 63,
+     "edge": 2.2,
      "label": "FAVOURED",
      "tone": "good",
      "confidence": 100,
@@ -985,12 +987,12 @@
      ]
     },
     "enemy_comp": {
-     "archetype": "teamfight",
-     "label": "Teamfight / Wombo",
-     "confidence": 66,
-     "counter_plan": "Don't group into their AoE: split the map, pick before fights and bring flash-clears / spread positioning.",
+     "archetype": "hard_engage",
+     "label": "Hard Engage / Dive",
+     "confidence": 84,
+     "counter_plan": "Respect their all-in: itemize survivability, hold a disengage/peel tool and don't get caught grouped.",
      "signals": [
-      "1 hard-engage frontline",
+      "2 hard-engage frontline",
       "2 tanks"
      ]
     },
@@ -998,7 +1000,7 @@
      "physical_threats": 5,
      "magic_threats": 0,
      "mixed_threats": 0,
-     "heavy_cc_count": 0,
+     "heavy_cc_count": 2,
      "suppression": false,
      "burst_ad": true,
      "burst_ap": false,
@@ -1010,25 +1012,21 @@
      "physical_threats": 2,
      "magic_threats": 1,
      "mixed_threats": 2,
-     "heavy_cc_count": 1,
+     "heavy_cc_count": 3,
      "suppression": false,
      "burst_ad": false,
      "burst_ap": false,
      "heavy_healing": false,
-     "tanks": 1,
+     "tanks": 2,
      "frontline": 3
     },
     "balance": {
-     "win_pct": 40,
-     "edge": -1.66,
+     "win_pct": 44,
+     "edge": -1.0,
      "label": "BEHIND",
      "tone": "bad",
      "confidence": 100,
      "drivers": [
-      {
-       "text": "Teamfight > Pick",
-       "sign": -1
-      },
       {
        "text": "No frontline",
        "sign": -1
