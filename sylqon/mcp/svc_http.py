@@ -92,7 +92,8 @@ def fetch_detail(cid: int, role: str,
     if payload:
         payload = dict(payload)
         payload["role"] = role  # local role string for opgg_to_build
-    counters = [{"champion_id": c["champion_id"], "opp_winrate": c["opp_winrate"]}
+    counters = [{"champion_id": c["champion_id"], "opp_winrate": c["opp_winrate"],
+                 "games": c.get("games")}
                 for c in e.get("counters", [])]
     return payload, counters
 

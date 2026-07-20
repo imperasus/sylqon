@@ -71,6 +71,25 @@ def counter_map(session: Session, champion_id: int, role: str,
     return {r.counter_id: r.advantage_score for r in rows}
 
 
+def counter_games_map(session: Session, champion_id: int, role: str,
+                      enemy_ids: list[int]) -> dict[int, int]:
+    """``{enemy_id: games}`` — matchup sample size for this champion in ``role``
+    vs the given enemies. Pairs with no stored sample size are absent (callers
+    treat a missing sample as "trust the point estimate as-is")."""
+    if not enemy_ids:
+        return {}
+    rows = (
+        session.query(ChampionCounter)
+        .filter(
+            ChampionCounter.champion_id == champion_id,
+            ChampionCounter.role == role,
+            ChampionCounter.counter_id.in_(enemy_ids),
+        )
+        .all()
+    )
+    return {r.counter_id: r.games for r in rows if r.games is not None}
+
+
 def synergy_map(session: Session, champion_id: int, role: str,
                 ally_ids: list[int]) -> dict[int, float]:
     """``{ally_id: synergy_score}`` for this champion in ``role`` with the given

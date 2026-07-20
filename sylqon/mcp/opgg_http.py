@@ -74,7 +74,8 @@ def fetch_detail(cid: int, role: str, region: str | None = None) -> tuple[dict |
         play = c.get("play") or 0
         ocid = c.get("champion_id")
         if play > 0 and ocid:
-            counters.append({"champion_id": ocid, "opp_winrate": c.get("win", 0) / play})
+            counters.append({"champion_id": ocid, "opp_winrate": c.get("win", 0) / play,
+                             "games": play})
     return payload, counters
 
 

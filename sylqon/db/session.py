@@ -25,6 +25,11 @@ engine: Engine = create_engine(f"sqlite:///{config.DB_PATH}", future=True)
 # ADD COLUMN is safe and non-locking for nullable columns.
 _ADDITIVE_COLUMNS = [
     ("mission_runs", "champion_id", "INTEGER"),
+    # F2 — matchup/pair sample size + patch for Wilson-style confidence weighting.
+    ("champion_counters", "games", "INTEGER"),
+    ("champion_counters", "patch", "VARCHAR"),
+    ("champion_synergies", "games", "INTEGER"),
+    ("champion_synergies", "patch", "VARCHAR"),
 ]
 
 

@@ -14,7 +14,7 @@ BUNDLE = {
             "champion_id": 222, "champion": "Jinx", "role": "BOTTOM",
             "games": 40, "tier": 1, "win_rate": 0.53, "pick_rate": 0.12,
             "payload": {"role": "BOTTOM", "core_item_ids": [3031], "boot_ids": [3006]},
-            "counters": [{"champion_id": 119, "opp_winrate": 0.42}],
+            "counters": [{"champion_id": 119, "opp_winrate": 0.42, "games": 220}],
             "synergies": [{"synergy_champion_id": 412, "win_rate": 0.58, "games": 9}],
         },
         {
@@ -62,7 +62,7 @@ def test_one_bulk_call_serves_all_three():
 
     assert payload["core_item_ids"] == [3031]
     assert payload["role"] == "bottom"  # localized for opgg_to_build
-    assert counters == [{"champion_id": 119, "opp_winrate": 0.42}]
+    assert counters == [{"champion_id": 119, "opp_winrate": 0.42, "games": 220}]
     assert synergies == [{"synergy_champion_id": 412, "win_rate": 0.58}]
 
 

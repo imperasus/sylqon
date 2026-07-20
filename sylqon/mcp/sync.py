@@ -211,7 +211,8 @@ def run_full_sync(region: str | None = None, sleep: float = 0.12,
                         if other is None:
                             continue
                         adv = max(-10.0, min(10.0, (0.5 - c["opp_winrate"]) * 100))
-                        ingest.upsert_counter(session, champ.id, other.id, role, round(adv, 2))
+                        ingest.upsert_counter(session, champ.id, other.id, role, round(adv, 2),
+                                              games=c.get("games"), patch=catalog.patch)
                         counts["counters"] += 1
                     for s in synergies:
                         ally = rows.get(s["synergy_champion_id"])

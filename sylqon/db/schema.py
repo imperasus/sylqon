@@ -80,6 +80,8 @@ class ChampionCounter(Base):
     counter_id = Column(Integer, ForeignKey("champions.id"), primary_key=True)
     role = Column(String, primary_key=True)
     advantage_score = Column(Float)  # -10 (hard countered) .. +10 (hard counter)
+    games = Column(Integer)          # matchup sample size (None = unknown/legacy)
+    patch = Column(String)           # patch the sample was aggregated on
 
 
 class ChampionSynergy(Base):
@@ -92,6 +94,8 @@ class ChampionSynergy(Base):
     synergy_id = Column(Integer, ForeignKey("champions.id"), primary_key=True)
     role = Column(String, primary_key=True)
     synergy_score = Column(Float)  # 0 .. 10
+    games = Column(Integer)        # pair sample size (None = unknown/legacy)
+    patch = Column(String)         # patch the sample was aggregated on
 
 
 class ProBuild(Base):

@@ -61,21 +61,31 @@ def _champ(session: Session, name: str) -> Champion | None:
 
 # -- id-based upserts (used by the automated HTTP sync) ----------------------
 def upsert_counter(session: Session, champion_id: int, counter_id: int,
-                   role: str, advantage: float) -> None:
+                   role: str, advantage: float,
+                   games: int | None = None, patch: str = "") -> None:
     row = session.get(ChampionCounter, (champion_id, counter_id, role))
     if row is None:
         row = ChampionCounter(champion_id=champion_id, counter_id=counter_id, role=role)
         session.add(row)
     row.advantage_score = advantage
+    if games is not None:
+        row.games = games
+    if patch:
+        row.patch = patch
 
 
 def upsert_synergy(session: Session, champion_id: int, synergy_id: int,
-                   role: str, score: float) -> None:
+                   role: str, score: float,
+                   games: int | None = None, patch: str = "") -> None:
     row = session.get(ChampionSynergy, (champion_id, synergy_id, role))
     if row is None:
         row = ChampionSynergy(champion_id=champion_id, synergy_id=synergy_id, role=role)
         session.add(row)
     row.synergy_score = score
+    if games is not None:
+        row.games = games
+    if patch:
+        row.patch = patch
 
 
 # -- lane meta (roles + tier/win/pick) ---------------------------------------
