@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.33.0](https://github.com/imperasus/sylqon/compare/v1.32.0...v1.33.0) (2026-07-20)
+
+
+### Features
+
+* **desktop:** default the overlay to click-through ([43f6da1](https://github.com/imperasus/sylqon/commit/43f6da1efa4c71cc276b9167cff9420a5b2d0716))
+* **overlay:** live coach — reactive triggers, coaching depth, adaptive missions ([02ae19f](https://github.com/imperasus/sylqon/commit/02ae19fdd4a4145d0884dd7fd1a1bc8382333115))
+
 ## [1.32.0](https://github.com/imperasus/sylqon/compare/v1.31.0...v1.32.0) (2026-07-20)
 
 
