@@ -541,6 +541,46 @@ CHAMPION_DAMAGE_TYPE: dict[str, str] = {
     "Poppy": "mixed", "Dr. Mundo": "mixed",
 }
 
+
+# --- Generated full-roster trait coverage (scripts/generate_champion_traits.py)
+# The curated sets above encode expert judgment but historically covered only a
+# slice of the roster, leaving most champions as a "neutral blob". We UNION in
+# the deterministically-derivable traits (damage_type for the whole roster, and
+# heavy_cc / suppression / heavy_healing / tank keyword/info signals) from a
+# committed generated file — same discipline as the item-tag generator. The
+# curated data ALWAYS wins: generation only widens coverage, never overrides a
+# hand call or reorders anything. Effect-level tags (burst_ad/ap, poke) stay
+# curated-only, since a keyword scan cannot judge them reliably.
+def _load_generated_champion_traits() -> dict:
+    import json
+    from pathlib import Path
+    path = Path(__file__).with_name("generated_champion_traits.json")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+_GENERATED_TRAITS = _load_generated_champion_traits()
+
+
+def _generated_threat(tag: str) -> set[str]:
+    """Champion names the generated file flags with ``tag``."""
+    return {n for n, tags in _GENERATED_TRAITS.get("threats", {}).items()
+            if tag in tags}
+
+
+# Widen the curated threat sets with generated members (curated ∪ generated).
+HEAVY_CC_CHAMPS = HEAVY_CC_CHAMPS | _generated_threat("heavy_cc")
+SUPPRESSION_CHAMPS = SUPPRESSION_CHAMPS | _generated_threat("suppression")
+HEAVY_HEALING = HEAVY_HEALING | _generated_threat("heavy_healing")
+HEAVY_TANK = HEAVY_TANK | _generated_threat("tank")
+
+# Complete the damage-type map to the whole roster (curated entries win).
+CHAMPION_DAMAGE_TYPE = {**_GENERATED_TRAITS.get("damage_type", {}),
+                        **CHAMPION_DAMAGE_TYPE}
+
+
 ROLE_ALIASES = {
     "top": "top", "jungle": "jungle", "middle": "middle", "mid": "middle",
     "bottom": "bottom", "adc": "bottom", "bot": "bottom",

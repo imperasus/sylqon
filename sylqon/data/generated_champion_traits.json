@@ -1,0 +1,623 @@
+{
+ "_patch": "16.14.1",
+ "_source": "championFull.json (deterministic keyword/info derivation)",
+ "damage_type": {
+  "Aatrox": "ad",
+  "Ahri": "ap",
+  "Akali": "ap",
+  "Akshan": "ad",
+  "Alistar": "mixed",
+  "Ambessa": "ad",
+  "Amumu": "ap",
+  "Anivia": "ap",
+  "Annie": "ap",
+  "Aphelios": "ad",
+  "Ashe": "ad",
+  "Aurelion Sol": "ap",
+  "Aurora": "ap",
+  "Azir": "ad",
+  "Bard": "ap",
+  "Bel'Veth": "ap",
+  "Blitzcrank": "mixed",
+  "Brand": "ap",
+  "Braum": "mixed",
+  "Briar": "ad",
+  "Caitlyn": "ad",
+  "Camille": "ad",
+  "Cassiopeia": "ap",
+  "Cho'Gath": "ap",
+  "Corki": "ad",
+  "Darius": "ad",
+  "Diana": "mixed",
+  "Dr. Mundo": "mixed",
+  "Draven": "ad",
+  "Ekko": "ap",
+  "Elise": "ap",
+  "Evelynn": "ap",
+  "Ezreal": "ad",
+  "Fiddlesticks": "ap",
+  "Fiora": "ad",
+  "Fizz": "mixed",
+  "Galio": "ap",
+  "Gangplank": "ad",
+  "Garen": "ad",
+  "Gnar": "ad",
+  "Gragas": "ap",
+  "Graves": "ad",
+  "Gwen": "ad",
+  "Hecarim": "ad",
+  "Heimerdinger": "ap",
+  "Hwei": "ap",
+  "Illaoi": "ad",
+  "Irelia": "ad",
+  "Ivern": "ap",
+  "Janna": "ap",
+  "Jarvan IV": "ad",
+  "Jax": "ad",
+  "Jayce": "ad",
+  "Jhin": "ad",
+  "Jinx": "ad",
+  "K'Sante": "ad",
+  "Kai'Sa": "ad",
+  "Kalista": "ad",
+  "Karma": "ap",
+  "Karthus": "ap",
+  "Kassadin": "ap",
+  "Katarina": "ap",
+  "Kayle": "ad",
+  "Kayn": "ad",
+  "Kennen": "ap",
+  "Kha'Zix": "ad",
+  "Kindred": "ad",
+  "Kled": "ad",
+  "Kog'Maw": "ad",
+  "LeBlanc": "ap",
+  "Lee Sin": "ad",
+  "Leona": "mixed",
+  "Lillia": "ap",
+  "Lissandra": "ap",
+  "Locke": "ad",
+  "Lucian": "ad",
+  "Lulu": "ap",
+  "Lux": "ap",
+  "Malphite": "ap",
+  "Malzahar": "ap",
+  "Maokai": "ap",
+  "Master Yi": "ad",
+  "Mel": "ap",
+  "Milio": "ap",
+  "Miss Fortune": "ad",
+  "Mordekaiser": "ap",
+  "Morgana": "ap",
+  "Naafiri": "ad",
+  "Nami": "ap",
+  "Nasus": "ad",
+  "Nautilus": "mixed",
+  "Neeko": "ap",
+  "Nidalee": "ap",
+  "Nilah": "ad",
+  "Nocturne": "ad",
+  "Nunu & Willump": "ap",
+  "Olaf": "ad",
+  "Orianna": "ap",
+  "Ornn": "mixed",
+  "Pantheon": "ad",
+  "Poppy": "ad",
+  "Pyke": "ad",
+  "Qiyana": "ap",
+  "Quinn": "ad",
+  "Rakan": "ap",
+  "Rammus": "mixed",
+  "Rek'Sai": "ad",
+  "Rell": "mixed",
+  "Renata Glasc": "ap",
+  "Renekton": "ad",
+  "Rengar": "ad",
+  "Riven": "ad",
+  "Rumble": "ap",
+  "Ryze": "ap",
+  "Samira": "ad",
+  "Sejuani": "mixed",
+  "Senna": "ad",
+  "Seraphine": "ap",
+  "Sett": "ad",
+  "Shaco": "ad",
+  "Shen": "mixed",
+  "Shyvana": "ad",
+  "Singed": "ap",
+  "Sion": "ad",
+  "Sivir": "ad",
+  "Skarner": "ad",
+  "Smolder": "ad",
+  "Sona": "ap",
+  "Soraka": "ap",
+  "Swain": "ap",
+  "Sylas": "ap",
+  "Syndra": "ap",
+  "Tahm Kench": "ap",
+  "Taliyah": "ap",
+  "Talon": "ad",
+  "Taric": "mixed",
+  "Teemo": "ad",
+  "Thresh": "mixed",
+  "Tristana": "ad",
+  "Trundle": "ad",
+  "Tryndamere": "ad",
+  "Twisted Fate": "ad",
+  "Twitch": "ad",
+  "Udyr": "ad",
+  "Urgot": "ad",
+  "Varus": "ad",
+  "Vayne": "ad",
+  "Veigar": "ap",
+  "Vel'Koz": "ap",
+  "Vex": "ap",
+  "Vi": "ad",
+  "Viego": "ad",
+  "Viktor": "ap",
+  "Vladimir": "ap",
+  "Volibear": "ad",
+  "Warwick": "ad",
+  "Wukong": "ad",
+  "Xayah": "ad",
+  "Xerath": "ap",
+  "Xin Zhao": "ad",
+  "Yasuo": "ad",
+  "Yone": "ad",
+  "Yorick": "ad",
+  "Yunara": "ad",
+  "Yuumi": "ap",
+  "Zaahen": "ad",
+  "Zac": "ap",
+  "Zed": "ad",
+  "Zeri": "ad",
+  "Ziggs": "ap",
+  "Zilean": "ap",
+  "Zoe": "ap",
+  "Zyra": "ap"
+ },
+ "threats": {
+  "Aatrox": [
+   "heavy_healing"
+  ],
+  "Ahri": [
+   "heavy_cc"
+  ],
+  "Akshan": [
+   "heavy_cc"
+  ],
+  "Alistar": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Ambessa": [
+   "heavy_cc",
+   "suppression"
+  ],
+  "Amumu": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Anivia": [
+   "heavy_cc"
+  ],
+  "Aphelios": [
+   "heavy_cc"
+  ],
+  "Ashe": [
+   "heavy_cc"
+  ],
+  "Aurelion Sol": [
+   "heavy_cc"
+  ],
+  "Bard": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Bel'Veth": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Blitzcrank": [
+   "tank"
+  ],
+  "Brand": [
+   "heavy_cc"
+  ],
+  "Braum": [
+   "tank"
+  ],
+  "Briar": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Caitlyn": [
+   "heavy_cc"
+  ],
+  "Camille": [
+   "heavy_healing"
+  ],
+  "Cassiopeia": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Cho'Gath": [
+   "tank"
+  ],
+  "Darius": [
+   "heavy_healing",
+   "tank"
+  ],
+  "Dr. Mundo": [
+   "heavy_healing",
+   "tank"
+  ],
+  "Ekko": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Elise": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Evelynn": [
+   "heavy_cc"
+  ],
+  "Fiddlesticks": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Fiora": [
+   "heavy_cc"
+  ],
+  "Galio": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Gangplank": [
+   "heavy_healing"
+  ],
+  "Garen": [
+   "tank"
+  ],
+  "Gnar": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Gragas": [
+   "heavy_cc"
+  ],
+  "Hecarim": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Heimerdinger": [
+   "heavy_cc"
+  ],
+  "Illaoi": [
+   "tank"
+  ],
+  "Irelia": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Ivern": [
+   "heavy_cc"
+  ],
+  "Janna": [
+   "heavy_healing"
+  ],
+  "Jarvan IV": [
+   "tank"
+  ],
+  "Jax": [
+   "heavy_cc"
+  ],
+  "Jhin": [
+   "heavy_cc"
+  ],
+  "Jinx": [
+   "heavy_cc"
+  ],
+  "K'Sante": [
+   "heavy_cc",
+   "heavy_healing",
+   "tank"
+  ],
+  "Karma": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Kayle": [
+   "heavy_healing"
+  ],
+  "Kha'Zix": [
+   "heavy_cc"
+  ],
+  "LeBlanc": [
+   "heavy_cc"
+  ],
+  "Lee Sin": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Leona": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Lillia": [
+   "heavy_cc"
+  ],
+  "Lissandra": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Locke": [
+   "heavy_healing"
+  ],
+  "Malphite": [
+   "tank"
+  ],
+  "Malzahar": [
+   "heavy_cc",
+   "suppression"
+  ],
+  "Maokai": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Master Yi": [
+   "heavy_healing"
+  ],
+  "Milio": [
+   "heavy_healing"
+  ],
+  "Mordekaiser": [
+   "heavy_healing"
+  ],
+  "Morgana": [
+   "heavy_cc"
+  ],
+  "Naafiri": [
+   "heavy_healing"
+  ],
+  "Nami": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Nasus": [
+   "tank"
+  ],
+  "Nautilus": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Neeko": [
+   "heavy_cc"
+  ],
+  "Nidalee": [
+   "heavy_healing"
+  ],
+  "Nocturne": [
+   "heavy_cc"
+  ],
+  "Nunu & Willump": [
+   "heavy_cc",
+   "heavy_healing",
+   "tank"
+  ],
+  "Olaf": [
+   "tank"
+  ],
+  "Ornn": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Pantheon": [
+   "heavy_cc"
+  ],
+  "Poppy": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Pyke": [
+   "heavy_cc"
+  ],
+  "Qiyana": [
+   "heavy_cc"
+  ],
+  "Rakan": [
+   "heavy_healing"
+  ],
+  "Rammus": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Rek'Sai": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Rell": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Renekton": [
+   "heavy_cc",
+   "heavy_healing",
+   "tank"
+  ],
+  "Rengar": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Riven": [
+   "heavy_cc"
+  ],
+  "Ryze": [
+   "heavy_cc"
+  ],
+  "Sejuani": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Senna": [
+   "heavy_healing"
+  ],
+  "Seraphine": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Sett": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Shaco": [
+   "heavy_cc"
+  ],
+  "Shen": [
+   "tank"
+  ],
+  "Shyvana": [
+   "heavy_cc",
+   "heavy_healing",
+   "tank"
+  ],
+  "Singed": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Sion": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Skarner": [
+   "heavy_cc",
+   "suppression",
+   "tank"
+  ],
+  "Sona": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Soraka": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Swain": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Sylas": [
+   "heavy_healing"
+  ],
+  "Syndra": [
+   "heavy_cc"
+  ],
+  "Tahm Kench": [
+   "heavy_cc",
+   "heavy_healing",
+   "tank"
+  ],
+  "Taliyah": [
+   "heavy_cc"
+  ],
+  "Taric": [
+   "heavy_cc",
+   "heavy_healing",
+   "tank"
+  ],
+  "Thresh": [
+   "tank"
+  ],
+  "Trundle": [
+   "heavy_healing",
+   "tank"
+  ],
+  "Tryndamere": [
+   "heavy_healing"
+  ],
+  "Udyr": [
+   "heavy_cc",
+   "heavy_healing",
+   "tank"
+  ],
+  "Urgot": [
+   "tank"
+  ],
+  "Varus": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Vayne": [
+   "heavy_cc"
+  ],
+  "Veigar": [
+   "heavy_cc"
+  ],
+  "Vi": [
+   "heavy_cc"
+  ],
+  "Viego": [
+   "heavy_cc"
+  ],
+  "Viktor": [
+   "heavy_cc"
+  ],
+  "Vladimir": [
+   "heavy_healing"
+  ],
+  "Volibear": [
+   "heavy_cc",
+   "heavy_healing",
+   "tank"
+  ],
+  "Warwick": [
+   "heavy_cc",
+   "suppression",
+   "heavy_healing",
+   "tank"
+  ],
+  "Wukong": [
+   "heavy_cc",
+   "tank"
+  ],
+  "Xerath": [
+   "heavy_cc"
+  ],
+  "Xin Zhao": [
+   "tank"
+  ],
+  "Yasuo": [
+   "heavy_cc"
+  ],
+  "Yone": [
+   "heavy_cc"
+  ],
+  "Yorick": [
+   "heavy_healing",
+   "tank"
+  ],
+  "Yuumi": [
+   "heavy_healing"
+  ],
+  "Zaahen": [
+   "heavy_cc",
+   "heavy_healing"
+  ],
+  "Zac": [
+   "tank"
+  ],
+  "Ziggs": [
+   "heavy_cc"
+  ],
+  "Zilean": [
+   "heavy_cc"
+  ],
+  "Zoe": [
+   "heavy_cc"
+  ],
+  "Zyra": [
+   "heavy_cc"
+  ]
+ }
+}
