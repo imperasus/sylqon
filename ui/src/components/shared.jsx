@@ -187,11 +187,13 @@ export function DraftScorecard({ balance }) {
              : <Chip tone={balance.tone}>{balance.label}</Chip>}>
       <div className="flex items-center gap-3">
         <div className="flex shrink-0 flex-col items-center leading-none"
-             title="Deterministic estimate from comp archetypes, damage balance, frontline and lane matchup — not a trained model.">
+             title={`Calibratable logistic estimate from comp archetypes, damage balance, frontline and lane matchup — not yet trained on match outcomes. Confidence ${balance.confidence ?? 0}% reflects how much of the draft is revealed.`}>
           <span className={`font-mono text-4xl font-bold tabular-nums ${reading ? "text-white/30" : t.text}`}>
             {win}<span className="text-lg">%</span>
           </span>
-          <span className="mt-0.5 text-3xs font-semibold tracking-[0.08em] text-white/35">EST.</span>
+          <span className="mt-0.5 text-3xs font-semibold tracking-[0.08em] text-white/35">
+            EST. · {balance.confidence ?? 0}% CONF
+          </span>
         </div>
         <div className="relative h-1 flex-1 overflow-hidden rounded-full bg-white/8">
           <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/25" />
