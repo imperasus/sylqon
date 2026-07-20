@@ -26,7 +26,10 @@ from sylqon.ai.pick_prompt import (
     heuristic_rank,
 )
 from sylqon.ai.prompts import compile_prompt
-from sylqon.analysis import build_archetype, core_select, draft_intel, rune_select
+from sylqon.analysis import (
+    ban_model, build_archetype, core_select, draft_intel, power_curve, role_infer,
+    rune_select,
+)
 from sylqon.analysis.scoring import ChampionScorer
 from sylqon.cache.store import MetaCache
 from sylqon.data import rune_pool, static
@@ -65,6 +68,11 @@ DEMO_ENEMIES = [
     ("Malzahar", "middle"), ("Leona", "utility"), ("Zed", "jungle"),
     ("Soraka", "bottom"), ("Malphite", "top"),
 ]
+
+
+def _tier_num(tier) -> int:
+    """op.gg tier as a sortable number (lower = stronger); ``None`` sinks last."""
+    return tier if tier is not None else 9
 
 
 class PipelineRunner:
@@ -1128,6 +1136,7 @@ class PipelineRunner:
                                  summoner_id=self._summoner_id)
         if not ctx:
             return
+        self._enrich_roles(ctx)  # infer hidden enemy roles → resurrect lane layer
         self._publish_lobby(ctx, demo=False)  # UI follows every visible change
 
         # Scout teammates whose identity champ select exposes (ranked solo
@@ -1158,6 +1167,27 @@ class PipelineRunner:
         if ctx.fingerprint == self._last_injected_fp:
             return
         self._do_injection(ctx)
+
+    def _enrich_roles(self, ctx: MatchContext) -> None:
+        """Fill champ-select roles Riot hides (chiefly the enemy team, whose
+        ``assignedPosition`` is not exposed) via op.gg-prior role inference, so
+        the lane layer resolves a real lane opponent instead of degrading to
+        nothing. Best-effort and in place; only ever fills an EMPTY role, never
+        overrides a real ``assignedPosition``."""
+        if not any(not p.role for p in (*ctx.enemies, *ctx.allies)):
+            return
+        try:
+            from sylqon.db.session import get_session
+            session = get_session()
+        except Exception:
+            return
+        try:
+            filled = (role_infer.enrich_roles(session, ctx.enemies)
+                      + role_infer.enrich_roles(session, ctx.allies))
+            if filled:
+                log.info("Role inference filled %d hidden champ-select role(s)", filled)
+        finally:
+            session.close()
 
     def _do_injection(self, ctx: MatchContext) -> None:
         """Compile + inject the final loadout off-thread so a slow Ollama call
@@ -1328,6 +1358,8 @@ class PipelineRunner:
                 ally_comp, enemy_comp,
                 self._ally_summary(ctx), ctx.team_threat_summary()),
             "counter_pick": draft_intel.counter_pick_advice(ctx),
+            # Tempo vs scaling read — the timing axis that dictates the macro plan.
+            "tempo": power_curve.tempo_read(ally_picks, ctx.enemies),
             "ban_now": ctx.my_ban_turn,
             "flex_warnings": self._flex_warnings(ctx),
             "ban_suggestions": self._ban_suggestions(ctx),
@@ -1337,7 +1369,11 @@ class PipelineRunner:
 
     def _flex_warnings(self, ctx: MatchContext) -> list[dict]:
         """Revealed enemies that can play more than one lane — their final role
-        (and thus the matchup) is not yet settled. Best-effort against the DB."""
+        (and thus the matchup) is not yet settled. Each carries the inferred lane
+        and a confidence: when the role inference is a genuine toss-up (below
+        ``FLEX_CONFIDENCE``) the entry is flagged ``tentative`` so downstream reads
+        widen rather than commit to a single lane opponent (F4c). Best-effort
+        against the DB."""
         from sylqon.db.schema import Champion
         from sylqon.db.session import get_session
         out: list[dict] = []
@@ -1346,31 +1382,56 @@ class PipelineRunner:
         except Exception:
             return out
         try:
+            confidences = role_infer.infer_enemy_roles(session, ctx.enemies)
             for e in ctx.enemies:
                 champ = session.query(Champion).filter_by(riot_key=e.champion_id).first()
                 roles = list(champ.roles) if champ and champ.roles else []
                 if len(roles) > 1:
+                    conf = confidences.get(e.champion_id, (None, 1.0))[1]
                     out.append({
                         "name": e.name,
                         "slug": (self.catalog.champion_by_key(e.champion_id) or {}).get("id", ""),
                         "roles": roles,
                         "assigned": e.role,
+                        "confidence": round(conf, 2),
+                        "tentative": conf < role_infer.FLEX_CONFIDENCE,
                     })
         finally:
             session.close()
         return out
 
     def _ban_suggestions(self, ctx: MatchContext, limit: int = 3) -> list[dict]:
-        """Who to ban for the player's role: the strongest meta champions in the
-        lane, boosted when they hard-counter the player's pool, minus anything
-        already picked or banned. Degrades to pure meta when counter data is thin."""
-        # meta_report.json is the primary source, but it is never written by the
-        # app (only shipped/seeded), so packaged builds lack it — fall back to the
-        # synced DB tier list (the same source as the Patch Meta panel) so ban
-        # suggestions appear whenever op.gg has been synced.
-        rows = self._meta_positions().get(ctx.my_role, []) or self._db_role_rows(ctx.my_role)
-        if not rows:
+        """Team-wide, multi-factor ban list. Gathers meta threats across ALL five
+        lanes (not just the player's), then scores each by meta strength, how hard
+        it beats the player's pool, how contested it is, and whether it flexes —
+        labelling every suggestion a **power** ban (meta-warping, deny it to
+        anyone), a **personal** ban (specifically beats your pool) or a **meta**
+        ban. Degrades gracefully: pure meta when counter data is thin, [] when no
+        source is available.
+
+        meta_report.json is the primary source, but it is never written by the app
+        (only shipped/seeded), so packaged builds fall back to the synced DB tier
+        list per lane — the same data the Patch Meta panel uses."""
+        meta = self._meta_positions()
+        # Fold every lane's meta rows into one candidate map, tracking which lanes
+        # each champion appears in (≥2 → a flex threat) and keeping its strongest
+        # (lowest-tier) row as the primary read.
+        cand: dict[str, dict] = {}
+        for role in role_infer.ROLES:
+            for r in (meta.get(role) or self._db_role_rows(role)):
+                name = r.get("champion", "")
+                if not name:
+                    continue
+                cur = cand.get(name)
+                if cur is None:
+                    cand[name] = {"row": r, "roles": {role}, "tier": r.get("tier")}
+                else:
+                    cur["roles"].add(role)
+                    if _tier_num(r.get("tier")) < _tier_num(cur["tier"]):
+                        cur["row"], cur["tier"] = r, r.get("tier")
+        if not cand:
             return []
+
         taken = ({e.name for e in ctx.enemies} | {a.name for a in ctx.allies}
                  | {ctx.my_champion}
                  | {self.catalog.champion_name(cid) for cid in ctx.bans})
@@ -1378,27 +1439,32 @@ class PipelineRunner:
         counter_threat = self._pool_counter_threat(ctx.my_role, pool)
 
         scored = []
-        for r in rows:
-            name = r.get("champion", "")
-            if not name or name in taken:
+        for name, info in cand.items():
+            if name in taken:
                 continue
-            tier = r.get("tier")
-            tier_num = tier if tier is not None else 9
+            row, tier = info["row"], info["tier"]
+            plays_my_role = ctx.my_role in info["roles"]
+            is_flex = len(info["roles"]) >= 2
             threat = counter_threat.get(name, 0.0)
-            # lower tier number = stronger; counter advantage breaks ties upward.
-            rank = (tier_num, -threat, -(r.get("win_rate") or 0.0))
-            scored.append((rank, name, r, tier, threat))
-        scored.sort(key=lambda x: x[0])
+            total, factors = ban_model.score_ban(
+                tier, row.get("pick_rate"), threat, is_flex, plays_my_role)
+            category = ban_model.categorize(factors)
+            scored.append((total, name, row, tier, threat, factors, category, is_flex))
+        # Highest score first; a stronger (lower) tier breaks ties.
+        scored.sort(key=lambda x: (-x[0], _tier_num(x[3])))
 
         out = []
-        for _, name, r, tier, threat in scored[:limit]:
+        for total, name, row, tier, threat, factors, category, is_flex in scored[:limit]:
             out.append({
                 "name": name,
-                "slug": r.get("slug", self.catalog.champion_slug(name)),
+                "slug": row.get("slug", self.catalog.champion_slug(name)),
                 "tier": tier,
-                "win_rate": r.get("win_rate"),
+                "win_rate": row.get("win_rate"),
                 "counters_pool": round(threat, 1) if threat else 0,
-                "reason": self._ban_reason(name, tier, threat, name in pool),
+                "category": category,
+                "factors": {k: round(v, 2) for k, v in factors.items()},
+                "reason": ban_model.ban_reason(name, tier, factors, category,
+                                               is_flex, name in pool),
             })
         return out
 
@@ -1434,20 +1500,6 @@ class PipelineRunner:
         finally:
             session.close()
 
-    @staticmethod
-    def _ban_reason(name: str, tier, threat: float, in_pool: bool) -> str:
-        tier_label = {0: "S+", 1: "S", 2: "A", 3: "B"}.get(tier)
-        bits = [name]
-        if tier_label:
-            bits.append(f"is {tier_label}-tier in this lane")
-        else:
-            bits.append("is a lane threat")
-        if threat:
-            bits.append("and beats champions in your pool")
-        elif in_pool:
-            bits.append("(also one of yours — denies a mirror)")
-        return " ".join(bits) + "."
-
     def _role_top(self, ctx: MatchContext, limit: int = 10) -> list[dict]:
         """Best champions for the player's role given the live draft — scored
         across ALL role champions (not just the pool). Each is flagged with
@@ -1465,9 +1517,16 @@ class PipelineRunner:
                 [ctx.my_champion] if ctx.my_champion else [])
             ally_ids = queries.ids_for_names(session, ally_names)
             enemy_ids = queries.ids_for_names(session, [e.name for e in ctx.enemies])
+            # The direct lane opponent (role inferred in F1) carries most of the
+            # counter weight — resolve their DB id so the scorer can lane-weight.
+            lane_name = next((e.name for e in ctx.enemies
+                              if e.role and e.role == ctx.my_role), None)
+            lane_enemy_id = (queries.champion_ids_by_name(session, [lane_name]).get(lane_name)
+                             if lane_name else None)
             recs = ChampionScorer().get_top_recommendations(
                 session, ctx.my_role, ally_ids, enemy_ids,
-                pool_names=pool, personal_stats=personal, limit=limit + 5)
+                pool_names=pool, personal_stats=personal, limit=limit + 5,
+                lane_enemy_id=lane_enemy_id)
         except Exception:
             log.debug("role-top scoring failed", exc_info=True)
             return []
@@ -1513,7 +1572,7 @@ class PipelineRunner:
         return obj
 
     def _compose_universe(self, role_top: list[dict], ranked: list[dict],
-                          ai: dict | None) -> dict:
+                          ai: dict | None, ctx: MatchContext | None = None) -> dict:
         """Build the dual recommendation from the scored universe: an OPTIMAL
         pick (best overall, possibly off-pool — Ollama may refine it) plus the
         player's best in-POOL option, so the UI can show both side by side."""
@@ -1532,7 +1591,58 @@ class PipelineRunner:
             "pool_pick": pool_pick,
             "scored": pool_scored,
             "role_top": role_top,
+            # Pick-order exposure: how counterable this pick is given the enemy
+            # picks still to come (F4). None when ctx isn't available.
+            "counter_risk": (self._counter_pick_risk(ctx, optimal["name"])
+                             if ctx is not None else None),
         }
+
+    def _counter_pick_risk(self, ctx: MatchContext, pick_name: str) -> dict | None:
+        """How exposed the recommended pick is to a still-unrevealed enemy
+        counter (F4 pick-order awareness). Zero risk once every enemy is locked —
+        they can no longer adapt to you; otherwise counts the strong meta counters
+        to this pick in the player's role that the enemy could still pick. Purely
+        advisory and best-effort (None when the DB isn't reachable)."""
+        remaining = getattr(ctx, "enemy_picks_after_me", 0) or 0
+        if not pick_name or remaining <= 0:
+            return {"level": "safe", "remaining": 0, "available": 0,
+                    "note": "Every enemy is revealed — safe to lock the counter."}
+        from sylqon.db.schema import Champion, ChampionCounter
+        from sylqon.db.session import get_session
+        try:
+            session = get_session()
+        except Exception:
+            return None
+        try:
+            pick = session.query(Champion).filter_by(name=pick_name).first()
+            if pick is None:
+                return None
+            taken = ({e.name for e in ctx.enemies} | {a.name for a in ctx.allies}
+                     | {ctx.my_champion}
+                     | {self.catalog.champion_name(cid) for cid in ctx.bans})
+            taken_ids = {c.id for c in session.query(Champion)
+                         .filter(Champion.name.in_(taken)).all()}
+            rows = (session.query(ChampionCounter)
+                    .filter(ChampionCounter.role == ctx.my_role,
+                            ChampionCounter.counter_id == pick.id,
+                            ChampionCounter.advantage_score >= 5.0).all())
+            available = sum(1 for r in rows if r.champion_id not in taken_ids)
+        except Exception:
+            log.debug("counter-pick risk lookup failed", exc_info=True)
+            return None
+        finally:
+            session.close()
+        level = "high" if available >= 3 else "moderate" if available >= 1 else "low"
+        note = {
+            "high": (f"{remaining} enemy pick(s) still to come and {available} strong "
+                     "counters open — favour a flexible pick over a greedy one."),
+            "moderate": (f"{remaining} enemy pick(s) left; a few counters remain — "
+                         "lockable, but not blind-safe."),
+            "low": (f"{remaining} enemy pick(s) left but few counters available — "
+                    "safe to commit."),
+        }[level]
+        return {"level": level, "remaining": remaining, "available": available,
+                "note": note}
 
     def _maybe_recommend(self, ctx: MatchContext) -> None:
         """Publish a champion suggestion. Preferred path scores the WHOLE
@@ -1560,7 +1670,7 @@ class PipelineRunner:
 
         if self._last_role_top:
             self.state.set("recommendation",
-                           self._compose_universe(self._last_role_top, ranked, None))
+                           self._compose_universe(self._last_role_top, ranked, None, ctx))
             best = self._last_role_top[0]["champion"]["name"]
             pool_best = next((e["champion"]["name"] for e in self._last_role_top
                               if e.get("in_pool")), "—")
@@ -1599,7 +1709,7 @@ class PipelineRunner:
             return
         if reco_fp != self._last_reco_fp:
             return  # draft moved on while we were thinking; drop the stale result
-        result = self._compose_universe(self._last_role_top, ranked, ai)
+        result = self._compose_universe(self._last_role_top, ranked, ai, ctx)
         self.state.set("recommendation", result)
         log.info("AI optimal pick: %s (%s)", result["pick"], result["source"])
 
@@ -1640,9 +1750,34 @@ class PipelineRunner:
                 "wins": rec["wins"],
                 "win_rate": rec["wins"] / games if games else 0.0,
             }
+        self._merge_self_mastery(named)
         self._champ_stats = named
         self._scout_cache.clear()  # personal stats feed the scout heuristic
         log.info("Champion stats: %d champions over recent SR games", len(named))
+
+    def _merge_self_mastery(self, named: dict[str, dict]) -> None:
+        """Fold the player's own CHAMPION-MASTERY-V4 into the per-champion stat
+        map so a *mained* champion reads as a comfort pick even with no recent
+        games (F5). Best-effort: needs a Riot API key + resolvable self puuid;
+        any failure leaves ``named`` untouched. Adds mastery-only champions with
+        a zero-game record so the scorer's mastery floor can still lift them."""
+        try:
+            from sylqon.riot import api as riot_api
+            puuid = self._riot_self_puuid()
+            if not puuid:
+                return
+            top = riot_api.get_top_mastery(puuid, count=20) or []
+        except Exception:
+            log.debug("self mastery fetch failed", exc_info=True)
+            return
+        for m in top:
+            info = self.catalog.champion_by_key(m.get("championId"))
+            if not info:
+                continue
+            rec = named.setdefault(info["name"],
+                                   {"games": 0, "wins": 0, "win_rate": 0.0})
+            rec["mastery_points"] = m.get("championPoints")
+            rec["mastery_level"] = m.get("championLevel")
 
     def champion_stats_named(self) -> dict[str, dict]:
         return dict(self._champ_stats)
