@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.33.1](https://github.com/imperasus/sylqon/compare/v1.33.0...v1.33.1) (2026-07-20)
+
+
+### Bug Fixes
+
+* **draft:** infer hidden lane so a blind-pick role never breaks the loadout ([81e2e43](https://github.com/imperasus/sylqon/commit/81e2e435f101f9f400d1575e3f966b3d630434f5))
+
 ## [1.33.0](https://github.com/imperasus/sylqon/compare/v1.32.0...v1.33.0) (2026-07-20)
 
 
