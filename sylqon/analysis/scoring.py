@@ -29,6 +29,40 @@ COMFORT_OFF_POOL = 42.0
 COMFORT_IN_POOL = 68.0
 COMFORT_MIN_GAMES = 5  # personal win rate only trusted past this sample size
 
+# F5 — mastery lifts comfort. A champion the player has *mained* is comfortable
+# even with a thin recent-game sample, a signal op.gg/Blitz ignore entirely. Maps
+# CHAMPION-MASTERY-V4 points to a comfort floor (level 7 ≈ 21.6k points). The
+# floor never drags a strong recent win-rate down — the scorer takes the max.
+_MASTERY_COMFORT = [
+    (200_000, 90.0),   # hardcore one-trick
+    (100_000, 84.0),
+    (50_000, 76.0),
+    (21_600, 68.0),    # ~mastery 7 — a real comfort pick
+    (10_000, 58.0),    # below this, mastery is too thin to imply comfort
+]
+
+
+def mastery_comfort(points: float | None) -> float:
+    """Comfort floor (0..100) implied by mastery points alone."""
+    if not points:
+        return 0.0
+    for threshold, floor in _MASTERY_COMFORT:
+        if points >= threshold:
+            return floor
+    return 0.0
+
+# F2 — matchup confidence + lane weighting.
+# Empirical-Bayes shrinkage: a matchup advantage backed by ``games`` games is
+# scaled by games/(games + PRIOR) toward neutral, so a thin sample can't swing
+# the counter score. A pair with no stored sample size is trusted as-is (legacy
+# / seed data), which preserves prior behaviour until the hosted sync supplies
+# sample sizes.
+MATCHUP_PRIOR_GAMES = 100
+# The direct lane opponent dominates the laning phase, so it carries most of the
+# counter weight when we know who it is; the rest of the enemy team fills the
+# remainder. Mirrors the post-lock ``matchup._lane_score`` blend.
+LANE_COUNTER_WEIGHT = 0.6
+
 
 class ChampionScorer:
     """Score every champion that can play a role against the current draft."""
@@ -47,11 +81,13 @@ class ChampionScorer:
                                 ally_ids: list[int], enemy_ids: list[int],
                                 pool_names: set[str] | None = None,
                                 personal_stats: dict[str, dict] | None = None,
-                                limit: int = 5) -> list[dict]:
+                                limit: int = 5,
+                                lane_enemy_id: int | None = None) -> list[dict]:
         scored = []
         for champ in queries.champions_for_role(session, role):
             scores = self.score_champion(session, champ, role, ally_ids, enemy_ids,
-                                         pool_names=pool_names, personal_stats=personal_stats)
+                                         pool_names=pool_names, personal_stats=personal_stats,
+                                         lane_enemy_id=lane_enemy_id)
             in_pool = bool(pool_names) and champ.name in pool_names
             scored.append({
                 "champion": {"id": champ.id, "name": champ.name,
@@ -66,8 +102,10 @@ class ChampionScorer:
     def score_champion(self, session: Session, champ: Champion, role: str,
                        ally_ids: list[int], enemy_ids: list[int],
                        pool_names: set[str] | None = None,
-                       personal_stats: dict[str, dict] | None = None) -> dict:
-        counter = self._counter_score(session, champ.id, role, enemy_ids)
+                       personal_stats: dict[str, dict] | None = None,
+                       lane_enemy_id: int | None = None) -> dict:
+        counter = self._counter_score(session, champ.id, role, enemy_ids,
+                                      lane_enemy_id=lane_enemy_id)
         synergy = self._synergy_score(session, champ.id, role, ally_ids)
         meta = self._meta_score(champ, role)
         win_rate = self._win_rate_score(session, champ.id, role)
@@ -88,14 +126,36 @@ class ChampionScorer:
 
     # -- components -----------------------------------------------------------
     def _counter_score(self, session: Session, champion_id: int, role: str,
-                       enemy_ids: list[int]) -> float:
-        """Average matchup advantage vs the enemies, mapped -10..+10 -> 0..100.
+                       enemy_ids: list[int], lane_enemy_id: int | None = None) -> float:
+        """Matchup advantage vs the enemies, mapped -10..+10 -> 0..100.
+
+        Two corrections over a flat team average (F2):
+          * **sample-size shrinkage** — a thin matchup is pulled toward neutral
+            so a 12-game fluke can't swing the score (``MATCHUP_PRIOR_GAMES``);
+          * **lane weighting** — when the direct lane opponent is known, their
+            head-to-head carries most of the weight, since it dominates the
+            laning phase (a bot-lane matchup shouldn't dilute your mid read).
+
         Missing matchups count as neutral (0). No enemies -> neutral 50."""
         if not enemy_ids:
             return 50.0
         advantages = queries.counter_map(session, champion_id, role, enemy_ids)
-        avg = sum(advantages.get(eid, 0.0) for eid in enemy_ids) / len(enemy_ids)
-        return max(0.0, min(100.0, ((avg + 10) / 20) * 100))
+        games = queries.counter_games_map(session, champion_id, role, enemy_ids)
+
+        def shrunk(eid: int) -> float:
+            adv = advantages.get(eid, 0.0)
+            g = games.get(eid)
+            if g is None:  # no sample info (seed/legacy) → trust the estimate
+                return adv
+            return adv * (g / (g + MATCHUP_PRIOR_GAMES))
+
+        team_avg = sum(shrunk(eid) for eid in enemy_ids) / len(enemy_ids)
+        if lane_enemy_id is not None and lane_enemy_id in advantages:
+            blended = (LANE_COUNTER_WEIGHT * shrunk(lane_enemy_id)
+                       + (1 - LANE_COUNTER_WEIGHT) * team_avg)
+        else:
+            blended = team_avg
+        return max(0.0, min(100.0, ((blended + 10) / 20) * 100))
 
     def _synergy_score(self, session: Session, champion_id: int, role: str,
                        ally_ids: list[int]) -> float:
@@ -140,12 +200,13 @@ class ChampionScorer:
     def _comfort_score(self, name: str, pool_names: set[str] | None,
                        personal_stats: dict[str, dict] | None) -> float:
         """How well the *player* can pilot this champion. Personal win rate (over
-        a meaningful sample) dominates; otherwise pool membership is the signal,
-        and an unfamiliar off-pool champion gets a low baseline so a strong draft
-        edge has to justify recommending it."""
+        a meaningful sample) dominates; mastery lifts a champion the player has
+        mained even when the recent sample is thin (F5); otherwise pool membership
+        is the signal, and an unfamiliar off-pool champion gets a low baseline so
+        a strong draft edge has to justify recommending it."""
         in_pool = bool(pool_names) and name in pool_names
-        personal = (personal_stats or {}).get(name)
-        if personal and personal.get("games", 0) >= COMFORT_MIN_GAMES:
+        personal = (personal_stats or {}).get(name) or {}
+        if personal.get("games", 0) >= COMFORT_MIN_GAMES:
             wr = personal.get("win_rate", 0.0) * 100
             if wr < 45:
                 base = 35.0
@@ -157,10 +218,15 @@ class ChampionScorer:
                 base = 95.0
             if in_pool:
                 base += 5
-            return max(20.0, min(100.0, base))
-        if in_pool:
-            return COMFORT_IN_POOL
-        return COMFORT_OFF_POOL
+            base = max(20.0, min(100.0, base))
+        elif in_pool:
+            base = COMFORT_IN_POOL
+        else:
+            base = COMFORT_OFF_POOL
+        # Mastery only ever LIFTS comfort — a one-trick's main is a comfort pick
+        # even off a thin recent sample, but a high recent win-rate is never
+        # dragged down by low mastery.
+        return max(base, mastery_comfort(personal.get("mastery_points")))
 
     # -- reasoning ------------------------------------------------------------
     @staticmethod
