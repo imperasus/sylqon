@@ -235,6 +235,69 @@ def test_topup_skips_when_engine_unavailable():
     assert champion_missions.count_pending(s, champ.id) == 0
 
 
+# -- Phase 6: progression analytics ------------------------------------------
+def test_current_streak_counts_leading_completions():
+    s = _session()
+    svc = ProgressionService()
+    p = svc.ensure_profile(s, "me")
+    # Order of resolution: completed, completed, failed, completed (most recent last).
+    for result in ("completed", "completed", "failed", "completed", "completed"):
+        svc.record_resolution(s, p, _mission(points=20), result)
+    # Streak counts back from the latest: 2 completions before the older failure.
+    assert svc.current_streak(s, p) == 2
+
+
+def test_session_stats_scoped_to_game_session():
+    s = _session()
+    svc = ProgressionService()
+    p = svc.ensure_profile(s, "me")
+    svc.record_resolution(s, p, _mission(points=30), "completed", game_session="g1")
+    svc.record_resolution(s, p, _mission(points=25), "failed", game_session="g1")
+    svc.record_resolution(s, p, _mission(points=30), "completed", game_session="g2")
+    st = svc.session_stats(s, p, "g1")
+    assert st == {"completed": 1, "failed": 1, "points": 30}   # only g1, points from the win
+    assert svc.session_stats(s, p, "") == {"completed": 0, "failed": 0, "points": 0}
+
+
+def test_recent_summary_reports_completion_rate_and_trend():
+    s = _session()
+    svc = ProgressionService()
+    p = svc.ensure_profile(s, "me")
+    # Older half mostly failed, newer half mostly completed → improving.
+    for result in ("failed", "failed", "failed", "completed", "completed", "completed"):
+        svc.record_resolution(s, p, _mission(points=20), result)
+    r = svc.recent_summary(s, p, limit=20)
+    assert r["total"] == 6
+    assert r["completion_rate"] == 0.5
+    assert r["trend"] == "improving"
+
+
+def test_cs_trend_needs_enough_games():
+    s = _session()
+    champ = Champion(name="Jinx", riot_key=222, roles=["bottom"])
+    s.add(champ); s.flush()
+    svc = ProgressionService()
+    assert svc.cs_trend(s, champ.id) is None                   # no games yet
+    for i, cspm in enumerate((5.0, 5.2, 7.0, 7.4)):            # older→newer
+        s.add(MatchHistory(game_id=f"g{i}", champion_id=champ.id, role="bottom",
+                           result="Win", kda_json={}, stats_json={"cs_per_min": cspm},
+                           played_at=datetime(2026, 7, 1 + i)))
+    s.flush()
+    t = svc.cs_trend(s, champ.id)
+    assert t["stat"] == "cs_per_min" and t["direction"] == "up"
+    assert t["to"] > t["from"]
+
+
+def test_serialize_live_progress_shape():
+    s = _session()
+    svc = ProgressionService()
+    p = svc.ensure_profile(s, "me")
+    svc.record_resolution(s, p, _mission(points=30), "completed", game_session="g1")
+    out = svc.serialize_live_progress(s, p, "g1")
+    assert set(out) == {"streak", "session", "recent", "trend"}
+    assert out["streak"] == 1 and out["session"]["completed"] == 1
+
+
 if __name__ == "__main__":
     import pytest
 

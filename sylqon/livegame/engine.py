@@ -18,12 +18,24 @@ from sylqon import config
 from sylqon.livegame.missions import (
     ROLE_CATALOG,
     MissionRuntime,
+    default_rationale,
     evaluate,
     make_runtime,
+    scaled_mission,
 )
 from sylqon.livegame.state import LiveGameState
+from sylqon.livegame.triggers import TriggerEngine
 
 log = logging.getLogger(__name__)
+
+# Rank tier → goal-difficulty multiplier. Lower elo gets gentler targets to build
+# confidence; higher elo gets tougher ones. Unknown/unranked stays at the 1.0
+# baseline, so the engine's behaviour is unchanged unless a tier is supplied.
+_TIER_DIFFICULTY = {
+    "IRON": 0.8, "BRONZE": 0.85, "SILVER": 0.95, "GOLD": 1.0, "PLATINUM": 1.1,
+    "EMERALD": 1.15, "DIAMOND": 1.25, "MASTER": 1.35, "GRANDMASTER": 1.35,
+    "CHALLENGER": 1.4,
+}
 
 
 def _role_catalog(role: str) -> list:
@@ -47,6 +59,9 @@ class MissionEngine:
         # nothing, it falls back to the static role catalog.
         self.mission_source = mission_source
         self._rng = rng or random.Random()
+        self._triggers = TriggerEngine()   # state-reactive coaching alerts
+        self._alerts: list[dict] = []
+        self.difficulty: float = 1.0       # rank-scaled goal multiplier (set_tier)
         self.active: list[MissionRuntime] = []
         self.session_id: str | None = None
         self._session_counter: int = 0
@@ -70,6 +85,10 @@ class MissionEngine:
         else:
             self._primary = []
 
+    def set_tier(self, tier: str) -> None:
+        """Scale future missions to the player's rank. Unknown tier → 1.0 baseline."""
+        self.difficulty = _TIER_DIFFICULTY.get((tier or "").upper(), 1.0)
+
     def set_role(self, role: str) -> None:
         """Back-compat shim: set role without changing the champion."""
         self.set_context(role, self.champion)
@@ -91,6 +110,8 @@ class MissionEngine:
 
     # -- main entry ----------------------------------------------------------
     def tick(self, live: LiveGameState) -> dict:
+        # State-reactive alerts run every tick (also resets itself when no game).
+        self._alerts = self._triggers.evaluate(live)
         if not live.active:
             self.active = []
             self.session_id = None
@@ -158,13 +179,14 @@ class MissionEngine:
             m = self._pick()
             if m is None:
                 break
-            self.active.append(make_runtime(m, live))
+            self.active.append(make_runtime(scaled_mission(m, self.difficulty), live))
             self._recent_ids.append(m.id)
 
     def _payload(self, live: LiveGameState) -> dict:
         return {
             "active": live.active,
             "role": self.role,
+            "alerts": self._alerts,
             "missions": [self._mission_dict(rt) for rt in self.active],
             "game": {
                 "game_time": live.game_time, "cs": live.cs, "cs_per_min": live.cs_per_min,
@@ -173,6 +195,8 @@ class MissionEngine:
                 "level": live.level, "cs_benchmark": live.cs_benchmark,
                 "level_diff": live.level_diff, "objective_timers": live.objective_timers,
                 "soul": live.soul, "item_spike": live.item_spike,
+                "current_gold": live.current_gold, "champion_stats": live.champion_stats,
+                "abilities": live.abilities, "map_terrain": live.map_terrain,
             },
         }
 
@@ -180,6 +204,7 @@ class MissionEngine:
     def _mission_dict(rt: MissionRuntime) -> dict:
         return {
             "id": rt.mission.id, "type": rt.mission.type, "text": rt.mission.text,
+            "rationale": rt.mission.rationale or default_rationale(rt.mission.type),
             "reward_points": rt.mission.reward_points, "status": rt.status,
             "progress": round(rt.progress, 3), "detail": rt.detail,
         }

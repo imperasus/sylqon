@@ -44,12 +44,22 @@ const isUp = (t) => t != null && t <= 0;
  * edge-detection logic is testable in isolation; the hook below performs the
  * actual speaking.
  *
- * A snapshot is `{ missions: [...], game: {...} }` (the shape useOverlayState
- * already exposes).
+ * A snapshot is `{ missions: [...], alerts: [...], game: {...} }` (the shape
+ * useOverlayState already exposes).
  */
 export function speakablesFor(prev, next) {
   const out = [];
   if (!next) return out;
+
+  // State-reactive alerts (Phase 3): speak each newly-surfaced alert once. The
+  // backend already rate-limits per category, so a fresh id == a fresh callout.
+  // `bad`-toned alerts (e.g. low HP) jump the queue as urgent.
+  const prevAlertIds = new Set((prev?.alerts || []).map((a) => a.id));
+  for (const a of next.alerts || []) {
+    if (!prevAlertIds.has(a.id)) {
+      out.push({ text: a.text, priority: a.tone === "bad" });
+    }
+  }
 
   const prevMissions = prev?.missions || [];
   const nextMissions = next.missions || [];

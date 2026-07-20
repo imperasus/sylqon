@@ -230,6 +230,8 @@ def overlay_state() -> dict:
         if cid is not None:
             champ_prog = svc.serialize_champion_progress(
                 svc.champion_progress(session, cid), champion)
+        game_session = runner._mission_engine.session_id or ""
+        progress = svc.serialize_live_progress(session, profile, game_session, cid)
         session.commit()
     finally:
         session.close()
@@ -237,9 +239,11 @@ def overlay_state() -> dict:
         "active": overlay.get("active", False),
         "role": overlay.get("role", ""),
         "active_missions": overlay.get("missions", []),
+        "alerts": overlay.get("alerts", []),
         "game": overlay.get("game", {}),
         "profile": prof,
         "champion_progress": champ_prog,
+        "progress": progress,
     }
 
 

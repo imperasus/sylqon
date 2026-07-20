@@ -227,6 +227,146 @@ def test_item_spike_and_soul_via_parse_live_state():
     assert s.soul["status"] == ""
 
 
+# ------------------------------------------ Phase 1: extended activePlayer data
+COMBAT_SAMPLE = {
+    "gameData": {"gameTime": 720.0, "mapTerrain": "Infernal"},
+    "activePlayer": {
+        "riotIdGameName": "Me", "level": 9, "currentGold": 1450.0,
+        "championStats": {
+            "abilityHaste": 25.0, "attackDamage": 210.4, "abilityPower": 0.0,
+            "armor": 95.6, "magicResist": 52.0, "moveSpeed": 340.0,
+            "attackRange": 550.0, "currentHealth": 900.0, "maxHealth": 1800.0,
+            "resourceValue": 120.0, "resourceMax": 300.0,
+        },
+        "abilities": {
+            "Q": {"abilityLevel": 5}, "W": {"abilityLevel": 3},
+            "E": {"abilityLevel": 1}, "R": {"abilityLevel": 1},
+        },
+    },
+    "allPlayers": [
+        {"riotIdGameName": "Me", "championName": "Jinx", "team": "ORDER",
+         "position": "BOTTOM", "level": 9, "scores": {"creepScore": 100}},
+    ],
+    "events": {"Events": []},
+}
+
+
+def test_parses_current_gold_and_terrain():
+    s = parse_live_state(COMBAT_SAMPLE)
+    assert s.current_gold == 1450.0
+    assert s.map_terrain == "Infernal"
+    # soul type is derived from the rift terrain
+    assert s.soul["type"] == "Infernal"
+
+
+def test_parses_champion_stats_with_health_pct():
+    s = parse_live_state(COMBAT_SAMPLE)
+    cs = s.champion_stats
+    assert cs["ability_haste"] == 25.0
+    assert cs["attack_damage"] == 210.4
+    assert cs["current_health"] == 900.0 and cs["max_health"] == 1800.0
+    assert cs["health_pct"] == 50.0          # 900 / 1800
+    assert cs["resource_value"] == 120.0 and cs["resource_max"] == 300.0
+
+
+def test_parses_ability_levels_for_spike_detection():
+    s = parse_live_state(COMBAT_SAMPLE)
+    ab = s.abilities
+    assert (ab["q"], ab["w"], ab["e"], ab["r"]) == (5, 3, 1, 1)
+    assert ab["ult_level"] == 1              # level-6 ultimate unlocked
+
+
+def test_extended_fields_degrade_gracefully_when_absent():
+    # The original SAMPLE has no championStats/abilities/currentGold/mapTerrain.
+    s = parse_live_state(SAMPLE)
+    assert s.current_gold == 0.0
+    assert s.map_terrain == ""
+    assert s.abilities == {"q": 0, "w": 0, "e": 0, "r": 0, "ult_level": 0}
+    assert s.champion_stats["health_pct"] == 0.0   # no max_health → safe 0
+    assert s.soul["type"] == ""                     # no terrain → no soul element
+
+
+def test_extended_fields_serialize():
+    d = parse_live_state(COMBAT_SAMPLE).to_dict()
+    assert d["current_gold"] == 1450.0
+    assert d["champion_stats"]["ability_haste"] == 25.0
+    assert d["abilities"]["ult_level"] == 1
+    assert d["map_terrain"] == "Infernal"
+
+
+# ------------------------------------------ Phase 2: accuracy improvements
+def test_completed_count_prefers_catalog_then_price_fallback():
+    from sylqon.livegame.state import _completed_count
+    p = {"items": [
+        {"itemID": 3031, "price": 3400},                    # catalog: completed → counts
+        {"itemID": 1038, "price": 1300},                    # catalog: component → excluded
+        {"itemID": 3006, "price": 1100},                    # catalog: boots → excluded
+        {"itemID": 999999, "price": 3000},                  # unknown to catalog → price proxy
+        {"itemID": 2055, "price": 75, "consumable": True},  # consumable → excluded
+    ]}
+    # Infinity Edge (catalog-completed) + the unknown legendary-priced item.
+    assert _completed_count(p) == 2
+
+
+def test_level_diff_uses_lane_opponent_not_average():
+    from sylqon.livegame.state import _level_diff
+    roster = [
+        {"side": "enemy", "role": "bottom", "level": 8},
+        {"side": "enemy", "role": "top", "level": 14},
+        {"side": "enemy", "role": "middle", "level": 12},
+    ]
+    # Lane opponent (bottom) is level 8; my 11 → +3, NOT the enemy average (~0).
+    assert _level_diff(roster, 11, "bottom") == 3
+    # No same-role opponent → falls back to the enemy-team average.
+    assert _level_diff(roster, 11, "jungle") == 11 - round((8 + 14 + 12) / 3)
+    # No level yet on the lane opponent → also falls back gracefully.
+    assert _level_diff([{"side": "enemy", "role": "bottom", "level": 0}], 5, "bottom") == 0
+
+
+# ------------------------------------------ Phase 4: coaching depth
+def test_last_death_captures_killer_and_collapse():
+    from sylqon.livegame.state import _last_death
+    events = [
+        {"EventName": "ChampionKill", "VictimName": "Me", "KillerName": "EnemyMid",
+         "Assisters": ["EnemyJg", "EnemySup"], "EventTime": 420.0},
+    ]
+    roster = [{"name": "EnemyMid", "champion": "Zed"}]
+    d = _last_death(events, "Me", roster)
+    assert d["killer_champ"] == "Zed"
+    assert d["assisters"] == 2          # a 3-man collapse
+    assert d["game_time"] == 420.0
+
+
+def test_last_death_empty_when_not_died():
+    from sylqon.livegame.state import _last_death
+    assert _last_death([], "Me", []) == {}
+
+
+def test_matchup_from_opponent_class_and_spells():
+    from sylqon.livegame.state import _matchup
+    roster = [{"side": "enemy", "role": "middle", "champion": "Zed",
+               "spells": ["Ignite", "Flash"]}]
+    m = _matchup(roster, "middle")
+    assert m["opponent"] == "Zed"
+    assert "all-in" in m["playstyle"].lower()      # Assassin playstyle note
+    assert "ignite" in m["tempo"].lower()          # summoner-spell tempo read
+
+
+def test_matchup_empty_without_lane_opponent():
+    from sylqon.livegame.state import _matchup
+    assert _matchup([{"side": "ally", "role": "middle", "champion": "Ahri"}], "middle") == {}
+    assert _matchup([], "") == {}
+
+
+def test_mission_dict_carries_rationale():
+    from sylqon.livegame.engine import MissionEngine
+    from sylqon.livegame.missions import ROLE_CATALOG, make_runtime
+    m = ROLE_CATALOG["middle"][0]
+    rt = make_runtime(m, parse_live_state(SAMPLE, my_role="middle"))
+    d = MissionEngine._mission_dict(rt)
+    assert d["rationale"]                            # per-type default is filled in
+
+
 if __name__ == "__main__":
     import pytest
 

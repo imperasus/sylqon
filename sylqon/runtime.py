@@ -619,8 +619,28 @@ class PipelineRunner:
                 name="ag-live-scout",
                 daemon=True,
             ).start()
+            # Scale mission difficulty to the player's own rank (best-effort).
+            threading.Thread(
+                target=self._apply_self_tier,
+                args=(puuid,),
+                name="ag-self-tier",
+                daemon=True,
+            ).start()
         else:
             log.info("Live scout skipped: no usable PUUID (set RIOT_SELF_PUUID)")
+
+    def _apply_self_tier(self, puuid: str) -> None:
+        """Resolve the player's ranked tier and scale mission goals to it. Best-
+        effort: no API key / unranked / any failure leaves the 1.0 baseline."""
+        try:
+            from sylqon.riot.api import get_ranked_stats
+            from sylqon.riot.scout import _solo_entry
+            tier = (_solo_entry(get_ranked_stats(puuid)) or {}).get("tier", "")
+            if tier:
+                self._mission_engine.set_tier(tier)
+                log.info("Mission difficulty scaled to rank: %s", tier)
+        except Exception:
+            log.debug("Self-tier resolution failed", exc_info=True)
 
     def _riot_self_puuid(self) -> str:
         """The PUUID for Riot API calls. The LCU's current-summoner puuid is

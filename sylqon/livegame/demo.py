@@ -51,12 +51,32 @@ def fake_live_state(elapsed_seconds: float, role: str = "bottom") -> LiveGameSta
         {"side": "ally", "role": role, "completed_items": mine_items},
         {"side": "enemy", "role": role, "completed_items": opp_items},
     ]
+    level = min(18, 1 + int(gt // 90))
+    # Synthetic combat stats/abilities/gold that climb with level, so the demo
+    # overlay exercises the Phase-1 readouts (haste, hp%, ult level, recall gold).
+    champion_stats = {
+        "ability_haste": float(5 * (level // 3)),
+        "attack_damage": round(60.0 + 9.0 * level, 1),
+        "ability_power": 0.0,
+        "armor": round(30.0 + 5.0 * level, 1),
+        "magic_resist": round(32.0 + 2.0 * level, 1),
+        "move_speed": 335.0,
+        "attack_range": 525.0,
+        "current_health": round(560.0 + 90.0 * level, 1),
+        "max_health": round(560.0 + 90.0 * level, 1),
+        "health_pct": 100.0,
+        "resource_value": round(300.0 + 40.0 * level, 1),
+        "resource_max": round(300.0 + 40.0 * level, 1),
+    }
+    abilities = {"q": min(5, max(1, level // 2)), "w": min(5, level // 3),
+                 "e": min(5, level // 4), "r": (level // 6),
+                 "ult_level": (level // 6)}
     return LiveGameState(
         active=True,
         game_time=round(gt, 1),
         my_name="Demo Summoner",
         champion=DEMO_CHAMPION.get(role, "Jinx"),
-        level=min(18, 1 + int(gt // 90)),
+        level=level,
         kills=kills, deaths=0, assists=assists,
         cs=cs,
         cs_per_min=round(cs / minutes, 1) if minutes > 0 else 0.0,
@@ -70,8 +90,12 @@ def fake_live_state(elapsed_seconds: float, role: str = "bottom") -> LiveGameSta
         death_times=[],
         events=[],
         roster=roster,
-        soul=_dragon_soul(objectives),
+        soul=_dragon_soul(objectives, "Infernal"),
         item_spike=_item_spike(roster, role),
+        current_gold=round(300.0 + 25.0 * gt / 60.0 * (mine_items % 3 + 1), 0),
+        champion_stats=champion_stats,
+        abilities=abilities,
+        map_terrain="Infernal",
     )
 
 

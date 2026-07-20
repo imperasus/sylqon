@@ -16,6 +16,8 @@ from sylqon.livegame.missions import (
     CS_PER_MIN,
     FARM_CS_DELTA,
     GANK_ASSIST,
+    GOLD_SPEND,
+    LEVEL_LEAD,
     MISSION_TYPE_SCHEMA,
     NO_DEATH,
     OBJECTIVE,
@@ -32,6 +34,8 @@ _TYPE_DESC = {
     WARDING: "place/clear a number of wards (vision score)",
     ROAM_ASSIST: "roam for kills/assists away from lane",
     GANK_ASSIST: "convert ganks into kills/assists",
+    GOLD_SPEND: "back on a good timer and spend gold into an item spike",
+    LEVEL_LEAD: "hold an XP lead over the lane opponent across a window",
 }
 
 

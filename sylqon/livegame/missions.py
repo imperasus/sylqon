@@ -8,7 +8,7 @@ never hidden state. Standard tuning lives here; Phase 5 lets `config` override i
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from sylqon import config
 from sylqon.livegame.state import LiveGameState
@@ -21,6 +21,8 @@ OBJECTIVE = "objective_control"
 WARDING = "warding"
 ROAM_ASSIST = "roam_assist"
 GANK_ASSIST = "gank_assist"
+GOLD_SPEND = "gold_spend"          # decision: don't hoard — back and itemise
+LEVEL_LEAD = "level_lead"          # decision: hold an XP lead over your laner
 
 
 # -- Standard tuning (env/config overridable in Phase 5 via config.MISSION_TUNING) --
@@ -41,6 +43,34 @@ def _t(key: str) -> float:
     return override.get(key, _DEFAULT_TUNING[key])
 
 
+# The coaching "why" per mission type — the concept the goal is training. Surfaced
+# under every mission so the player learns the pattern, not just the instruction.
+_TYPE_RATIONALE = {
+    NO_DEATH: "Staying alive keeps your gold and XP lead — a death hands the enemy "
+              "tempo and map control.",
+    FARM_CS_DELTA: "CS is free gold (~14 CS ≈ a kill); farm leads convert straight "
+                   "into earlier item spikes.",
+    CS_PER_MIN: "A steady CS rate out-scales your laner without risking fights you "
+                "don't need to take.",
+    OBJECTIVE: "Dragons and heralds are team gold and map pressure — objectives win "
+               "games more reliably than kills.",
+    WARDING: "Vision denies enemy plays and enables yours; you can't be ganked in a "
+             "lane you can see.",
+    ROAM_ASSIST: "Impacting other lanes spreads your lead across the map and "
+                 "snowballs the game.",
+    GANK_ASSIST: "Converting ganks turns your jungle tempo into lane leads for the "
+                 "whole team.",
+    GOLD_SPEND: "Gold sitting in your pocket is wasted power — back on a good timer "
+                "and turn it into an item spike.",
+    LEVEL_LEAD: "Levels are free power; out-XP your laner by catching every wave and "
+                "not dying, and you win the lane by default.",
+}
+
+
+def default_rationale(mtype: str) -> str:
+    return _TYPE_RATIONALE.get(mtype, "")
+
+
 @dataclass(frozen=True)
 class Mission:
     id: str
@@ -49,6 +79,7 @@ class Mission:
     params: dict
     reward_points: int
     text: str                  # ≤ 1 short sentence
+    rationale: str = ""        # the coaching "why"; defaults per type in _mission_dict
 
 
 @dataclass
@@ -75,6 +106,7 @@ def _counters(live: LiveGameState) -> dict:
         "takedowns": live.kills + live.assists,
         "dragons": ally("dragons"), "heralds": ally("heralds"),
         "barons": ally("barons"), "towers": ally("towers"),
+        "gold": live.current_gold,
     }
 
 
@@ -160,6 +192,34 @@ def _eval_takedown(m, rt, live):
     return "active", min(1.0, gained / max(1, target)), f"{gained}/{target} · {_left(m, rt, live)}s"
 
 
+def _eval_gold_spend(m, rt, live):
+    """Decision mission: spend at least ``gold_spent`` (i.e. actually back and buy)
+    within the window. Gold is only lost by spending — not by dying — so a drop of
+    this size is a genuine recall+itemise, the skill being trained."""
+    spent = rt.baseline["gold"] - live.current_gold
+    target = m.params["gold_spent"]
+    if spent >= target:
+        return "completed", 1.0, f"Spent {int(spent)}g"
+    if live.game_time >= rt.deadline:
+        return "failed", min(1.0, max(0.0, spent) / target), f"Only spent {int(max(0, spent))}g"
+    held = int(live.current_gold)
+    return "active", min(1.0, max(0.0, spent) / target), f"Holding {held}g — back to spend"
+
+
+def _eval_level_lead(m, rt, live):
+    """Decision mission: hold an XP lead of ``lead`` over the lane opponent through
+    the window (catch waves, don't die). Scored at the deadline off the live
+    lane-relative ``level_diff``."""
+    dur = m.params["duration"]
+    elapsed = live.game_time - rt.started_at
+    diff = live.level_diff
+    if elapsed >= dur:
+        if diff >= m.params["lead"]:
+            return "completed", 1.0, f"{diff:+d} vs laner"
+        return "failed", min(1.0, elapsed / dur), f"{diff:+d} vs laner"
+    return "active", min(1.0, elapsed / dur), f"{diff:+d} vs laner · {_left(m, rt, live)}s"
+
+
 EVALUATORS = {
     NO_DEATH: _eval_no_death,
     FARM_CS_DELTA: _eval_farm,
@@ -168,6 +228,8 @@ EVALUATORS = {
     WARDING: _eval_warding,
     ROAM_ASSIST: _eval_takedown,
     GANK_ASSIST: _eval_takedown,
+    GOLD_SPEND: _eval_gold_spend,
+    LEVEL_LEAD: _eval_level_lead,
 }
 
 
@@ -190,7 +252,35 @@ MISSION_TYPE_SCHEMA: dict[str, dict] = {
     WARDING: {"int": {"ward_count": (2, 8)}, "opt_int": {"duration": _DURATION}},
     ROAM_ASSIST: {"int": {"count": (1, 3)}, "opt_int": {"duration": _DURATION}},
     GANK_ASSIST: {"int": {"count": (1, 3)}, "opt_int": {"duration": _DURATION}},
+    GOLD_SPEND: {"int": {"gold_spent": (300, 2000), "duration": _DURATION}},
+    LEVEL_LEAD: {"int": {"lead": (0, 3), "duration": _DURATION}},
 }
+
+# Magnitude params that scale with rank difficulty (harder goals for higher elo).
+# Duration (the window) and small ordinal targets (``lead``) are left untouched.
+_SCALABLE_PARAMS = {"cs_delta", "cs_per_min", "ward_count", "count", "gold_spent"}
+
+
+def scaled_mission(mission: "Mission", mult: float) -> "Mission":
+    """A difficulty-scaled copy of ``mission`` — magnitude params multiplied by
+    ``mult`` and clamped back into their schema range. ``mult == 1.0`` (or an
+    unscalable mission) returns the original unchanged."""
+    if mult == 1.0:
+        return mission
+    schema = MISSION_TYPE_SCHEMA.get(mission.type, {})
+    ranges = {**schema.get("int", {}), **schema.get("float", {}),
+              **schema.get("opt_int", {})}
+    params = dict(mission.params)
+    changed = False
+    for key, val in mission.params.items():
+        if key not in _SCALABLE_PARAMS or not isinstance(val, (int, float)):
+            continue
+        scaled = val * mult
+        if key in ranges:
+            scaled = _clamp(scaled, *ranges[key])
+        params[key] = int(round(scaled)) if isinstance(val, int) else round(scaled, 1)
+        changed = True
+    return replace(mission, params=params) if changed else mission
 
 
 def _clamp(value, lo, hi):
@@ -252,6 +342,11 @@ def _fallback_text(mtype: str, params: dict) -> str:
         return f"Secure {params.get('count', 1)} objective(s)."
     if mtype == WARDING:
         return f"Place {params.get('ward_count', 3)} wards."
+    if mtype == GOLD_SPEND:
+        return f"Back and spend {params.get('gold_spent', 1000)}g."
+    if mtype == LEVEL_LEAD:
+        lead = params.get("lead", 0)
+        return "Stay even in levels." if lead == 0 else f"Stay {lead}+ levels ahead."
     return f"Get {params.get('count', 1)} takedown(s)."
 
 
@@ -305,6 +400,9 @@ def _build_catalog() -> dict[str, list[Mission]]:
             Mission("mid_farm_safe", "middle", FARM_CS_DELTA,
                     {"cs_delta": _t("cs_delta"), "duration": _t("no_death_farm"), "no_death": True},
                     30, "Farm +30 CS without dying."),
+            Mission("mid_level_lead", "middle", LEVEL_LEAD,
+                    {"lead": 0, "duration": _t("cspm_window")},
+                    25, "Don't fall behind your laner in levels."),
         ],
         "bottom": [
             Mission("adc_farm", "bottom", FARM_CS_DELTA,
@@ -315,6 +413,9 @@ def _build_catalog() -> dict[str, list[Mission]]:
                     30, "Survive 2 min while farming."),
             Mission("adc_survive", "bottom", NO_DEATH, {"duration": _t("no_death_short")},
                     25, "Survive the next 2 minutes — no deaths."),
+            Mission("adc_back_spend", "bottom", GOLD_SPEND,
+                    {"gold_spent": 1100, "duration": _t("cs_window")},
+                    25, "Back on a good timer and spend 1100g."),
         ],
         "utility": [
             Mission("sup_ward", "utility", WARDING,

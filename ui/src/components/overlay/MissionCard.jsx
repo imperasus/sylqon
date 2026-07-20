@@ -18,6 +18,9 @@ export default function MissionCard({ mission }) {
         <span className="line-clamp-3 text-base font-semibold leading-snug text-white/90">{mission.text}</span>
         <span className={`mt-0.5 shrink-0 text-2xs font-bold tracking-widest ${st.cls}`}>{st.label}</span>
       </div>
+      {mission.rationale && (
+        <p className="mt-0.5 line-clamp-2 text-3xs leading-tight text-white/45">{mission.rationale}</p>
+      )}
       <div className="mt-1.5"><Bar value={(mission.progress || 0) * 100} tone={tone} /></div>
       <div className="mt-1 flex items-center justify-between text-xs">
         <span className="truncate text-white/45">{mission.detail}</span>

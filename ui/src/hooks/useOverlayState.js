@@ -30,8 +30,10 @@ export function useOverlayState() {
     active: !!data?.active,
     role: data?.role || "",
     missions: data?.active_missions || [],
+    alerts: data?.alerts || [],
     profile: data?.profile || null,
     championProgress: data?.champion_progress || null,
+    progress: data?.progress || null,
     game: data?.game || {},
   };
 }

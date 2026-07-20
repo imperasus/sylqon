@@ -5,8 +5,11 @@ player. ``LiveGameState.none()`` is the explicit "no game running" sentinel.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass, field
+from functools import lru_cache
 
+from sylqon import config
 from sylqon.data import static
 
 
@@ -41,8 +44,14 @@ class LiveGameState:
     cs_benchmark: dict = field(default_factory=dict) # {target, delta, status}
     level_diff: int = 0                              # my level − enemy avg level
     objective_timers: dict = field(default_factory=dict)  # {dragon, baron} secs to next
-    soul: dict = field(default_factory=dict)         # {status, ally, enemy} dragon-soul read
+    soul: dict = field(default_factory=dict)         # {status, ally, enemy, type} dragon-soul read
     item_spike: dict = field(default_factory=dict)   # {mine, opponent, status} vs lane opp
+    current_gold: float = 0.0                        # activePlayer.currentGold (recall math)
+    champion_stats: dict = field(default_factory=dict)   # live combat stats (haste, hp%, …)
+    abilities: dict = field(default_factory=dict)    # {q,w,e,r,ult_level} skill levels
+    map_terrain: str = ""                            # elemental rift type (soul being formed)
+    last_death: dict = field(default_factory=dict)   # {killer_champ, assisters, game_time}
+    matchup: dict = field(default_factory=dict)      # lane-opponent plan {opponent, playstyle, tempo}
 
     @classmethod
     def none(cls) -> "LiveGameState":
@@ -158,18 +167,49 @@ def _item_ids(p: dict) -> list[int]:
     return out
 
 
-# A completed legendary/mythic costs ~2500-3400g; boots (~1100) and components
-# (≤1300) fall below this. The Live Client item carries its gold ``price``, so we
-# count "finished power-spike items" with no item DB lookup.
+# Gold-threshold fallback for items the catalog doesn't know (e.g. a brand-new
+# item not yet in the cached DDragon dump): a completed legendary/mythic costs
+# ~2500-3400g, well above boots (~1100) and components (≤1300).
 LEGENDARY_PRICE = 2000
 
 
+@lru_cache(maxsize=1)
+def _catalog_item_sets() -> tuple[frozenset[int], frozenset[int]]:
+    """``(all_item_ids, completed_non_boots_ids)`` from the local DDragon catalog.
+    Both empty when the catalog is absent, so callers fall back to the price
+    proxy. Cached — the catalog is static within a run."""
+    try:
+        data = json.loads(config.CATALOG_CACHE_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return frozenset(), frozenset()
+    all_ids: set[int] = set()
+    completed: set[int] = set()
+    for it in (data.get("items") or {}).values():
+        iid = it.get("id")
+        if not isinstance(iid, int):
+            continue
+        all_ids.add(iid)
+        if it.get("completed") and "Boots" not in (it.get("tags") or []):
+            completed.add(iid)
+    return frozenset(all_ids), frozenset(completed)
+
+
 def _completed_count(p: dict) -> int:
-    """Number of completed (legendary-priced, non-consumable) items a player holds,
-    from the on-screen Live Client ``items`` — a DB-free power-spike proxy."""
-    items = p.get("items") or []
-    return sum(1 for it in items
-               if not it.get("consumable") and int(it.get("price") or 0) >= LEGENDARY_PRICE)
+    """Number of completed legendary items (boots excluded) a player holds, from
+    the on-screen Live Client ``items``. Prefers the DDragon catalog's authoritative
+    ``completed`` flag; for an item the catalog doesn't know it falls back to the
+    gold-price proxy — so the read never regresses on a stale/missing catalog."""
+    all_ids, completed_ids = _catalog_item_sets()
+    count = 0
+    for it in p.get("items") or []:
+        if it.get("consumable"):
+            continue
+        iid = int(it.get("itemID") or 0)
+        if iid in completed_ids:
+            count += 1
+        elif iid not in all_ids and int(it.get("price") or 0) >= LEGENDARY_PRICE:
+            count += 1
+    return count
 
 
 def _rune_name(node: dict, table: dict) -> str:
@@ -251,9 +291,19 @@ def _cs_benchmark(role: str, cs_per_min: float) -> dict:
     return {"target": target, "delta": delta, "status": status}
 
 
-def _level_diff(roster: list[dict], my_level: int) -> int:
+def _level_diff(roster: list[dict], my_level: int, role: str = "") -> int:
+    """My level minus my *lane opponent's* (same role) — the comparison that
+    actually matters in lane. Falls back to the enemy-team average only when the
+    lane opponent can't be resolved (no role match or no level yet)."""
+    if not my_level:
+        return 0
+    if role:
+        opp = next((p for p in roster if p.get("side") == "enemy"
+                    and p.get("role") == role and p.get("level")), None)
+        if opp:
+            return my_level - int(opp["level"])
     enemies = [p["level"] for p in roster if p.get("side") == "enemy" and p.get("level")]
-    if not enemies or not my_level:
+    if not enemies:
         return 0
     return my_level - round(sum(enemies) / len(enemies))
 
@@ -270,11 +320,20 @@ def _objective_timers(events: list[dict], game_time: float) -> dict:
             "baron": max(0, round(next_baron - game_time))}
 
 
-def _dragon_soul(objectives: dict) -> dict:
+# ``gameData.mapTerrain`` names the rift's active element; the soul being formed is
+# that element. "Default"/"" means no soul element locked in yet (< 2 drakes taken).
+_TERRAIN_SOUL = {
+    "Infernal": "Infernal", "Mountain": "Mountain", "Ocean": "Ocean",
+    "Cloud": "Cloud", "Hextech": "Hextech", "Chemtech": "Chemtech",
+}
+
+
+def _dragon_soul(objectives: dict, terrain: str = "") -> dict:
     """Read the dragon-soul race from the drake counts (already on-screen). A team
     on 3 drakes is at its *soul point* — the next dragon grants the soul; ≥4 means
     the soul is taken (dragons then become Elder). Status is "" when neither team
-    is close, so the overlay only nags at the decisive moment."""
+    is close, so the overlay only nags at the decisive moment. ``type`` names the
+    soul element (from the rift terrain) so the coach can say *which* soul is live."""
     d = (objectives or {}).get("dragons") or {}
     ally, enemy = int(d.get("ally") or 0), int(d.get("enemy") or 0)
     if ally >= 4:
@@ -287,7 +346,43 @@ def _dragon_soul(objectives: dict) -> dict:
         status = "enemy_soul_point"
     else:
         status = ""
-    return {"status": status, "ally": ally, "enemy": enemy}
+    return {"status": status, "ally": ally, "enemy": enemy,
+            "type": _TERRAIN_SOUL.get(terrain, "")}
+
+
+# Live combat stats we surface for coaching (haste → cooldown reads, hp% → all-in /
+# retreat calls). We keep a curated subset — the raw ``championStats`` blob carries
+# ~30 fields, most irrelevant to a coach.
+def _champion_stats(active: dict) -> dict:
+    cs = active.get("championStats") or {}
+    cur_hp = float(cs.get("currentHealth") or 0.0)
+    max_hp = float(cs.get("maxHealth") or 0.0)
+    return {
+        "ability_haste": float(cs.get("abilityHaste") or 0.0),
+        "attack_damage": round(float(cs.get("attackDamage") or 0.0), 1),
+        "ability_power": round(float(cs.get("abilityPower") or 0.0), 1),
+        "armor": round(float(cs.get("armor") or 0.0), 1),
+        "magic_resist": round(float(cs.get("magicResist") or 0.0), 1),
+        "move_speed": round(float(cs.get("moveSpeed") or 0.0), 1),
+        "attack_range": round(float(cs.get("attackRange") or 0.0), 1),
+        "current_health": round(cur_hp, 1),
+        "max_health": round(max_hp, 1),
+        "health_pct": round(100.0 * cur_hp / max_hp, 1) if max_hp > 0 else 0.0,
+        "resource_value": round(float(cs.get("resourceValue") or 0.0), 1),
+        "resource_max": round(float(cs.get("resourceMax") or 0.0), 1),
+    }
+
+
+def _abilities(active: dict) -> dict:
+    """Skill levels (Q/W/E/R) from ``activePlayer.abilities`` — the R level drives
+    level-6/11/16 ultimate power-spike detection. Empty when unavailable."""
+    ab = active.get("abilities") or {}
+
+    def lvl(key: str) -> int:
+        return int((ab.get(key) or {}).get("abilityLevel") or 0)
+
+    return {"q": lvl("Q"), "w": lvl("W"), "e": lvl("E"), "r": lvl("R"),
+            "ult_level": lvl("R")}
 
 
 def _item_spike(roster: list[dict], my_role: str) -> dict:
@@ -310,6 +405,84 @@ def _item_spike(roster: list[dict], my_role: str) -> dict:
     return {"mine": m, "opponent": o, "status": status}
 
 
+# Live Client ChampionKill events name the killer + assisters — enough to tell a
+# solo loss from a collapse without ever touching the game process.
+def _last_death(events: list[dict], my_name: str, roster: list[dict]) -> dict:
+    """The most recent time I died, with who landed the kill and how many enemies
+    were involved (an ``Assisters`` count > 0 means I was collapsed on, not out-
+    played 1v1). ``{}`` when I haven't died yet."""
+    mine = [e for e in events
+            if e.get("EventName") == "ChampionKill" and e.get("VictimName") == my_name]
+    if not mine:
+        return {}
+    e = mine[-1]
+    killer = (e.get("KillerName") or "").strip()
+    name_to_champ = {p.get("name"): p.get("champion") for p in roster}
+    # KillerName is the summoner name for a champion kill (else a turret/monster).
+    killer_champ = name_to_champ.get(killer) or name_to_champ.get(killer.split("#")[0]) or ""
+    return {
+        "killer_champ": killer_champ,
+        "assisters": len(e.get("Assisters") or []),
+        "game_time": float(e.get("EventTime") or 0.0),
+    }
+
+
+@lru_cache(maxsize=1)
+def _champion_class_map() -> dict[str, tuple[str, ...]]:
+    """``champion name/slug (lower) -> class tags`` from the local DDragon catalog
+    (e.g. "zed" -> ("Assassin",)). Empty when the catalog is absent."""
+    try:
+        data = json.loads(config.CATALOG_CACHE_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    out: dict[str, tuple[str, ...]] = {}
+    for info in (data.get("champions") or {}).values():
+        tags = tuple(info.get("tags") or [])
+        for key in ((info.get("name") or "").lower(), (info.get("id") or "").lower()):
+            if key:
+                out[key] = tags
+    return out
+
+
+# Class → the single most useful early-lane note against that archetype. Beginner-
+# grade but on-screen-grounded: the enemy's champion class is visible from pick.
+_CLASS_PLAYSTYLE = {
+    "Assassin": "Respect the level-6 all-in — track their ultimate and hold a summoner.",
+    "Marksman": "Deny CS and trade early; they win the game if they get to scale.",
+    "Mage": "Dodge their key skillshot — their damage and threat drop hard on cooldown.",
+    "Fighter": "Avoid extended fights at their item spikes; kite and short-trade.",
+    "Tank": "Don't feed early kills; they scale on time, so pressure them off CS.",
+    "Support": "Watch for a roam/engage; ward your flanks and don't get picked.",
+}
+# Enemy summoner spell → the tempo it signals for the lane.
+_SPELL_TEMPO = {
+    "Ignite": "Enemy Ignite means an early all-in — play safe until you out-trade it.",
+    "Teleport": "Enemy Teleport is map pressure — watch their recalls and TP flanks.",
+    "Heal": "Sustain summoner — extended trades favour them; look for burst windows.",
+    "Barrier": "Barrier eats your burst — bait it before you commit your combo.",
+    "Exhaust": "Exhaust neuters your all-in — force it out before you go in.",
+    "Cleanse": "Cleanse escapes your lockdown — chain CC or wait it out.",
+}
+
+
+def _matchup(roster: list[dict], role: str) -> dict:
+    """A lane plan against the same-role enemy: a class-based playstyle note plus a
+    tempo read from their summoner spells — all from on-screen pick + loadout.
+    ``{}`` when there is no resolvable lane opponent."""
+    if not role:
+        return {}
+    opp = next((p for p in roster
+                if p.get("side") == "enemy" and p.get("role") == role), None)
+    if not opp or not opp.get("champion"):
+        return {}
+    tags = _champion_class_map().get((opp["champion"] or "").lower(), ())
+    playstyle = next((_CLASS_PLAYSTYLE[t] for t in tags if t in _CLASS_PLAYSTYLE), "")
+    tempo = next((_SPELL_TEMPO[s] for s in (opp.get("spells") or []) if s in _SPELL_TEMPO), "")
+    if not playstyle and not tempo:
+        return {}
+    return {"opponent": opp["champion"], "playstyle": playstyle, "tempo": tempo}
+
+
 def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
     """Convert a raw ``allgamedata`` payload into a normalized snapshot. Returns
     the no-game sentinel for ``None``/malformed input. ``my_role`` (the champ-select
@@ -322,6 +495,7 @@ def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
     all_players = raw.get("allPlayers") or []
     events = (raw.get("events") or {}).get("Events") or []
     game_time = float(game.get("gameTime") or 0.0)
+    map_terrain = (game.get("mapTerrain") or "").strip()
 
     me = _find_me(active, all_players) or {}
     scores = me.get("scores") or {}
@@ -365,8 +539,14 @@ def parse_live_state(raw: dict | None, *, my_role: str = "") -> LiveGameState:
         events=light_events,
         roster=roster,
         cs_benchmark=_cs_benchmark(role, cs_per_min),
-        level_diff=_level_diff(roster, my_level),
+        level_diff=_level_diff(roster, my_level, role),
         objective_timers=_objective_timers(light_events, game_time),
-        soul=_dragon_soul(objectives),
+        soul=_dragon_soul(objectives, map_terrain),
         item_spike=_item_spike(roster, role),
+        current_gold=float(active.get("currentGold") or 0.0),
+        champion_stats=_champion_stats(active),
+        abilities=_abilities(active),
+        map_terrain=map_terrain,
+        last_death=_last_death(events, my_name, roster),
+        matchup=_matchup(roster, role),
     )

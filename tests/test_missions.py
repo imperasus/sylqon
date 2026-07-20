@@ -16,12 +16,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sylqon.livegame.engine import MissionEngine
 from sylqon.livegame.missions import (
     FARM_CS_DELTA,
+    GOLD_SPEND,
+    LEVEL_LEAD,
     NO_DEATH,
     OBJECTIVE,
     WARDING,
     Mission,
     evaluate,
     make_runtime,
+    scaled_mission,
 )
 from sylqon.livegame.state import LiveGameState
 
@@ -107,6 +110,46 @@ def test_role_switch_clears():
     eng.tick(live(game_time=10))
     eng.set_role("jungle")
     assert eng.active == [] and eng.role == "jungle"
+
+
+# -- Phase 5: decision missions + rank-adaptive difficulty -------------------
+def test_gold_spend_completes_on_a_back():
+    m = Mission("g", "bottom", GOLD_SPEND, {"gold_spent": 1000, "duration": 180}, 25, "x")
+    rt = make_runtime(m, live(game_time=100, current_gold=1400.0))
+    # Gold climbs but nothing spent → still active.
+    assert evaluate(rt, live(game_time=140, current_gold=1600.0))[0] == "active"
+    # Backed and bought (gold dropped past the target) → completed.
+    assert evaluate(rt, live(game_time=160, current_gold=300.0))[0] == "completed"
+    # Never spent by the deadline → failed.
+    assert evaluate(rt, live(game_time=300, current_gold=1900.0))[0] == "failed"
+
+
+def test_level_lead_scored_at_deadline():
+    m = Mission("l", "middle", LEVEL_LEAD, {"lead": 0, "duration": 180}, 25, "x")
+    rt = make_runtime(m, live(game_time=100, level_diff=0))
+    assert evaluate(rt, live(game_time=200, level_diff=1))[0] == "active"     # window open
+    # At the deadline: even-or-ahead completes, behind fails.
+    assert evaluate(rt, live(game_time=280, level_diff=0))[0] == "completed"
+    assert evaluate(rt, live(game_time=280, level_diff=-1))[0] == "failed"
+
+
+def test_scaled_mission_raises_and_lowers_goals_within_range():
+    m = Mission("f", "bottom", FARM_CS_DELTA, {"cs_delta": 40, "duration": 180}, 30, "x")
+    assert scaled_mission(m, 1.0) is m                       # baseline is a no-op
+    assert scaled_mission(m, 1.25).params["cs_delta"] == 50  # harder for high elo
+    assert scaled_mission(m, 0.8).params["cs_delta"] == 32   # gentler for low elo
+    assert scaled_mission(m, 1.25).params["duration"] == 180  # window is untouched
+    assert scaled_mission(m, 1.25).id == m.id                # identity preserved
+
+
+def test_set_tier_scales_engine_difficulty():
+    eng = MissionEngine("bottom", rng=random.Random(7))
+    eng.set_tier("IRON")
+    assert eng.difficulty < 1.0
+    eng.set_tier("DIAMOND")
+    assert eng.difficulty > 1.0
+    eng.set_tier("")                       # unknown/unranked → baseline
+    assert eng.difficulty == 1.0
 
 
 if __name__ == "__main__":

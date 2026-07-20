@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Crown, Flame, Trophy, Volume2, VolumeX, Zap } from "lucide-react";
+import {
+  AlertTriangle, Coins, Crown, Eye, Flame, Skull, Swords, Sword, Target,
+  Trophy, Volume2, VolumeX, Zap,
+} from "lucide-react";
 import { ROLE_LABELS } from "../../assets.js";
 import { useOverlayState } from "../../hooks/useOverlayState.js";
 import { useCoachSpeech } from "../../hooks/useCoachSpeech.js";
@@ -13,13 +16,20 @@ const fmtClock = (s) => {
   const t = Math.max(0, Math.floor(s || 0));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };
-const fmtTimer = (s) => (s != null && s <= 0 ? "UP" : fmtClock(s));
+// Objective timers are estimated from on-screen kill events + standard respawn
+// rules, so a leading "≈" marks them as an estimate, not a server feed.
+const fmtTimer = (s) => (s != null && s <= 0 ? "UP" : `≈${fmtClock(s)}`);
 
 const CS_TONE = { ahead: "text-good", behind: "text-bad", "on-track": "text-white/70" };
 
 /* Compact live readout: CS-vs-target, level diff, KDA — all from the read-only
    Live Client Data snapshot the coach already polls. */
 const SPIKE_TONE = { ahead: "text-good", behind: "text-bad", even: "text-white/70" };
+
+/* A colour-independent shape for each status, so ahead/behind reads the same for
+   colourblind users (never colour alone). */
+const STATUS_SYM = { ahead: "▲", behind: "▼", "on-track": "·", even: "·" };
+const sym = (s) => STATUS_SYM[s] || "";
 
 function Benchmark({ game }) {
   const b = game.cs_benchmark || {};
@@ -31,6 +41,7 @@ function Benchmark({ game }) {
       <div className="flex flex-col">
         <span className="text-3xs tracking-widest text-white/35">CS/MIN</span>
         <span className={CS_TONE[b.status] || "text-white/70"}>
+          {sym(b.status) && <span className="mr-0.5">{sym(b.status)}</span>}
           {game.cs_per_min ?? 0}<span className="text-white/30"> /{b.target ?? "—"}</span>
         </span>
       </div>
@@ -49,6 +60,7 @@ function Benchmark({ game }) {
         <div className="flex flex-col" title="Completed items vs your lane opponent">
           <span className="text-3xs tracking-widest text-white/35">ITEMS</span>
           <span className={`font-mono ${SPIKE_TONE[spike.status] || "text-white/70"}`}>
+            {sym(spike.status) && <span className="mr-0.5 font-sans">{sym(spike.status)}</span>}
             {spike.mine}<span className="text-white/30">/{spike.opponent}</span>
           </span>
         </div>
@@ -64,14 +76,49 @@ const SOUL = {
   enemy_soul: { text: "ENEMY HAS SOUL — play around Elder", cls: "border-bad/45 bg-bad/10 text-bad" },
 };
 
-/* A prominent one-line warning at the decisive dragon-soul moment. */
+/* State-reactive coaching alerts (Phase 3): an edge-triggered call + its "why".
+   Tone drives the colour; the category picks the icon. */
+const ALERT_TONE = {
+  good: "border-good/45 bg-good/10 text-good",
+  bad: "border-bad/50 bg-bad/12 text-bad",
+  info: "border-accent/40 bg-accent/10 text-accent",
+};
+const ALERT_ICON = {
+  low_hp: AlertTriangle,
+  enemy_down: Swords,
+  ult_spike: Zap,
+  item_spike: Sword,
+  recall_gold: Coins,
+  objective_setup: Eye,
+  death_review: Skull,
+  matchup_plan: Target,
+};
+
+function AlertBanner({ alert }) {
+  const Icon = ALERT_ICON[alert.category] || Flame;
+  return (
+    <div className={`flex items-start gap-1.5 rounded-lg border px-2.5 py-1.5 ${ALERT_TONE[alert.tone] || ALERT_TONE.info}`}>
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <div className="leading-tight">
+        <div className="text-2xs font-bold tracking-wide">{alert.text}</div>
+        {alert.rationale && (
+          <div className="mt-0.5 text-3xs font-normal text-white/55">{alert.rationale}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* A prominent one-line warning at the decisive dragon-soul moment. The rift
+   terrain names the soul element, so the call is specific ("INFERNAL SOUL POINT"). */
 function SoulBanner({ soul }) {
   const s = SOUL[soul?.status];
   if (!s) return null;
+  const el = soul?.type ? `${soul.type.toUpperCase()} ` : "";
   return (
     <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-2xs font-bold tracking-wide ${s.cls}`}>
       <Flame className="h-3.5 w-3.5 shrink-0" />
-      <span>{s.text}</span>
+      <span>{el}{s.text}</span>
     </div>
   );
 }
@@ -102,8 +149,52 @@ function Objectives({ timers }) {
 
 /* Minimal in-game overlay: live readout + 1–2 active missions + a slim
    progression footer. Designed to sit in a screen corner / OBS browser source. */
+const TREND = {
+  improving: { sym: "▲", cls: "text-good" },
+  up: { sym: "▲", cls: "text-good" },
+  declining: { sym: "▼", cls: "text-bad" },
+  down: { sym: "▼", cls: "text-bad" },
+};
+
+/* A slim consistency row: current streak, this-game tally, and recent trend —
+   the "am I improving" read a flat point total can't give. */
+function ProgressRow({ progress }) {
+  if (!progress) return null;
+  const { streak = 0, session, recent, trend } = progress;
+  const t = TREND[recent?.trend];
+  const csT = TREND[trend?.direction];
+  const hasSession = (session?.completed || 0) + (session?.failed || 0) > 0;
+  if (!streak && !hasSession && !t && !csT) return null;
+  return (
+    <div className="mt-2 flex items-center gap-3 rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-xs">
+      {streak > 0 && (
+        <span className="flex items-center gap-1 font-bold text-amber" title="Completed-mission streak">
+          <Flame className="h-3.5 w-3.5" /> {streak}
+        </span>
+      )}
+      {hasSession && (
+        <span className="font-mono text-white/55" title="This game: completed · points">
+          {session.completed}✓ · +{session.points}
+        </span>
+      )}
+      <span className="ml-auto flex items-center gap-2 text-white/50">
+        {t && recent?.total >= 6 && (
+          <span className={t.cls} title={`Recent completion ${Math.round((recent.completion_rate || 0) * 100)}%`}>
+            {t.sym} form
+          </span>
+        )}
+        {csT && (
+          <span className={csT.cls} title={`CS/min ${trend.from} → ${trend.to}`}>
+            {csT.sym} {trend.to} cs/m
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 export default function OverlayView() {
-  const { active, role, missions, profile, championProgress, game } = useOverlayState();
+  const { active, role, missions, alerts, profile, championProgress, progress, game } = useOverlayState();
   const inGame = active && (game?.game_time || 0) > 0;
 
   // Voice coaching (Web Speech API; Riot-safe — read-only audio). Off by default
@@ -117,7 +208,7 @@ export default function OverlayView() {
     try { localStorage.setItem(VOICE_KEY, next ? "on" : "off"); } catch { /* ignore */ }
     return next;
   });
-  useCoachSpeech({ missions, game }, voiceOn);
+  useCoachSpeech({ missions, alerts, game }, voiceOn);
 
   return (
     <div className="w-[300px] select-none p-2 font-tech">
@@ -151,6 +242,7 @@ export default function OverlayView() {
         </div>
       ) : (
         <div className="flex flex-col gap-2">
+          {inGame && alerts.map((a) => <AlertBanner key={a.id} alert={a} />)}
           {inGame && <SoulBanner soul={game.soul} />}
           {inGame && <Benchmark game={game} />}
           {inGame && <Objectives timers={game.objective_timers} />}
@@ -173,6 +265,8 @@ export default function OverlayView() {
           </div>
         </div>
       )}
+
+      <ProgressRow progress={progress} />
 
       {profile && (
         <div className="mt-2 flex items-center gap-3 rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-xs">

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from sylqon.db.schema import (
     ChampionMission,
     ChampionProgress,
+    MatchHistory,
     MissionRun,
     PlayerProfile,
 )
@@ -145,6 +146,91 @@ class ProgressionService:
         if c["level"] >= 5:
             out.append("level_5")
         return out
+
+    # -- progression analytics (Phase 6) -------------------------------------
+    def current_streak(self, session: Session, profile: PlayerProfile) -> int:
+        """Consecutive completed missions counting back from the latest — the
+        consistency signal a flat point total can't show."""
+        rows = (session.query(MissionRun.result)
+                .filter(MissionRun.profile_id == profile.id)
+                .order_by(MissionRun.finished_at.desc(), MissionRun.id.desc())
+                .limit(50).all())
+        streak = 0
+        for (result,) in rows:
+            if result != "completed":
+                break
+            streak += 1
+        return streak
+
+    def session_stats(self, session: Session, profile: PlayerProfile,
+                      game_session: str) -> dict:
+        """This game's completed/failed counts and points — the live session goal."""
+        if not game_session:
+            return {"completed": 0, "failed": 0, "points": 0}
+        rows = (session.query(MissionRun.result, MissionRun.points_awarded)
+                .filter(MissionRun.profile_id == profile.id,
+                        MissionRun.game_session == game_session).all())
+        return {
+            "completed": sum(1 for r, _ in rows if r == "completed"),
+            "failed": sum(1 for r, _ in rows if r == "failed"),
+            "points": sum((p or 0) for _, p in rows),
+        }
+
+    def recent_summary(self, session: Session, profile: PlayerProfile,
+                       limit: int = 20) -> dict:
+        """Completion rate over the last ``limit`` resolved missions, plus whether
+        the player is trending up — the newer half's rate vs the older half's."""
+        rows = (session.query(MissionRun.result)
+                .filter(MissionRun.profile_id == profile.id)
+                .order_by(MissionRun.finished_at.desc(), MissionRun.id.desc())
+                .limit(limit).all())
+        results = [r for (r,) in rows]
+        total = len(results)
+        if total == 0:
+            return {"total": 0, "completion_rate": 0.0, "trend": "steady"}
+        rate = round(sum(1 for r in results if r == "completed") / total, 2)
+        trend = "steady"
+        if total >= 6:                       # need enough to split into halves
+            half = total // 2
+            newer = results[:half]           # results are newest-first
+            older = results[half:]
+            nr = sum(1 for r in newer if r == "completed") / len(newer)
+            orr = sum(1 for r in older if r == "completed") / len(older)
+            if nr - orr >= 0.15:
+                trend = "improving"
+            elif orr - nr >= 0.15:
+                trend = "declining"
+        return {"total": total, "completion_rate": rate, "trend": trend}
+
+    def cs_trend(self, session: Session, champion_id: int | None = None,
+                 limit: int = 10) -> dict | None:
+        """CS/min trend from stored match history (newer half avg vs older half).
+        ``None`` when there aren't enough games to say anything honest."""
+        q = session.query(MatchHistory.stats_json)
+        if champion_id is not None:
+            q = q.filter(MatchHistory.champion_id == champion_id)
+        rows = q.order_by(MatchHistory.played_at.desc()).limit(limit).all()
+        vals = [float(v) for (stats,) in rows
+                if isinstance((v := (stats or {}).get("cs_per_min")), (int, float)) and v > 0]
+        if len(vals) < 4:
+            return None
+        half = len(vals) // 2
+        to = round(sum(vals[:half]) / half, 1)          # newest-first
+        frm = round(sum(vals[half:]) / len(vals[half:]), 1)
+        direction = "up" if to - frm >= 0.3 else "down" if frm - to >= 0.3 else "flat"
+        return {"stat": "cs_per_min", "from": frm, "to": to, "direction": direction}
+
+    def serialize_live_progress(self, session: Session, profile: PlayerProfile,
+                                game_session: str = "",
+                                champion_id: int | None = None) -> dict:
+        """The overlay's live progression extras: streak, this-session tally,
+        recent completion trend, and a CS/min trend when history allows."""
+        return {
+            "streak": self.current_streak(session, profile),
+            "session": self.session_stats(session, profile, game_session),
+            "recent": self.recent_summary(session, profile),
+            "trend": self.cs_trend(session, champion_id),
+        }
 
     # -- serialization + reset ----------------------------------------------
     def serialize_profile(self, profile: PlayerProfile) -> dict:
