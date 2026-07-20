@@ -60,6 +60,7 @@ class MatchContext:
     bans: list[int] = field(default_factory=list)   # champion ids banned by both teams
     # Per-team ban slots in draft order, display-ready (see ``parse_bans``).
     ban_slots: dict = field(default_factory=lambda: {"ally": [], "enemy": []})
+    my_role_assigned: bool = True      # my_role came from a real assignment (vs a hidden-lane default)
     enemy_picks_after_me: int = 0      # enemy pick actions still to come after ours
     ally_picks_after_me: int = 0       # ally pick actions still to come after ours
     is_last_pick: bool = False         # our pick is the last one in the draft order
@@ -157,6 +158,17 @@ def _threats(name: str) -> list[str]:
     return out
 
 
+def _norm_role(pos: str) -> str:
+    """LCU ``assignedPosition`` → canonical role, or ``""`` for none/unknown.
+
+    Champ select reports ``"NONE"`` (blind pick, unassigned, some queues) and
+    occasionally other non-role tokens; the old ``.get(pos, pos)`` passed those
+    straight through as a garbage role, which then keyed build / role lookups on
+    a non-existent lane and produced no loadout at all. Returning ``""`` lets
+    callers default or infer instead."""
+    return static.ROLE_ALIASES.get((pos or "").lower(), "")
+
+
 def _profile(player: dict, side: str, catalog: Catalog,
              locked_cells: set[int]) -> ChampPick:
     champion_id = player["championId"]
@@ -165,8 +177,7 @@ def _profile(player: dict, side: str, catalog: Catalog,
     return ChampPick(
         name=name,
         champion_id=champion_id,
-        role=static.ROLE_ALIASES.get(player.get("assignedPosition", ""),
-                                     player.get("assignedPosition", "")),
+        role=_norm_role(player.get("assignedPosition", "")),
         side=side,
         damage_type=_damage_type(info),
         tags=info.get("tags", []) if info else [],
@@ -445,8 +456,13 @@ def read_match_context(client: LCUClient, catalog: Catalog,
         if p.get("championId")
     ]
 
-    my_role = static.ROLE_ALIASES.get(me.get("assignedPosition", ""),
-                                      me.get("assignedPosition", "")) or "middle"
+    # Champ select hides the local player's lane too (blind pick, unassigned →
+    # "NONE"). Keep a safe "middle" default so a loadout is always produced, but
+    # flag whether it was a REAL assignment so the runtime can infer the true
+    # lane from the champion instead of blindly defaulting.
+    assigned_role = _norm_role(me.get("assignedPosition", ""))
+    my_role_assigned = bool(assigned_role)
+    my_role = assigned_role or "middle"
     all_locked = _all_players_locked(session)
     my_turn = _is_my_turn(session, cell_id)
     my_ban_turn = _is_my_ban_turn(session, cell_id)
@@ -462,6 +478,7 @@ def read_match_context(client: LCUClient, catalog: Catalog,
         my_champion=catalog.champion_name(my_champion_id) if my_champion_id else "",
         my_champion_id=my_champion_id,
         my_role=my_role,
+        my_role_assigned=my_role_assigned,
         locked=locked,
         all_locked=all_locked,
         my_turn=my_turn,

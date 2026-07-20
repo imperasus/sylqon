@@ -122,6 +122,42 @@ def infer_enemy_roles(session, picks: list) -> dict:
     return assign_roles(candidates)
 
 
+def infer_self_role(session, my_champion: str, allies: list):
+    """Best-guess lane for the LOCAL player when champ select hides it (blind
+    pick / unassigned). Read jointly with the allies — their known lanes are hard
+    constraints, so the player is assigned whichever lane the team leaves open,
+    biased by their own champion's pick-rate prior. Returns ``(role, confidence)``
+    or ``None`` (empty champion / DB unavailable)."""
+    if not my_champion:
+        return None
+    try:
+        from sylqon.db.schema import Champion
+        names = [my_champion] + [a.name for a in allies]
+        rows = {c.name: c for c in session.query(Champion)
+                .filter(Champion.name.in_(names)).all()}
+    except Exception:  # pragma: no cover - defensive
+        log.debug("self-role inference DB lookup failed", exc_info=True)
+        return None
+
+    self_key = "__self__"
+    me = rows.get(my_champion)
+    candidates = [{
+        "key": self_key,
+        "weights": _role_weights(getattr(me, "op_gg_stats", None),
+                                 getattr(me, "roles", None)),
+        "pin": None,
+    }]
+    for a in allies:
+        row = rows.get(a.name)
+        candidates.append({
+            "key": a.name,
+            "weights": _role_weights(getattr(row, "op_gg_stats", None),
+                                     getattr(row, "roles", None)),
+            "pin": a.role if a.role in ROLES else None,
+        })
+    return assign_roles(candidates).get(self_key)
+
+
 def enrich_roles(session, picks: list) -> int:
     """Fill in missing ``role`` on each pick from inference, in place. Never
     touches a pick that already has a role. Returns the number of roles filled

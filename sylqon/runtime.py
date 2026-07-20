@@ -307,6 +307,7 @@ class PipelineRunner:
                     ctx = read_match_context(self.client, self.catalog,
                                              summoner_id=self._summoner_id)
                     if ctx:
+                        self._enrich_roles(ctx)  # infer hidden roles (enemy + self)
                         self._publish_lobby(ctx, demo=False)
                         self._maybe_recommend(ctx)
                 self._retry_injection_if_pending()
@@ -1194,7 +1195,8 @@ class PipelineRunner:
         the lane layer resolves a real lane opponent instead of degrading to
         nothing. Best-effort and in place; only ever fills an EMPTY role, never
         overrides a real ``assignedPosition``."""
-        if not any(not p.role for p in (*ctx.enemies, *ctx.allies)):
+        needs_self = not ctx.my_role_assigned and bool(ctx.my_champion)
+        if not needs_self and not any(not p.role for p in (*ctx.enemies, *ctx.allies)):
             return
         try:
             from sylqon.db.session import get_session
@@ -1206,6 +1208,16 @@ class PipelineRunner:
                       + role_infer.enrich_roles(session, ctx.allies))
             if filled:
                 log.info("Role inference filled %d hidden champ-select role(s)", filled)
+            # The local player's own lane can be hidden too (blind pick). Infer it
+            # from the champion so the loadout targets the right lane instead of
+            # the blind "middle" default that produced no usable build.
+            if needs_self:
+                got = role_infer.infer_self_role(session, ctx.my_champion, ctx.allies)
+                if got and got[0]:
+                    log.info("Inferred hidden self role: %s -> %s (conf %.2f)",
+                             ctx.my_champion, got[0], got[1])
+                    ctx.my_role = got[0]
+                    ctx.my_role_assigned = True
         finally:
             session.close()
 

@@ -117,3 +117,53 @@ def test_enrich_no_op_when_all_known():
     session = _session()
     picks = [_pick("Darius", 122, role="top")]
     assert role_infer.enrich_roles(session, picks) == 0
+
+
+# -- self-role inference (hidden local-player lane) --------------------------
+def test_norm_role_rejects_garbage_positions():
+    from sylqon.lcu.lobby import _norm_role
+    assert _norm_role("top") == "top"
+    assert _norm_role("MID") == "middle"
+    assert _norm_role("NONE") == ""      # the blind-pick token that broke builds
+    assert _norm_role("") == ""
+    assert _norm_role("fill") == ""
+
+
+def test_infer_self_role_from_champion():
+    session = _session()
+    _champ(session, "Darius", 122, {"top": 12.0})
+    session.commit()
+    role, conf = role_infer.infer_self_role(session, "Darius", [])
+    assert role == "top"
+
+
+def test_infer_self_role_takes_lane_allies_leave_open():
+    session = _session()
+    _champ(session, "Sett", 875, {"top": 6.0, "utility": 5.0})
+    session.commit()
+    # A top-laner ally is already locked → the Sett player is pushed to support.
+    allies = [_pick("Gnar", 150, role="top")]
+    role, _ = role_infer.infer_self_role(session, "Sett", allies)
+    assert role == "utility"
+
+
+def test_infer_self_role_none_without_champion():
+    assert role_infer.infer_self_role(_session(), "", []) is None
+
+
+def test_enrich_fixes_hidden_self_role(monkeypatch):
+    # Regression: a blind-pick "NONE" position defaulted my_role to "middle" and
+    # produced no usable loadout; the runtime must infer the champion's real lane.
+    from types import SimpleNamespace
+    from sylqon.runtime import PipelineRunner
+    session = _session()
+    _champ(session, "Darius", 122, {"top": 12.0})
+    session.commit()
+    monkeypatch.setattr("sylqon.db.session.get_session", lambda: session)
+
+    r = PipelineRunner()
+    ctx = SimpleNamespace(my_role="middle", my_role_assigned=False,
+                          my_champion="Darius", enemies=[], allies=[])
+    r._enrich_roles(ctx)
+    assert ctx.my_role == "top"
+    assert ctx.my_role_assigned is True
