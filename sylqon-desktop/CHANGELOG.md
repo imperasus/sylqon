@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.32.0](https://github.com/imperasus/sylqon/compare/v1.31.0...v1.32.0) (2026-07-20)
+
+
+### Features
+
+* **draft:** calibratable logistic win-probability model ([16b7d0a](https://github.com/imperasus/sylqon/commit/16b7d0a3a55ecd84f8807432c286332a89074c05))
+* **draft:** deterministic analysis modules — roles, bans, power curve ([2e0f2fc](https://github.com/imperasus/sylqon/commit/2e0f2fc230a8683e24faf34ef17f602bb7e3f7e6))
+* **draft:** full-roster champion trait coverage ([f58cc25](https://github.com/imperasus/sylqon/commit/f58cc251d26f104b3242718b006819d3fe8183c0))
+* **draft:** sample-size-aware counter data pipeline ([c25ef40](https://github.com/imperasus/sylqon/commit/c25ef40d13ed7d256087adc5eab966082a6c49eb))
+* **draft:** wire draft intelligence into the live pipeline ([9b7afb9](https://github.com/imperasus/sylqon/commit/9b7afb9a88289a103a58c527d0cfb18c377291ad))
+* **scoring:** lane-weighted counter + mastery-aware comfort ([53a2ce2](https://github.com/imperasus/sylqon/commit/53a2ce20c2bb826e3f219a360156932b6dda6cda))
+* **ui:** surface draft win% confidence and honest model framing ([59bd3fd](https://github.com/imperasus/sylqon/commit/59bd3fdfe0a9f430e19fe89dbb6cda8d96a67864))
+
 ## [1.31.0](https://github.com/imperasus/sylqon/compare/v1.30.0...v1.31.0) (2026-07-19)
 
 
