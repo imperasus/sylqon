@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.34.0](https://github.com/imperasus/sylqon/compare/v1.33.1...v1.34.0) (2026-07-21)
+
+
+### Features
+
+* **players:** honest, actionable and accessible Players tab ([f5cc362](https://github.com/imperasus/sylqon/commit/f5cc36231f5406d56721cb48d7e86c59311e0982))
+* **players:** lane matchup, coaching callouts and rank-band benchmarks ([c5066fc](https://github.com/imperasus/sylqon/commit/c5066fc57d9d584f341b8e888b158aa120af3a0a))
+
 ### [1.33.1](https://github.com/imperasus/sylqon/compare/v1.33.0...v1.33.1) (2026-07-20)
 
 
