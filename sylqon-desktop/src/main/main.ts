@@ -1,5 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain } from "electron";
+import * as fs from "fs";
 import * as path from "path";
+import { spawn } from "child_process";
 import {
   getBaseUrl,
   getClickThroughHotkey,
@@ -275,6 +277,35 @@ ipcMain.handle("sylqon:getLogPath", () =>
 );
 // App version (same value electron-updater compares against) for the UI badge.
 ipcMain.handle("sylqon:getVersion", () => app.getVersion());
+
+// --- Launch the League client (Home "Next match" CTA) -----------------------
+// Starts Riot's own launcher with its documented product arguments. This only
+// *starts* an application the user already has installed — it does not attach
+// to, read, or interact with the game process in any way, so it stays clear of
+// the read-only boundary the overlay is built on.
+const RIOT_CLIENT_CANDIDATES = [
+  "C:\\Riot Games\\Riot Client\\RiotClientServices.exe",
+  "C:\\Program Files\\Riot Games\\Riot Client\\RiotClientServices.exe",
+  "C:\\Program Files (x86)\\Riot Games\\Riot Client\\RiotClientServices.exe",
+];
+
+ipcMain.handle("sylqon:launchLeague", async () => {
+  const exe = RIOT_CLIENT_CANDIDATES.find((p) => fs.existsSync(p));
+  if (!exe) {
+    return { ok: false, reason: "not-found" };
+  }
+  try {
+    const child = spawn(
+      exe,
+      ["--launch-product=league_of_legends", "--launch-patchline=live"],
+      { detached: true, stdio: "ignore" }
+    );
+    child.unref();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: String(err) };
+  }
+});
 
 // --- Single instance: a second launch focuses the existing window -----------
 if (!app.requestSingleInstanceLock()) {

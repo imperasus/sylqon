@@ -18,6 +18,10 @@ contextBridge.exposeInMainWorld("sylqon", {
   getLogPath: (): Promise<string> => ipcRenderer.invoke("sylqon:getLogPath"),
   /** Resolve the installed app version (for the UI version badge). */
   getVersion: (): Promise<string> => ipcRenderer.invoke("sylqon:getVersion"),
+  /** Start the League client via Riot's own launcher (Home "Next match" CTA).
+   *  Starts an installed application; never touches the game process. */
+  launchLeague: (): Promise<{ ok: boolean; reason?: string }> =>
+    ipcRenderer.invoke("sylqon:launchLeague"),
 });
 
 // Update banner buttons (Download / Restart) → main process (see updater.ts).
