@@ -35,11 +35,11 @@ export default class ErrorBoundary extends Component {
       <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-bg-1 p-8 text-center">
         <div className="max-w-xl rounded-lg border border-bad/40 bg-bg-2/95 p-6 text-left">
           <h1 className="mb-2 font-display text-lg font-bold tracking-wide text-bad">
-            A felület hibába ütközött
+            Something went wrong
           </h1>
           <p className="mb-3 text-sm text-white/60">
-            Egy komponens váratlan hibát dobott. A részletek a fejlesztői konzolon
-            (DevTools) is megjelentek.
+            A component threw an unexpected error. The details are also in the
+            developer console (DevTools).
           </p>
           <pre className="mb-4 max-h-48 overflow-auto rounded bg-black/40 p-3 text-2xs text-bad/90">
             {String(error?.stack || error?.message || error)}
@@ -50,7 +50,7 @@ export default class ErrorBoundary extends Component {
             onClick={this.handleReload}
             className="rounded-md border border-accent/45 bg-accent/15 px-4 py-1.5 text-xs font-bold tracking-wide text-accent-bright transition-colors hover:bg-accent/25"
           >
-            Újratöltés
+            Reload
           </button>
         </div>
       </div>

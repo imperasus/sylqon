@@ -142,13 +142,13 @@ export default function App() {
       case "draft":
         return state?.lobby
           ? <DraftCockpit state={state} />
-          : <EmptyState icon={Swords} label="NINCS DRAFT"
-                        hint="A draft board akkor jelenik meg, amikor elindul a champion select." />;
+          : <EmptyState icon={Swords} label="NO DRAFT"
+                        hint="The draft board appears when champion select starts." />;
       case "loadout":
         return (state?.build || state?.lobby?.my_champion)
           ? <PostlockCockpit state={state} act={act} api={api} />
-          : <EmptyState icon={Package} label="NINCS LOADOUT"
-                        hint="A végleges build a bajnok lockolása után jelenik meg." />;
+          : <EmptyState icon={Package} label="NO LOADOUT"
+                        hint="The final build appears once your champion is locked in." />;
       case "players":
         if (isInGame) return <LiveBoard scout={state?.scout} live={state.live} matchups={state?.matchups}
                                        callouts={state?.callouts} patch={patch} />;
@@ -157,8 +157,8 @@ export default function App() {
         // lobby is enough to render it — PlayersView handles the thinner states.
         return (state?.scout?.players?.length || state?.lobby)
           ? <PlayersView state={state} />
-          : <EmptyState icon={Users} label="NINCS LOBBY ADAT"
-                        hint="A 10 játékos scoutja a lobby/meccs során töltődik fel." />;
+          : <EmptyState icon={Users} label="NO LOBBY DATA"
+                        hint="Scouting for all 10 players fills in during the lobby or match." />;
       case "home":
       default:
         return <HomeCockpit state={state} act={act} api={api} />;

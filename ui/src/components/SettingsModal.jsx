@@ -9,13 +9,13 @@ import { useSettings } from "../api.js";
 /* Dashboard Settings panel. Reads the effective settings from the backend
    (env/default overlaid with persisted user overrides), edits them grouped by
    theme, and PUTs the changed values back. Mirrors the portal + framer-motion
-   modal pattern used by MatchAnalysisModal. Hungarian UI to match the app. */
+   modal pattern used by MatchAnalysisModal. */
 
 const GROUPS = [
-  { key: "region", label: "Régió & adat", icon: Globe },
+  { key: "region", label: "Region & data", icon: Globe },
   { key: "riot", label: "Riot API", icon: KeyRound },
   { key: "ai", label: "AI / Ollama", icon: Cpu },
-  { key: "overlay", label: "Overlay & missziók", icon: MonitorPlay },
+  { key: "overlay", label: "Overlay & missions", icon: MonitorPlay },
 ];
 
 // Human labels + (for string fields) a dropdown option list. Anything not listed
@@ -25,39 +25,39 @@ const RIOT_PLATFORMS = ["euw1", "na1", "kr", "eun1", "br1", "jp1", "oce1", "la1"
 const RIOT_MASS = ["europe", "americas", "asia", "sea"];
 
 const FIELD = {
-  opgg_region: { label: "OP.GG régió", options: OPGG_REGIONS, hint: "Build-meta lekérés régiója" },
-  riot_api_region: { label: "Riot platform régió", options: RIOT_PLATFORMS, hint: "Spectator / League (live scout)" },
-  riot_api_mass_region: { label: "Riot mass régió", options: RIOT_MASS, hint: "Match-V5 (meccstörténet)" },
-  cache_ttl_seconds: { label: "Build-cache élettartam (mp)", hint: "Mennyi ideig friss egy cache-elt build" },
-  auto_full_sync: { label: "Auto teljes szinkron", hint: "Patch-váltáskor automatikus op.gg sync" },
+  opgg_region: { label: "OP.GG region", options: OPGG_REGIONS, hint: "Region used for build meta lookups" },
+  riot_api_region: { label: "Riot platform region", options: RIOT_PLATFORMS, hint: "Spectator / League (live scout)" },
+  riot_api_mass_region: { label: "Riot mass region", options: RIOT_MASS, hint: "Match-V5 (match history)" },
+  cache_ttl_seconds: { label: "Build cache TTL (s)", hint: "How long a cached build stays fresh" },
+  auto_full_sync: { label: "Auto full sync", hint: "Sync from op.gg automatically on a patch change" },
 
-  riot_api_key: { label: "Riot API kulcs", hint: "Live scouthoz; lokálisan tárolva (mint a .env)" },
-  riot_self_puuid: { label: "Saját PUUID", hint: "A kulcshoz tartozó fiók azonosítója" },
-  riot_match_count: { label: "Scout meccsmennyiség", hint: "Játékosonként lekért meccsek száma" },
+  riot_api_key: { label: "Riot API key", hint: "For live scouting; stored locally (like .env)" },
+  riot_self_puuid: { label: "Your PUUID", hint: "Account id belonging to the key" },
+  riot_match_count: { label: "Scout match count", hint: "Matches fetched per player" },
 
   ollama_url: { label: "Ollama URL" },
-  ollama_model: { label: "Ollama modell" },
-  ollama_timeout_seconds: { label: "Ollama timeout (mp)" },
-  open_build_mode: { label: "Open-build mód", hint: "Teljes item-katalógusból javasol" },
-  rag_items_mode: { label: "RAG itemek", hint: "Szemantikus item-keresés (open-build kell)" },
-  rag_runes_mode: { label: "RAG runák", hint: "Szemantikus runa-keresés" },
-  rag_kit_mode: { label: "RAG kit-grounding", hint: "Képesség fact-sheet a lane-tervhez" },
-  rag_fusion_mode: { label: "RAG scout-fúzió", hint: "Ellenfél scout + kit a lane-tervbe" },
+  ollama_model: { label: "Ollama model" },
+  ollama_timeout_seconds: { label: "Ollama timeout (s)" },
+  open_build_mode: { label: "Open-build mode", hint: "Recommend from the full item catalog" },
+  rag_items_mode: { label: "RAG items", hint: "Semantic item search (needs open-build)" },
+  rag_runes_mode: { label: "RAG runes", hint: "Semantic rune search" },
+  rag_kit_mode: { label: "RAG kit grounding", hint: "Ability fact sheet for the lane plan" },
+  rag_fusion_mode: { label: "RAG scout fusion", hint: "Enemy scout + kit folded into the lane plan" },
 
-  overlay_auto: { label: "Overlay auto megjelenés", hint: "Meccs indulásakor magától felugrik / eltűnik" },
-  overlay_max_missions: { label: "Max. egyszerre látható misszió" },
-  live_poll_seconds: { label: "Overlay poll (mp)", hint: "Kisebb = gyorsabb, több CPU" },
-  champion_mission_target: { label: "Misszió-queue / bajnok" },
+  overlay_auto: { label: "Overlay auto show", hint: "Appears / hides by itself when a match starts" },
+  overlay_max_missions: { label: "Max missions shown at once" },
+  live_poll_seconds: { label: "Overlay poll (s)", hint: "Lower = faster, more CPU" },
+  champion_mission_target: { label: "Mission queue per champion" },
 };
 
 const MISSION_TYPES = [
-  ["no_death_for_duration", "Halál nélkül (idő)"],
-  ["farm_cs_delta", "CS előny (farm)"],
-  ["cs_per_min_threshold", "CS/perc cél"],
-  ["objective_control", "Objektíva kontroll"],
-  ["warding", "Wardozás"],
-  ["roam_assist", "Roam / segítés"],
-  ["gank_assist", "Gank segítés"],
+  ["no_death_for_duration", "No deaths (timed)"],
+  ["farm_cs_delta", "CS lead (farm)"],
+  ["cs_per_min_threshold", "CS/min target"],
+  ["objective_control", "Objective control"],
+  ["warding", "Warding"],
+  ["roam_assist", "Roam / assist"],
+  ["gank_assist", "Gank assist"],
 ];
 const ALL_MISSION_IDS = MISSION_TYPES.map(([id]) => id);
 
@@ -81,7 +81,7 @@ function Toggle({ on, onChange }) {
 
 function RestartTag() {
   return (
-    <span className="rounded bg-amber/15 px-1 py-px text-3xs font-bold tracking-wider text-amber" title="Újraindítás után lép életbe">
+    <span className="rounded bg-amber/15 px-1 py-px text-3xs font-bold tracking-wider text-amber" title="Takes effect after a restart">
       RESTART
     </span>
   );
@@ -101,7 +101,7 @@ function Field({ name, spec, value, onChange }) {
       <input
         type="password"
         className={INPUT_CLS}
-        placeholder={spec.value ? "•••••••• (beállítva)" : "nincs beállítva"}
+        placeholder={spec.value ? "•••••••• (set)" : "not set"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
@@ -201,12 +201,12 @@ export default function SettingsModal({ onClose }) {
 
         <div className="flex items-center gap-2">
           <SettingsIcon className="h-5 w-5 text-accent" />
-          <span className="font-display text-lg font-bold tracking-[0.08em] text-white/90">BEÁLLÍTÁSOK</span>
+          <span className="font-display text-lg font-bold tracking-[0.08em] text-white/90">SETTINGS</span>
         </div>
 
         {loading && !settings && (
           <div className="flex items-center gap-2 py-10 text-md text-white/50">
-            <Loader2 className="h-4 w-4 animate-spin text-accent" /> Beállítások betöltése…
+            <Loader2 className="h-4 w-4 animate-spin text-accent" /> Loading settings…
           </div>
         )}
 
@@ -229,7 +229,7 @@ export default function SettingsModal({ onClose }) {
                   <>
                     <div className="mt-2 flex flex-col gap-1.5">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-white/80">Aktív misszió-típusok</span>
+                        <span className="text-sm font-semibold text-white/80">Active mission types</span>
                         {settings.mission_types_enabled?.applies === "restart" && <RestartTag />}
                       </div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
@@ -249,8 +249,8 @@ export default function SettingsModal({ onClose }) {
                       </div>
                     </div>
                     <div className="mt-2 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white/45">
-                      Overlay ki/be: <span className="font-mono text-white/70">F10</span> · átkattinthatóság:
-                      {" "}<span className="font-mono text-white/70">F9</span> — játék közben sem kell alt-tab.
+                      Overlay toggle: <span className="font-mono text-white/70">F10</span> · click-through:
+                      {" "}<span className="font-mono text-white/70">F9</span> — no alt-tab needed mid-game.
                     </div>
                   </>
                 )}
@@ -262,13 +262,13 @@ export default function SettingsModal({ onClose }) {
         <div className="flex items-center justify-end gap-2 border-t border-white/10 pt-3">
           <button onClick={onClose}
                   className="cursor-pointer rounded-md border border-white/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-white/55 transition-colors hover:bg-white/8 hover:text-white/85">
-            Mégse
+            Cancel
           </button>
           <button onClick={onSave} disabled={saving || !settings}
                   className={`inline-flex items-center gap-1.5 rounded-md border border-transparent bg-accent px-3 py-1 text-xs font-bold uppercase tracking-widest text-bg transition-colors hover:bg-accent-bright
                     ${saving || !settings ? "cursor-default opacity-50" : "cursor-pointer"}`}>
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Mentés
+            Save
           </button>
         </div>
       </motion.div>

@@ -52,10 +52,10 @@ export default function NavRail({ view, onView, scout, live, demoActive, onToggl
         icon={demoActive ? Square : Play}
         tone="amber"
         active={demoActive}
-        title={demoActive ? "Demo leállítása" : "Demo lobby indítása"}
+        title={demoActive ? "Stop demo" : "Start demo lobby"}
         onClick={onToggleDemo}
       />
-      <IconButton icon={Settings} title="Beállítások" onClick={onOpenSettings} />
+      <IconButton icon={Settings} title="Settings" onClick={onOpenSettings} />
     </nav>
   );
 }

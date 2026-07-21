@@ -67,7 +67,7 @@ export default function StatusStrip({ state, mode, api }) {
       <div className="h-4 w-px bg-line" />
 
       <span className={`flex items-center gap-1.5 font-display text-xs font-semibold tracking-[0.08em] ${tag.text}`}
-            title="Aktuális játékfázis (a megtekintett nézet ettől eltérhet)">
+            title="Current game phase (the view you are on may differ)">
         <span className={`h-1.5 w-1.5 rounded-full ${tag.dot}`} />
         {tag.label}
       </span>
@@ -76,8 +76,8 @@ export default function StatusStrip({ state, mode, api }) {
         <span
           className="rounded border border-bad/50 bg-bad/15 px-1.5 py-px font-display text-xs font-semibold tracking-[0.08em] text-bad"
           title={api.lastError?.message
-            ? `A backend nem elérhető: ${api.lastError.message}`
-            : "A backend (http://127.0.0.1:8077) nem válaszol"}
+            ? `Backend unreachable: ${api.lastError.message}`
+            : "The backend (http://127.0.0.1:8077) is not responding"}
         >
           BACKEND OFFLINE
         </span>

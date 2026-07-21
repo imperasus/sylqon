@@ -73,7 +73,7 @@ export default function MatchAnalysisModal({ match, patch, onClose }) {
 
         {loading && (
           <div className="flex items-center gap-2 py-6 text-md text-white/50">
-            <Loader2 className="h-4 w-4 animate-spin text-accent" /> AI elemzés készítése…
+            <Loader2 className="h-4 w-4 animate-spin text-accent" /> Generating AI review…
           </div>
         )}
 
@@ -82,8 +82,8 @@ export default function MatchAnalysisModal({ match, patch, onClose }) {
             <AlertTriangle size={15} className="shrink-0" />
             <span>
               {data.error
-                ? "Az elemzés nem érhető el ehhez a meccshez."
-                : (data.detail || "Az Ollama jelenleg offline; az elemzés nem generálható.")}
+                ? "No review is available for this match."
+                : (data.detail || "Ollama is offline; the review cannot be generated.")}
             </span>
           </div>
         )}
@@ -94,9 +94,9 @@ export default function MatchAnalysisModal({ match, patch, onClose }) {
             {/* Side-by-side on wider modals so the review uses width, not height
                 (keeps it scroll-free). Stacks on a narrow window. */}
             <div className="grid gap-x-5 gap-y-4 sm:grid-cols-3">
-              <Block icon={ThumbsUp} accent="ally" title="ERŐSSÉGEK" items={data.strengths} mark="+" markCls="text-good" />
-              <Block icon={AlertTriangle} accent="enemy" title="HIBÁK" items={data.weaknesses} mark="–" markCls="text-bad" />
-              <Block icon={Lightbulb} accent="accent" title="JAVASLATOK" items={data.tips} mark="›" markCls="text-accent" />
+              <Block icon={ThumbsUp} accent="ally" title="STRENGTHS" items={data.strengths} mark="+" markCls="text-good" />
+              <Block icon={AlertTriangle} accent="enemy" title="WEAKNESSES" items={data.weaknesses} mark="–" markCls="text-bad" />
+              <Block icon={Lightbulb} accent="accent" title="TIPS" items={data.tips} mark="›" markCls="text-accent" />
             </div>
           </div>
         )}
