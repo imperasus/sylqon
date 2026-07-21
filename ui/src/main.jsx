@@ -1,8 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
 import App from "./App.jsx";
 import OverlayApp from "./OverlayApp.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
+import { queryClient } from "./api.js";
 import "./index.css";
 
 // Lightweight routing (the project has no react-router): the /overlay path
@@ -18,7 +20,9 @@ if (!isOverlay) document.documentElement.classList.add("app-fluid-root");
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ErrorBoundary>
-      {isOverlay ? <OverlayApp /> : <App />}
+      <QueryClientProvider client={queryClient}>
+        {isOverlay ? <OverlayApp /> : <App />}
+      </QueryClientProvider>
     </ErrorBoundary>
   </React.StrictMode>
 );

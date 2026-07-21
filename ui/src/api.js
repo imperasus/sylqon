@@ -1,6 +1,32 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  QueryClient, useMutation, useQuery, useQueryClient,
+} from "@tanstack/react-query";
 
-const POLL_MS = 1500;
+// Champ select and a live game need a tight loop; an idle Home does not. One
+// adaptive interval replaces the per-component `setInterval`s that used to poll
+// the same backend independently.
+const POLL_ACTIVE_MS = 1500;
+const POLL_IDLE_MS = 4000;
+const POLL_SLOW_MS = 30000;
+
+/** Shared client. Server state is polled, so retries and refetch-on-focus only
+ * add duplicate traffic — the next interval tick recovers anyway. */
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+      staleTime: 1000,
+    },
+  },
+});
+
+/** True while the client is in champ select or a live game. */
+function isLivePhase(state) {
+  if (!state) return false;
+  return Boolean(state.lobby || state.live?.active || state.lcu?.phase === "InProgress");
+}
 
 /** Debug toggle: `?debug=1` in the URL or `localStorage.sylqon_debug=1`.
  * Off by default; when on, the fetch layer logs verbose timing/detail. */
@@ -48,32 +74,32 @@ async function post(path, body) {
   });
 }
 
-/** Polls the FastAPI bridge and exposes dashboard actions. */
+/** Polls the FastAPI bridge and exposes dashboard actions. The poll rate follows
+ * the client phase: tight during champ select / a live game, relaxed on an idle
+ * Home so a parked dashboard is not hammering the backend. */
 export function useSylqon() {
-  const [state, setState] = useState(null);
-  const [online, setOnline] = useState(false);
   const [busy, setBusy] = useState("");
   const [lastError, setLastError] = useState(null);
-  const timer = useRef(null);
+  const qc = useQueryClient();
 
-  const refresh = useCallback(async () => {
-    try {
-      setState(await apiFetch("/api/state"));
-      setOnline(true);
-    } catch (e) {
-      // Distinguish "backend down / errored" from "no data yet" — the UI can
-      // now show an explicit offline banner instead of a bare empty state.
-      setOnline(false);
-      setLastError({ where: "state", message: e?.message || String(e) });
-      logApiError("GET /api/state", e);
-    }
-  }, []);
+  const { data: state = null, isSuccess, error } = useQuery({
+    queryKey: ["state"],
+    queryFn: () => apiFetch("/api/state"),
+    refetchInterval: (query) =>
+      isLivePhase(query.state.data) ? POLL_ACTIVE_MS : POLL_IDLE_MS,
+    refetchIntervalInBackground: true,
+  });
 
+  // Distinguish "backend down / errored" from "no data yet" — the UI shows an
+  // explicit offline banner instead of a bare empty state.
   useEffect(() => {
-    refresh();
-    timer.current = setInterval(refresh, POLL_MS);
-    return () => clearInterval(timer.current);
-  }, [refresh]);
+    if (error) {
+      setLastError({ where: "state", message: error?.message || String(error) });
+      logApiError("GET /api/state", error);
+    }
+  }, [error]);
+
+  const refresh = useCallback(() => qc.invalidateQueries({ queryKey: ["state"] }), [qc]);
 
   const action = useCallback(
     async (name, path, body) => {
@@ -97,82 +123,75 @@ export function useSylqon() {
 
   return {
     state,
-    online,
+    online: isSuccess && !error,
     busy,
     lastError,
+    refresh,
     inject: (variant) => action("inject", "/api/inject", { variant }),
     injectVariant: (index) => action("inject", "/api/inject/variant", { index }),
     startDemo: () => action("demo", "/api/demo", {}),
     stopDemo: () => action("demo", "/api/demo", null),
+    fullSync: () => action("sync", "/api/sync/full", {}),
   };
 }
 
 /** Loads the static-ish dashboard data: champion list + op.gg meta report.
  * Fetched once on mount (they only change on a patch / catalog refresh). */
 export function useStaticData() {
-  const [champions, setChampions] = useState([]);
-  const [meta, setMeta] = useState({ positions: {}, patch: "" });
-  const [benchmarks, setBenchmarks] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [c, m, b] = await Promise.all([
-          apiFetch("/api/champions"),
-          apiFetch("/api/meta"),
-          apiFetch("/api/benchmarks"),
-        ]);
-        if (cancelled) return;
-        setChampions(c.champions || []);
-        setMeta(m || { positions: {} });
-        setBenchmarks(b || null);
-      } catch (e) {
-        logApiError("useStaticData", e); // degrade to empty, but visibly
-      }
-    })();
-    return () => (cancelled = true);
-  }, []);
-  return { champions, meta, benchmarks };
+  const { data } = useQuery({
+    queryKey: ["static"],
+    queryFn: async () => {
+      const [c, m, b] = await Promise.all([
+        apiFetch("/api/champions"),
+        apiFetch("/api/meta"),
+        apiFetch("/api/benchmarks"),
+      ]);
+      return { champions: c.champions || [], meta: m || { positions: {} }, benchmarks: b || null };
+    },
+    staleTime: Infinity, // only changes on a patch / catalog refresh
+  });
+  return data || { champions: [], meta: { positions: {}, patch: "" }, benchmarks: null };
 }
 
-/** Champion-pool reads + writes (Dashboard editor). */
+/** Champion-pool reads + writes (Dashboard editor). Writes are optimistic: the
+ * cache updates before the PUT lands, and rolls back if it fails. */
 export function usePool() {
-  const [pool, setPool] = useState({});
-  const [buildable, setBuildable] = useState({});
-  const [saving, setSaving] = useState(false);
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["pool"],
+    queryFn: () => apiFetch("/api/pool"),
+    staleTime: POLL_SLOW_MS,
+  });
 
-  const load = useCallback(async () => {
-    try {
-      const r = await apiFetch("/api/pool");
-      setPool(r.pool || {});
-      setBuildable(r.buildable || {});
-    } catch (e) {
-      logApiError("usePool.load", e);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const save = useCallback(async (nextPool) => {
-    setSaving(true);
-    setPool(nextPool); // optimistic
-    try {
-      const j = await apiFetch("/api/pool", {
+  const mutation = useMutation({
+    mutationFn: (nextPool) =>
+      apiFetch("/api/pool", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pool: nextPool }),
-      });
-      setPool(j.pool || nextPool);
-    } catch (e) {
-      logApiError("usePool.save", e); // keep optimistic value; surface the failure
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+      }),
+    onMutate: async (nextPool) => {
+      await qc.cancelQueries({ queryKey: ["pool"] });
+      const previous = qc.getQueryData(["pool"]);
+      qc.setQueryData(["pool"], (old) => ({ ...(old || {}), pool: nextPool }));
+      return { previous };
+    },
+    onError: (e, _next, ctx) => {
+      qc.setQueryData(["pool"], ctx?.previous); // roll back, then surface it
+      logApiError("usePool.save", e);
+    },
+    onSuccess: (j) => {
+      if (j?.pool) qc.setQueryData(["pool"], j);
+    },
+  });
 
-  return { pool, buildable, saving, save, reload: load };
+  return {
+    pool: data?.pool || {},
+    buildable: data?.buildable || {},
+    saving: mutation.isPending,
+    save: mutation.mutate,
+    reload: () => qc.invalidateQueries({ queryKey: ["pool"] }),
+  };
 }
 
 /** Dashboard Settings: lazy GET on open + PUT save. The backend returns the
@@ -219,55 +238,70 @@ export function useSettings() {
 /** Per-champion personal win-rate + games from local match history.
  * Keyed by champion name; refreshed on a slow poll (history rarely changes). */
 export function useChampionStats() {
-  const [stats, setStats] = useState({});
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const r = await apiFetch("/api/champion-stats");
-        if (!cancelled) setStats(r.stats || {});
-      } catch (e) {
-        logApiError("useChampionStats", e);
-      }
-    };
-    load();
-    const t = setInterval(load, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(t);
-    };
-  }, []);
-  return stats;
+  const { data } = useQuery({
+    queryKey: ["champion-stats"],
+    queryFn: () => apiFetch("/api/champion-stats"),
+    refetchInterval: POLL_SLOW_MS,
+    staleTime: POLL_SLOW_MS,
+  });
+  return data?.stats || {};
 }
 
 /** "Ollama Meta Scout" recommendation for a role. Returns the heuristic result
- * instantly, then re-fetches once so the Ollama-refined wording can land. */
+ * instantly, then keeps polling until the Ollama-refined wording lands. */
 export function useScout(role) {
-  const [scout, setScout] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    let timer = null;
-    const load = async () => {
-      try {
-        const r = await apiFetch(`/api/scout?role=${role}`);
-        if (cancelled) return;
-        setScout(r);
-        // If still heuristic, the AI may be refining in the background — peek again.
-        if (r?.source === "heuristic" && r?.pick) {
-          timer = setTimeout(load, 4000);
-        }
-      } catch (e) {
-        logApiError("useScout", e);
-      }
-    };
-    setScout(null);
-    load();
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [role]);
-  return scout;
+  const { data } = useQuery({
+    queryKey: ["scout", role],
+    queryFn: () => apiFetch(`/api/scout?role=${role}`),
+    // Still heuristic means the AI may be refining in the background — peek
+    // again until it either upgrades or the pick disappears.
+    refetchInterval: (query) =>
+      query.state.data?.source === "heuristic" && query.state.data?.pick ? 4000 : false,
+  });
+  return data || null;
+}
+
+/** Account macro coach: scorecard, movement vs the previous window, the derived
+ * next-match goal and account progression. One query, shared by every consumer
+ * on the page — this used to be a second 30s `setInterval` inside MacroCoach. */
+export function useMacroCoach() {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["coach"],
+    queryFn: () => apiFetch("/api/coach"),
+    refetchInterval: POLL_SLOW_MS,
+  });
+  const refresh = useMutation({
+    mutationFn: () => apiFetch("/api/coach/refresh", { method: "POST" }),
+    onSuccess: (data) => qc.setQueryData(["coach"], data),
+    onError: (e) => logApiError("POST /api/coach/refresh", e),
+  });
+  return {
+    coach: query.data || null,
+    loading: query.isLoading,
+    refreshing: refresh.isPending,
+    refresh: refresh.mutate,
+  };
+}
+
+/** Recent Summoner's Rift games for the Home list + the hero-strip win rate. */
+export function useRecentMatches(limit = 10) {
+  const query = useQuery({
+    queryKey: ["matches", limit],
+    queryFn: () => apiFetch(`/api/matches/recent?limit=${limit}`),
+    refetchInterval: POLL_SLOW_MS,
+  });
+  return { matches: query.data?.matches || [], loading: query.isLoading };
+}
+
+/** Tier list for a role. Keyed by role so switching back is instant (cached). */
+export function useChampionsByRole(role) {
+  const query = useQuery({
+    queryKey: ["champions-by-role", role],
+    queryFn: () => apiFetch(`/api/champions/role/${role}`),
+    staleTime: POLL_SLOW_MS,
+  });
+  return { rows: query.data?.champions || [], loading: query.isLoading };
 }
 
 /* --- v2 champion browser + match history (plain fetchers) -----------------
@@ -279,17 +313,8 @@ export async function fetchChampionsByRole(role) {
 export async function fetchChampionDetails(id, role) {
   return apiFetch(`/api/champions/${id}/details?role=${role}`);
 }
-export async function fetchRecentMatches(limit = 10) {
-  return apiFetch(`/api/matches/recent?limit=${limit}`);
-}
 export async function fetchMatchAnalysis(id) {
   return apiFetch(`/api/matches/${id}/analysis`);
-}
-export async function fetchMacroCoach() {
-  return apiFetch(`/api/coach`);
-}
-export async function refreshMacroCoach() {
-  return apiFetch(`/api/coach/refresh`, { method: "POST" });
 }
 export async function fetchProBuilds(champion, role = "") {
   const q = new URLSearchParams({ champion, ...(role ? { role } : {}) });

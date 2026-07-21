@@ -10,6 +10,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.3",
     "framer-motion": "^11.18.0",
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
