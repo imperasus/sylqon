@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.35.0](https://github.com/imperasus/sylqon/compare/v1.34.0...v1.35.0) (2026-07-21)
+
+
+### Features
+
+* **ai:** return English coach and match-review prose ([c2ac7fc](https://github.com/imperasus/sylqon/commit/c2ac7fcd2aa286fb59202cc55e0e37785cdc7b88))
+* **coach:** score movement, next-match goal and rank-band baselines ([c9317db](https://github.com/imperasus/sylqon/commit/c9317db8f7db7138200ba1d146e1338f6f2662a9))
+* **desktop:** launch the League client from the Home CTA ([3e45134](https://github.com/imperasus/sylqon/commit/3e45134486ae2dfc6e7ea6cd2476ccfe502e4903))
+* **home:** next-match CTA, progression surface and reachable overflow ([4bd24fe](https://github.com/imperasus/sylqon/commit/4bd24fe6bf6e63b1e606bda3e74caaa6ef28056b))
+
+
+### Refactoring
+
+* **ui:** move server state onto TanStack Query ([8b212e7](https://github.com/imperasus/sylqon/commit/8b212e713cea1ec7c910f0bf027d5dba52a75955))
+* **ui:** unify user-facing copy to English ([71b4af6](https://github.com/imperasus/sylqon/commit/71b4af6220d3b4bcd8fff6d1e182d81174ecdf34))
+
 ## [1.34.0](https://github.com/imperasus/sylqon/compare/v1.33.1...v1.34.0) (2026-07-21)
 
 
