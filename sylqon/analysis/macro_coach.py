@@ -28,6 +28,11 @@ _ROLE_BASELINES = {
 _DEFAULT_BASELINE = {"cs_min": 6.5, "vis_min": 0.70, "deaths": 4.5, "dmg_min": 600}
 _KDA_BASELINE = 3.0
 
+# ``data/benchmarks`` states vision as a per-game total, while this module scores
+# it per minute. Converting needs a game-length assumption; 30 minutes is the
+# rough Summoner's Rift average and keeps the two tables comparable.
+_ASSUMED_GAME_MINUTES = 30.0
+
 DEFAULT_WINDOW = 20
 MIN_GAMES = 3  # below this the scores are too noisy to coach from
 
@@ -35,11 +40,17 @@ MIN_GAMES = 3  # below this the scores are too noisy to coach from
 _WEIGHTS = {"farm": 0.25, "vision": 0.20, "combat": 0.30, "survival": 0.25}
 
 _DIM_LABELS = {
-    "farm": ("Farm", "CS/perc"),
-    "vision": ("Vízió", "vízió/perc"),
-    "combat": ("Harc", "KDA"),
-    "survival": ("Túlélés", "halál/meccs"),
+    "farm": ("Farm", "CS/min"),
+    "vision": ("Vision", "vision/min"),
+    "combat": ("Combat", "KDA"),
+    "survival": ("Survival", "deaths/game"),
 }
+
+# A goal is the next reachable step, not the ideal. Asking a 3.0 CS/min player
+# for 9.6 is demotivating and unactionable in a single game; +10 score points is
+# a step they can actually take next match.
+_GOAL_STEP = 10
+_GOAL_MAX_SCORE = 95
 
 
 def _ratio_score(value: float, baseline: float, *, higher_better: bool = True) -> float:
@@ -69,15 +80,47 @@ def _per_minute(total: float, duration_s: float) -> float | None:
     return (total / (duration_s / 60.0)) if duration_s and duration_s > 0 else None
 
 
-def build_scorecard(matches: list[dict], *, window: int = DEFAULT_WINDOW) -> dict:
-    """Aggregate up to ``window`` newest games into the coach scorecard."""
+def rank_baselines(tier: str | None) -> dict[str, dict]:
+    """Per-role baselines calibrated to the player's own rank band.
+
+    Without this every player is graded against one high-elo constant, so a Gold
+    laner reads red on essentially every game. ``data/benchmarks`` already holds
+    the band × role table the Players tab uses; this adapts it to the metric
+    shape this module scores against. Damage has no band benchmark yet, so it
+    keeps the role default.
+    """
+    from sylqon.data import benchmarks
+
+    out: dict[str, dict] = {}
+    for role in benchmarks.ROLES:
+        b = benchmarks.benchmark(role, tier) or {}
+        default = _ROLE_BASELINES.get(role, _DEFAULT_BASELINE)
+        vision = b.get("vision_score")
+        out[role] = {
+            "cs_min": b.get("cs_per_min") or default["cs_min"],
+            "vis_min": (vision / _ASSUMED_GAME_MINUTES) if vision else default["vis_min"],
+            "deaths": b.get("deaths") or default["deaths"],
+            "dmg_min": default["dmg_min"],
+        }
+    return out
+
+
+def build_scorecard(matches: list[dict], *, window: int = DEFAULT_WINDOW,
+                    baselines: dict[str, dict] | None = None) -> dict:
+    """Aggregate up to ``window`` newest games into the coach scorecard.
+
+    ``baselines`` overrides the built-in role table (see :func:`rank_baselines`)
+    so the same game scores differently for a Silver and a Diamond player.
+    """
+    table = baselines or _ROLE_BASELINES
     games = (matches or [])[:window]
     n = len(games)
     if n == 0:
         return {"games_analyzed": 0, "insufficient": True, "win_rate": None,
                 "recent_results": [], "overall": 0,
                 "overall_trend": {"dir": "flat", "delta": 0},
-                "dimensions": [d | {"value": "—", "score": 0,
+                "primary_role": "",
+                "dimensions": [d | {"value": "—", "raw": 0.0, "score": 0,
                                     "trend": {"dir": "flat", "delta": 0}}
                                for d in _empty_dims()]}
 
@@ -86,10 +129,13 @@ def build_scorecard(matches: list[dict], *, window: int = DEFAULT_WINDOW) -> dic
     raw = {"cs": [], "vis": [], "kda": [], "deaths": []}
     wins = 0
     results = []
+    role_counts: dict[str, int] = {}
 
     for g in games:
         role = g.get("role") or ""
-        base = _ROLE_BASELINES.get(role, _DEFAULT_BASELINE)
+        base = table.get(role, _DEFAULT_BASELINE)
+        if role:
+            role_counts[role] = role_counts.get(role, 0) + 1
         stats = g.get("stats") or {}
         kda = g.get("kda") or {}
         dur = stats.get("duration", 0) or 0
@@ -122,11 +168,16 @@ def build_scorecard(matches: list[dict], *, window: int = DEFAULT_WINDOW) -> dic
         return sum(xs) / len(xs) if xs else 0.0
 
     raw_display = {
-        "farm": (f"{avg(raw['cs']):.1f}", "CS/perc"),
-        "vision": (f"{avg(raw['vis']):.2f}", "vízió/perc"),
+        "farm": (f"{avg(raw['cs']):.1f}", "CS/min"),
+        "vision": (f"{avg(raw['vis']):.2f}", "vision/min"),
         "combat": (f"{avg(raw['kda']):.2f}", "KDA"),
-        "survival": (f"{avg(raw['deaths']):.1f}", "halál/meccs"),
+        "survival": (f"{avg(raw['deaths']):.1f}", "deaths/game"),
     }
+
+    # Numeric twin of raw_display — the display strings are formatted for the UI,
+    # but the goal maths needs the unrounded value.
+    raw_numeric = {"farm": avg(raw["cs"]), "vision": avg(raw["vis"]),
+                   "combat": avg(raw["kda"]), "survival": avg(raw["deaths"])}
 
     dimensions = []
     for key in ("farm", "vision", "combat", "survival"):
@@ -134,6 +185,7 @@ def build_scorecard(matches: list[dict], *, window: int = DEFAULT_WINDOW) -> dic
         value, unit = raw_display[key]
         dimensions.append({
             "key": key, "label": label, "unit": unit, "value": value,
+            "raw": round(raw_numeric[key], 3),
             "score": round(avg(series[key])),
             "trend": _trend(series[key]),
         })
@@ -143,6 +195,7 @@ def build_scorecard(matches: list[dict], *, window: int = DEFAULT_WINDOW) -> dic
         sum(series[k][i] * _WEIGHTS[k] for k in _WEIGHTS if i < len(series[k]))
         for i in range(n)
     ]
+    primary_role = max(role_counts, key=role_counts.get) if role_counts else ""
     return {
         "games_analyzed": n,
         "insufficient": n < MIN_GAMES,
@@ -150,7 +203,82 @@ def build_scorecard(matches: list[dict], *, window: int = DEFAULT_WINDOW) -> dic
         "recent_results": results[:10],
         "overall": overall,
         "overall_trend": _trend(overall_series),
+        "primary_role": primary_role,
         "dimensions": dimensions,
+    }
+
+
+def build_progress(current: dict, previous: dict) -> dict:
+    """Score movement between the current window and the one before it.
+
+    This is what turns the coach from a snapshot into a progress read: the same
+    deterministic scorecard computed over ``matches[window:window*2]`` gives an
+    honest "where you were" baseline without storing any history.
+
+    ``available`` is false when the older window is too thin to compare against —
+    the UI then shows the plain score rather than a misleading delta of zero.
+    """
+    prev_games = (previous or {}).get("games_analyzed", 0)
+    available = prev_games >= MIN_GAMES and not (current or {}).get("insufficient", True)
+    prev_dims = {d["key"]: d for d in (previous or {}).get("dimensions", [])}
+
+    dims = {}
+    for d in (current or {}).get("dimensions", []):
+        prev = prev_dims.get(d["key"])
+        dims[d["key"]] = {
+            "previous_score": prev["score"] if prev else None,
+            "delta": (d["score"] - prev["score"]) if (available and prev) else None,
+        }
+    return {
+        "available": available,
+        "compared_games": prev_games,
+        "previous_overall": previous.get("overall") if available else None,
+        "overall_delta": (current["overall"] - previous["overall"]) if available else None,
+        "dimensions": dims,
+    }
+
+
+def _target_value(key: str, baseline: float, target_score: float) -> float:
+    """Invert ``_ratio_score``: the metric value that would earn ``target_score``."""
+    if key == "survival":  # lower is better
+        return 50.0 * baseline / max(target_score, 1.0)
+    return target_score * baseline / 50.0
+
+
+def derive_goal(scorecard: dict, baselines: dict[str, dict] | None = None) -> dict | None:
+    """The single next-match target: lift the weakest dimension to a real number.
+
+    Deterministic and LLM-free, so the CTA still has something concrete to say
+    when Ollama is offline. Returns ``None`` when there is not enough data to
+    name a weak spot honestly.
+    """
+    if not scorecard or scorecard.get("insufficient"):
+        return None
+    dims = [d for d in scorecard.get("dimensions", []) if d.get("value") != "—"]
+    if not dims:
+        return None
+
+    weakest = min(dims, key=lambda d: d["score"])
+    role = scorecard.get("primary_role", "")
+    table = baselines or _ROLE_BASELINES
+    base = table.get(role, _DEFAULT_BASELINE)
+    metric_key = {"farm": "cs_min", "vision": "vis_min",
+                  "survival": "deaths", "combat": None}[weakest["key"]]
+
+    # Combat has no single baseline metric (it blends KDA and damage), so it
+    # gets a score goal rather than a metric goal.
+    target_score = min(weakest["score"] + _GOAL_STEP, _GOAL_MAX_SCORE)
+    if metric_key is None:
+        return {"key": weakest["key"], "label": weakest["label"], "unit": weakest["unit"],
+                "current": weakest["raw"], "target": None,
+                "current_score": weakest["score"], "target_score": target_score}
+
+    target = _target_value(weakest["key"], base[metric_key], target_score)
+    precision = 2 if weakest["key"] == "vision" else 1
+    return {
+        "key": weakest["key"], "label": weakest["label"], "unit": weakest["unit"],
+        "current": weakest["raw"], "target": round(target, precision),
+        "current_score": weakest["score"], "target_score": target_score,
     }
 
 

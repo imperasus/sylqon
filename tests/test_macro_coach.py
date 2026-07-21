@@ -120,3 +120,81 @@ def test_analyzer_degrades_when_ollama_offline():
 def test_analyzer_handles_garbage_response():
     sc = macro_coach.build_scorecard([_match() for _ in range(5)])
     assert MacroCoachAnalyzer(FakeEngine(response="not a dict")).analyze(sc) is None
+
+
+# -- progress (movement vs the previous window) ------------------------------
+def test_progress_reports_movement_between_windows():
+    current = macro_coach.build_scorecard([_match(cs_min=8.0, deaths=2) for _ in range(20)])
+    previous = macro_coach.build_scorecard([_match(cs_min=4.0, deaths=8) for _ in range(20)])
+    p = macro_coach.build_progress(current, previous)
+
+    assert p["available"] is True
+    assert p["compared_games"] == 20
+    assert p["previous_overall"] == previous["overall"]
+    assert p["overall_delta"] == current["overall"] - previous["overall"]
+    assert p["overall_delta"] > 0                     # strictly better window
+    assert p["dimensions"]["farm"]["delta"] > 0
+
+
+def test_progress_unavailable_without_a_comparable_previous_window():
+    current = macro_coach.build_scorecard([_match() for _ in range(20)])
+    p = macro_coach.build_progress(current, macro_coach.build_scorecard([]))
+
+    assert p["available"] is False
+    assert p["overall_delta"] is None
+    # Deltas stay None rather than reading as a misleading zero.
+    assert all(d["delta"] is None for d in p["dimensions"].values())
+
+
+# -- goal derivation ---------------------------------------------------------
+def test_goal_targets_the_weakest_dimension_with_a_reachable_step():
+    sc = macro_coach.build_scorecard([_match(cs_min=3.0, vision=40, deaths=2) for _ in range(20)])
+    goal = macro_coach.derive_goal(sc)
+
+    assert goal["key"] == "farm"
+    # A step up from where they are, not the ideal — an unreachable target is
+    # not coaching.
+    assert goal["current"] == 3.0
+    assert 3.0 < goal["target"] < 6.0
+    assert goal["target_score"] == goal["current_score"] + 10
+
+
+def test_goal_for_survival_asks_for_fewer_deaths():
+    sc = macro_coach.build_scorecard([_match(cs_min=9.0, vision=40, deaths=12) for _ in range(20)])
+    goal = macro_coach.derive_goal(sc)
+
+    assert goal["key"] == "survival"
+    assert goal["target"] < goal["current"]           # lower is better here
+
+
+def test_goal_is_none_without_enough_games():
+    assert macro_coach.derive_goal(macro_coach.build_scorecard([])) is None
+    assert macro_coach.derive_goal(macro_coach.build_scorecard([_match()])) is None
+
+
+# -- rank-band baselines -----------------------------------------------------
+def test_identical_games_score_differently_per_rank_band():
+    games = [_match(cs_min=6.0, vision=30, deaths=5) for _ in range(20)]
+    low = macro_coach.build_scorecard(games, baselines=macro_coach.rank_baselines("IRON"))
+    high = macro_coach.build_scorecard(games, baselines=macro_coach.rank_baselines("MASTER"))
+
+    # Same raw stats, harsher band -> lower score. This is the whole point of
+    # grading against the player's own rank.
+    assert low["overall"] > high["overall"]
+    assert _dim(low, "farm")["score"] > _dim(high, "farm")["score"]
+
+
+def test_rank_baselines_cover_every_role_with_the_expected_metrics():
+    base = macro_coach.rank_baselines("GOLD")
+    for role in ("top", "jungle", "middle", "bottom", "utility"):
+        assert set(base[role]) == {"cs_min", "vis_min", "deaths", "dmg_min"}
+        assert all(v > 0 for v in base[role].values())
+
+
+def test_unknown_tier_falls_back_to_the_default_band():
+    assert macro_coach.rank_baselines("") == macro_coach.rank_baselines("NONSENSE")
+
+
+def test_primary_role_is_the_most_played_role():
+    games = [_match(role="middle") for _ in range(7)] + [_match(role="top") for _ in range(3)]
+    assert macro_coach.build_scorecard(games)["primary_role"] == "middle"

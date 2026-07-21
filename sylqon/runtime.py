@@ -483,6 +483,11 @@ class PipelineRunner:
         finally:
             self._scout_lock.release()
 
+    def self_rank_summary(self) -> dict | None:
+        """Public accessor for the local player's rank — the coach API uses it to
+        grade against the player's own rank band instead of one global constant."""
+        return self._self_rank_summary()
+
     def _self_rank_summary(self) -> dict | None:
         """The local player's own rank from the LCU, cached per scout session.
         Lets the live board show your rank even in custom/bot games (Spectator

@@ -512,21 +512,34 @@ def _coach_payload(force: bool = False) -> dict:
     generated) LLM 'top 3'. The scorecard is always returned; the priorities
     degrade gracefully when Ollama is offline."""
     from sylqon.ai.macro_coach_prompt import MacroCoachAnalyzer
-    from sylqon.analysis.macro_coach import build_scorecard
+    from sylqon.analysis.macro_coach import (
+        DEFAULT_WINDOW, build_progress, build_scorecard, derive_goal, rank_baselines,
+    )
     from sylqon.db.schema import MacroCoachReport
 
+    # Grade against the player's own rank band — a Silver and a Diamond player
+    # with identical raw stats should not get the same score.
+    tier = ((runner.self_rank_summary() or {}).get("solo") or {}).get("tier") or ""
+    baselines = rank_baselines(tier)
+
+    # Two windows: the current one and the one before it, so the coach can report
+    # movement instead of a standalone snapshot.
+    span = DEFAULT_WINDOW * 2
     session = get_session()
     try:
         if runner.client is not None and runner.client.is_alive():
             try:
-                match_store.sync_recent_matches(session, runner.client, 20)
+                match_store.sync_recent_matches(session, runner.client, span)
                 session.commit()
             except Exception:
                 logging.getLogger(__name__).warning("coach match sync failed", exc_info=True)
                 session.rollback()
-        rows = queries.recent_matches(session, 20)
+        rows = queries.recent_matches(session, span)
         matches = [match_store.serialize_match(session, m) for m in rows]
-        scorecard = build_scorecard(matches)
+        scorecard = build_scorecard(matches[:DEFAULT_WINDOW], baselines=baselines)
+        progress = build_progress(
+            scorecard, build_scorecard(matches[DEFAULT_WINDOW:span], baselines=baselines))
+        goal = derive_goal(scorecard, baselines)
         latest_gid = matches[0]["game_id"] if matches else ""
 
         narrative, priorities, available = "", [], False
@@ -537,16 +550,48 @@ def _coach_payload(force: bool = False) -> dict:
             narrative, priorities, available = (cached.narrative or "",
                                                 cached.priorities or [], True)
         elif not scorecard["insufficient"]:
-            result = MacroCoachAnalyzer(runner.engine).analyze(scorecard)
+            result = MacroCoachAnalyzer(runner.engine).analyze(scorecard, progress)
             if result is not None:
                 narrative, priorities, available = (result["narrative"],
                                                     result["priorities"], True)
                 session.add(MacroCoachReport(based_on_game_id=latest_gid,
                             narrative=narrative, priorities=priorities))
                 session.commit()
-        return {"scorecard": scorecard, "narrative": narrative,
-                "priorities": priorities, "priorities_available": available,
+        from sylqon.data import benchmarks
+        return {"scorecard": scorecard, "progress": progress, "goal": goal,
+                "narrative": narrative, "priorities": priorities,
+                "priorities_available": available,
+                "progression": _progression_payload(),
+                "rank_band": benchmarks.rank_band(tier),
+                "rank_known": bool(tier),
                 "patch": runner.catalog.patch}
+    finally:
+        session.close()
+
+
+def _progression_payload() -> dict:
+    """Account-level progression (level, points, streak, badges) for the Home
+    coach strip. Already computed for the overlay; this lifts it out so the
+    dashboard can show the same numbers between games."""
+    from sylqon.livegame.progression import ProgressionService
+
+    session = get_session()
+    try:
+        svc = ProgressionService()
+        # Read-only: a GET must not create a profile as a side effect, so an
+        # untouched install honestly reports "no progression yet".
+        profile = svc.get_profile(session)
+        if profile is None:
+            return {"available": False}
+        points = profile.total_points or 0
+        return svc.serialize_profile(profile) | {
+            "available": True,
+            "points_into_level": points % 100,
+            "streak": svc.current_streak(session, profile),
+        }
+    except Exception:
+        logging.getLogger(__name__).warning("progression read failed", exc_info=True)
+        return {"available": False}
     finally:
         session.close()
 
