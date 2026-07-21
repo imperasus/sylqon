@@ -1,5 +1,7 @@
-import { Gauge } from "lucide-react";
-import { squareUrl, spellUrl, THREAT_LABELS } from "../assets.js";
+import {
+  Crosshair, Flame, Gauge, Megaphone, Shield, Swords, TrendingUp, UsersRound,
+} from "lucide-react";
+import { squareUrl, spellUrl, pct, poolEntryLabel, THREAT_LABELS } from "../assets.js";
 
 /* Summoner-spell icons with hover tooltip = description. */
 export function SpellPips({ spells, patch, size = "h-6 w-6" }) {
@@ -214,6 +216,137 @@ export function DraftScorecard({ balance }) {
         </div>
       )}
     </Panel>
+  );
+}
+
+/* Lane matchup edge indicator. `m` is the backend lane_matchup read:
+   { edge, confidence, lean, low_data, reasons[] }. Honest by construction — an
+   under-evidenced lane reads "low data" (never a fabricated lean), and the
+   reasons behind a call surface on hover. */
+export function LaneEdge({ m }) {
+  const reasons = m?.reasons?.length ? m.reasons.join("\n") : "";
+  if (!m || m.low_data) {
+    return (
+      <span className="text-3xs text-white/25"
+            title={reasons || "not enough data to call this lane yet"}>
+        low data
+      </span>
+    );
+  }
+  if (m.lean === "ally")
+    return <span className="text-3xs font-bold text-good" title={reasons}>◂ edge</span>;
+  if (m.lean === "enemy")
+    return <span className="text-3xs font-bold text-enemy/80" title={reasons}>risk ▸</span>;
+  return <span className="text-3xs text-white/35" title={reasons}>even</span>;
+}
+
+/* Backend coaching callouts (analysis/player_callouts): each one an action, when
+   to do it, and the evidence we based it on. Deliberately capped and ranked —
+   the panel is a short priority list, not a wall of advice. Renders nothing when
+   the roster gives no signal, which is the honest outcome. */
+const CALLOUT_ICON = {
+  dive_risk: UsersRound, jungle_threat: Crosshair, itemization: Shield,
+  one_trick: Crosshair, fed_enemy: Flame, pressure: Swords, enable_ally: TrendingUp,
+};
+const CALLOUT_TONE = {
+  enemy: "text-enemy", amber: "text-amber", good: "text-good",
+  ally: "text-ally", accent: "text-accent-bright",
+};
+
+export function CalloutList({ callouts, title = "COACH", limit = 5 }) {
+  const items = callouts?.items || [];
+  if (!items.length) return null;
+  return (
+    <Panel title={title} icon={Megaphone} accent="accent" className="gap-1.5">
+      {items.slice(0, limit).map((c, i) => {
+        const Icon = CALLOUT_ICON[c.kind] || Crosshair;
+        return (
+          <div key={`${c.kind}-${i}`} className="flex items-start gap-2">
+            <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${CALLOUT_TONE[c.tone] || "text-accent"}`} />
+            <div className="min-w-0 leading-snug">
+              <div className="text-xs text-white/80">{c.action}</div>
+              <div className="truncate text-3xs text-white/40" title={c.evidence}>
+                {c.timing && <span className="font-bold tracking-wide text-white/50">{c.timing}</span>}
+                {c.timing && c.evidence ? " · " : ""}
+                {c.evidence}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </Panel>
+  );
+}
+
+function DetailBlock({ label, children }) {
+  return (
+    <div className="min-w-0">
+      <div className="t-label mb-1 text-white/35">{label}</div>
+      <div className="flex flex-col gap-0.5 text-2xs text-white/70">{children}</div>
+    </div>
+  );
+}
+
+/* The deep read for one scouted player, revealed when their row is expanded.
+   This is the depth that used to be reachable only by hovering — unusable
+   mid-game or by keyboard — so it lives in the document now. Every section
+   renders only when its data actually exists. */
+export function PlayerDetail({ p, matchup }) {
+  const kda = p.avg_kda || {};
+  const pool = (p.champion_pool || []).slice(0, 5);
+  const form = p.recent_form || {};
+  const solo = p.account?.solo;
+  const analyzed = p.games_analyzed || 0;
+
+  if (!analyzed && !pool.length && !matchup?.reasons?.length) {
+    return <span className="text-2xs text-white/35">No scouted history for this player.</span>;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <DetailBlock label={`RECENT AVERAGES · ${analyzed} GAMES`}>
+          {kda.ratio != null && (
+            <span>{kda.kills}/{kda.deaths}/{kda.assists} · <b className="text-white/85">{kda.ratio.toFixed(1)} KDA</b></span>
+          )}
+          {p.avg_cs_per_min != null && <span>{p.avg_cs_per_min} CS/min</span>}
+          {p.avg_vision_score != null && <span>{Math.round(p.avg_vision_score)} vision score</span>}
+          {form.games > 0 && (
+            <span>
+              form: {pct(form.win_rate)} over {form.games}
+              {form.avg_deaths != null && <> · {form.avg_deaths} deaths/game</>}
+            </span>
+          )}
+          {solo?.games != null && (
+            <span>ranked: {solo.label || p.rank} · {pct(solo.win_rate)} over {solo.games}</span>
+          )}
+        </DetailBlock>
+
+        {pool.length > 0 && (
+          <DetailBlock label="CHAMPION POOL">
+            {pool.map((c) => (
+              <span key={c.champion_id} className="truncate">{poolEntryLabel(c)}</span>
+            ))}
+          </DetailBlock>
+        )}
+      </div>
+
+      {p.autofill && (
+        <div className="border-t border-white/8 pt-1.5 text-2xs text-amber">
+          Off-role: they main {p.autofill.main_role} — only {p.autofill.games} recent games in this lane.
+        </div>
+      )}
+
+      {matchup?.reasons?.length > 0 && (
+        <div className="border-t border-white/8 pt-1.5">
+          <div className="t-label mb-1 text-white/35">
+            LANE READ · {Math.round((matchup.confidence || 0) * 100)}% CONFIDENCE
+          </div>
+          <div className="flex flex-col gap-0.5 text-2xs text-white/70">
+            {matchup.reasons.map((r) => <span key={r}>• {r}</span>)}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

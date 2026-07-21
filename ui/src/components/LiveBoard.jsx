@@ -1,15 +1,25 @@
 import { useMemo } from "react";
 import {
-  Crosshair, Flame, Radar, Skull, Swords, TrendingUp, UsersRound,
+  Flame, Radar, Skull, Swords, TrendingUp, UsersRound,
 } from "lucide-react";
 import { useStaticData } from "../api.js";
-import { ROLE_LABELS, ROLE_ORDER, itemUrl, spellUrl, pct } from "../assets.js";
-import { ChampPortrait, Chip, EmptyState, Panel } from "./shared.jsx";
-import { NumCell, RankCell, RoleCell, TeamRow, TeamTable } from "./TeamTable.jsx";
+import {
+  ROLE_LABELS, ROLE_ORDER, benchTarget, dyingMoreThanUsual, itemUrl, spellUrl, pct,
+  poolEntryLabel, sampleNote, wrTone,
+} from "../assets.js";
+import {
+  CalloutList, ChampPortrait, Chip, EmptyState, LaneEdge, Panel, PlayerDetail,
+} from "./shared.jsx";
+import { NumCell, RankCell, RoleCell, Skeleton, TeamRow, TeamTable } from "./TeamTable.jsx";
 
-/* Per-role CS/min targets — a glanceable "keeping up?" gauge, not a hard rule.
-   Mirrors livegame/state._CS_TARGETS (support farms by design → low bar). */
-const ROLE_CS_TARGET = { top: 7.5, jungle: 5.5, middle: 8.0, bottom: 8.5, utility: 1.5 };
+/* Fallback CS/min targets, used only if the rank-band benchmarks (/api/benchmarks)
+   haven't loaded. Normally the gauge grades against the player's OWN rank band
+   (see benchTarget) so a Gold ADC isn't measured against a Challenger's farm. */
+const CS_TARGET_FALLBACK = { top: 6.5, jungle: 5.0, middle: 7.0, bottom: 7.3, utility: 1.2 };
+
+/* Roles whose job includes vision — only these get a vision shortfall flag. */
+const VISION_ROLES = new Set(["utility", "jungle"]);
+const VISION_LOW_RATIO = 0.75;   // this far under their rank band → worth saying
 
 /* Premade groups are colored independently of team; same color = same party.
    Pastel categorical set — light enough for the dark badge text. */
@@ -82,8 +92,7 @@ function Build({ p, patch }) {
 function rowTip(p) {
   const bits = [];
   const pool = (p.champion_pool || []).slice(0, 4);
-  if (pool.length) bits.push("pool: " + pool.map((c) =>
-    `${c.champion || ""} ${c.games || 0}g${c.win_rate != null ? ` ${pct(c.win_rate)}` : ""}`).join(" · "));
+  if (pool.length) bits.push("pool: " + pool.map(poolEntryLabel).join(" · "));
   const kda = p.avg_kda || {};
   if (kda.ratio != null) bits.push(`recent avg ${kda.ratio.toFixed(1)} KDA · ${p.avg_cs_per_min ?? 0} cs/m · ${Math.round(p.avg_vision_score ?? 0)} vis`);
   const cc = p.current_champ || {};
@@ -93,7 +102,7 @@ function rowTip(p) {
 
 /* One live player as a table row: identity, rank, recent form, live K/D/A + CS
    pace, flags, and the live build strip. */
-function LiveRow({ p, patch, gameTime = 0 }) {
+function LiveRow({ p, patch, benchmarks, matchup, gameTime = 0 }) {
   const acc = p.account || {};
   const solo = acc.solo;
   const cc = p.current_champ || {};
@@ -102,20 +111,41 @@ function LiveRow({ p, patch, gameTime = 0 }) {
   const hasGroup = p.premade_group != null;
   const partners = p.premade_partners || [];
 
-  const csTarget = ROLE_CS_TARGET[p.role] ?? 7;
-  const benchmark = gameTime >= 180 && p.role !== "utility";
-  const csTone = !benchmark ? "text-white/35"
+  // Grade CS against the player's OWN rank band, not a fixed high-elo constant.
+  const csTarget = benchTarget(benchmarks, p.role, solo?.tier, "cs_per_min")
+    ?? CS_TARGET_FALLBACK[p.role] ?? 7;
+  const graded = gameTime >= 180 && p.role !== "utility";
+  const csTone = !graded ? "text-white/35"
     : p.cs_per_min - csTarget >= 0.3 ? "text-good"
     : p.cs_per_min - csTarget <= -0.3 ? "text-bad" : "text-white/35";
 
+  // Recent form: hot only with a supporting win rate; "cold" is a factual streak
+  // note, escalated to a tilt read only when recent deaths are above the player's
+  // own baseline (evidence, not a psychology guess). See recent_form.avg_deaths.
   const streak = form.streak || 0;
+  const dyingMore = dyingMoreThanUsual(p);
   const formChip = streak >= 3 && (form.win_rate || 0) >= 0.55
     ? { tone: "good", icon: TrendingUp, label: `${streak}W` }
-    : streak <= -3 ? { tone: "bad", icon: Flame, label: `${Math.abs(streak)}L` } : null;
+    : streak <= -3
+      ? { tone: "bad", icon: Flame, label: dyingMore ? `${Math.abs(streak)}L tilt?` : `${Math.abs(streak)}L cold` }
+      : null;
+
+  // "Fresh blood" alone just means recently promoted/demoted into the tier — a
+  // weak smurf signal. Only call it a smurf when it's paired with a hard-carry
+  // record over a real sample.
+  const smurfSuspect = solo?.fresh_blood && (solo.win_rate ?? 0) >= 0.65
+    && (solo.games ?? 0) >= 20 && (p.avg_kda?.ratio ?? 0) >= 3.5;
+
+  // Vision is the job in these roles, so a persistent shortfall against their own
+  // rank band is a real, actionable read rather than trivia.
+  const visionTarget = benchTarget(benchmarks, p.role, solo?.tier, "vision_score");
+  const lowVision = VISION_ROLES.has(p.role) && visionTarget != null
+    && p.avg_vision_score != null && p.avg_vision_score < visionTarget * VISION_LOW_RATIO;
 
   return (
     <TeamRow premade={hasGroup ? premadeColor(p.premade_group) : null} self={p.isSelf}
-             dim={p.is_dead} title={rowTip(p)}>
+             dim={p.is_dead} title={rowTip(p)}
+             detail={<PlayerDetail p={p} matchup={matchup} />}>
       <RoleCell role={ROLE_LABELS[p.role]} />
 
       <div className="flex min-w-0 items-center gap-1.5">
@@ -133,9 +163,17 @@ function LiveRow({ p, patch, gameTime = 0 }) {
           <div className="flex items-center gap-1">
             <span className="truncate text-xs font-bold text-white/90">{p.name}</span>
             {p.isSelf && <span className="text-3xs font-bold tracking-widest text-accent">YOU</span>}
-            {solo?.fresh_blood && (
-              <span className="rounded border border-ally/40 px-1 text-3xs font-bold text-ally"
-                    title="new to this rank — possible smurf / fresh account">SMURF?</span>
+            {solo?.fresh_blood && (smurfSuspect
+              ? <span className="rounded border border-amber/50 px-1 text-3xs font-bold text-amber"
+                      title={`new to this rank AND winning hard (${pct(solo.win_rate)} over ${solo.games}g, ${p.avg_kda?.ratio?.toFixed(1)} KDA) — possible smurf`}>SMURF?</span>
+              : <span className="rounded border border-ally/40 px-1 text-3xs font-bold text-ally"
+                      title="promoted/demoted into this tier recently (fresh blood) — not necessarily a smurf">NEW</span>)}
+            {p.autofill && (
+              <span className="shrink-0 rounded border border-amber/50 px-1 text-3xs font-bold text-amber"
+                    title={`off-role: mains ${ROLE_LABELS[p.autofill.main_role] || p.autofill.main_role}, `
+                           + `only ${p.autofill.games} of their recent games here`}>
+                AUTOFILL
+              </span>
             )}
             {hasGroup && (
               <span className="shrink-0 rounded px-1 text-3xs font-bold"
@@ -147,7 +185,7 @@ function LiveRow({ p, patch, gameTime = 0 }) {
           </div>
           <div className="truncate text-3xs text-white/45">
             {p.champion}
-            {cc.games != null && <> · {cc.games}g <span className={cc.win_rate >= 0.5 ? "text-good" : "text-bad"}>{pct(cc.win_rate)}</span></>}
+            {cc.games != null && <> · {cc.games}g <span className={wrTone(cc.win_rate, cc.games)}>{pct(cc.win_rate)}</span></>}
           </div>
         </div>
       </div>
@@ -157,21 +195,27 @@ function LiveRow({ p, patch, gameTime = 0 }) {
                   : p.games_analyzed ? `${p.games_analyzed}g history` : null} />
 
       <NumCell value={form.games ? pct(form.win_rate) : null}
-               tone={form.games ? (form.win_rate >= 0.5 ? "text-good" : "text-bad") : "text-white/35"}
-               sub={streak !== 0 && form.games ? `${streak > 0 ? "+" : ""}${streak}` : null}
-               title="recent form win rate · streak" />
+               tone={wrTone(form.win_rate, form.games)}
+               sub={form.games ? `${form.games}g` : null}
+               pending={p.deep_pending}
+               title={`recent form win rate over ${form.games || 0} games${sampleNote(form.games)}`} />
 
       <NumCell value={`${p.kills ?? 0}/${p.deaths ?? 0}/${p.assists ?? 0}`} tone="text-white/80"
                sub={`${(p.cs_per_min || 0).toFixed(1)} cs/m`} subTone={csTone}
-               title={`live score · CS/min (role target ${csTarget})`} />
+               title={`live score · CS/min (rank-band target ${csTarget.toFixed(1)})`} />
 
       <div className="flex min-w-0 flex-wrap items-center gap-0.5">
+        {p.deep_pending && !p.is_dead && <Skeleton className="w-12" />}
         {p.is_dead && <Chip tone="bad"><Skull className="mr-0.5 inline h-2.5 w-2.5" />{Math.ceil(p.respawn_timer || 0)}s</Chip>}
         {solo?.hot_streak && <Flame className="h-3 w-3 shrink-0 text-bad" title="on a hot streak" />}
         {formChip && !p.is_dead && (
           <Chip tone={formChip.tone}>
             {formChip.icon && <formChip.icon className="mr-0.5 inline h-2.5 w-2.5" />}{formChip.label}
           </Chip>
+        )}
+        {lowVision && (
+          <Chip tone="muted" title={`averages ${Math.round(p.avg_vision_score)} vision vs `
+                                    + `~${visionTarget} for their rank band`}>low vis</Chip>
         )}
         {tags.slice(0, 1).map((t) => <Chip key={t} tone={TAG_TONE[t] || "muted"}>{t}</Chip>)}
       </div>
@@ -181,31 +225,26 @@ function LiveRow({ p, patch, gameTime = 0 }) {
   );
 }
 
-/* Lane-by-lane read: ally vs enemy champion per role, with a light edge lean
-   derived from recent form (ally streak) and the enemy's threat signals. */
-function LaneLadder({ byRole, patch }) {
+/* Lane-by-lane read: ally vs enemy champion per role. The edge is the backend
+   lane-matchup blend (champion counter + form + rank + experience), so a lane
+   with thin evidence honestly reads "low data" instead of guessing. */
+function LaneLadder({ byRole, matchups, patch }) {
+  const edges = matchups?.by_role || {};
   return (
     <Panel title="LANE MATCHUPS" icon={Swords} accent="white" className="gap-0.5">
       {ROLE_ORDER.map((role) => {
         const a = byRole.ally[role];
         const e = byRole.enemy[role];
-        const as = a?.recent_form?.streak || 0;
-        const eHot = (e?.recent_form?.streak || 0) >= 3 || (e?.playstyle_tags || []).includes("carry-threat");
-        const eTilt = (e?.recent_form?.streak || 0) <= -3;
-        const edge = as >= 3 || eTilt ? "ally" : eHot ? "enemy" : "even";
-        const edgeEl = edge === "ally"
-          ? <span className="text-3xs font-bold text-good">◂ edge</span>
-          : edge === "enemy"
-            ? <span className="text-3xs font-bold text-enemy/80">risk ▸</span>
-            : <span className="text-3xs text-white/30">even</span>;
+        const m = edges[role];
         return (
-          <div key={role} className="flex items-center gap-2 rounded px-1 py-0.5 text-2xs even:bg-white/[0.015]">
+          <div key={role} title={m?.reasons?.[0] || ""}
+               className="flex items-center gap-2 rounded px-1 py-0.5 text-2xs even:bg-white/[0.015]">
             <span className="w-6 shrink-0 font-bold tracking-widest text-white/40">{ROLE_LABELS[role]}</span>
             <span className="flex flex-1 items-center gap-1 truncate">
               {a && <ChampPortrait slug={a.slug} patch={patch} size="h-4 w-4" round title={a.champion} />}
               <span className={`truncate ${a?.isSelf ? "text-accent-bright" : "text-ally/90"}`}>{a?.name || "—"}</span>
             </span>
-            <span className="w-12 shrink-0 text-center">{edgeEl}</span>
+            <span className="w-14 shrink-0 text-center"><LaneEdge m={m} /></span>
             <span className="flex flex-1 items-center justify-end gap-1 truncate text-enemy/85">
               <span className="truncate">{e?.name || "—"}</span>
               {e && <ChampPortrait slug={e.slug} patch={patch} size="h-4 w-4" round title={e.champion} />}
@@ -217,50 +256,8 @@ function LaneLadder({ byRole, patch }) {
   );
 }
 
-/* Actionable callouts derived from the enemy reads: premade parties first, then
-   the hottest carry threat, then a tilted enemy to punish. */
-function Callouts({ enemies, groups }) {
-  const flags = [];
-  // Premade parties on the enemy team (botlane duos are the headline one).
-  for (const [gi, members] of Object.entries(groups)) {
-    const enemyMembers = members.filter((m) => m.side === "enemy");
-    if (enemyMembers.length < 2) continue;
-    const roles = enemyMembers.map((m) => m.role);
-    const botlane = roles.includes("bottom") && roles.includes("utility");
-    flags.push({
-      icon: UsersRound, color: premadeColor(+gi),
-      text: botlane
-        ? "Enemy botlane is a duo — expect coordinated 2v2 and dives."
-        : `Enemy ${enemyMembers.map((m) => ROLE_LABELS[m.role] || "?").join("+")} are premade.`,
-    });
-  }
-  for (const e of enemies) {
-    const s = e.recent_form?.streak || 0;
-    if ((s >= 4 || e.account?.solo?.hot_streak) && (e.playstyle_tags || []).includes("carry-threat")) {
-      flags.push({ icon: Flame, color: "var(--color-bad)",
-        text: `${e.name} (${ROLE_LABELS[e.role] || "?"}) is hot on ${e.champion} — deny early.` });
-    }
-  }
-  for (const e of enemies) {
-    const s = e.recent_form?.streak || 0;
-    if (s <= -3) flags.push({ icon: Crosshair, color: "var(--color-amber)",
-      text: `${e.name} (${ROLE_LABELS[e.role] || "?"}) is on a ${Math.abs(s)}-loss streak — punish.` });
-  }
-  if (!flags.length) return null;
-  return (
-    <Panel title="THREATS" icon={Crosshair} accent="enemy" className="gap-1">
-      {flags.slice(0, 4).map((f, i) => (
-        <div key={i} className="flex items-start gap-2 text-xs text-white/75">
-          <f.icon className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: f.color }} />
-          <span>{f.text}</span>
-        </div>
-      ))}
-    </Panel>
-  );
-}
-
-export default function LiveBoard({ scout, live, patch }) {
-  const { champions } = useStaticData();
+export default function LiveBoard({ scout, live, matchups, callouts, patch }) {
+  const { champions, benchmarks } = useStaticData();
 
   const merged = useMemo(() => {
     const slugByName = {};
@@ -288,6 +285,9 @@ export default function LiveBoard({ scout, live, patch }) {
     for (const p of enemies) if (p.role) m.enemy[p.role] = p;
     return m;
   }, [allies, enemies]);
+
+  // Per-lane matchup read, shared by the ladder and each row's expanded detail.
+  const edges = matchups?.by_role || {};
 
   const groups = useMemo(() => {
     const g = {};
@@ -336,19 +336,21 @@ export default function LiveBoard({ scout, live, patch }) {
         <div className="flex min-h-0 flex-col gap-2">
           <TeamTable title="YOUR TEAM" side="ally" lastCol="Build" className="flex-1">
             {ordered("ally").map((p) => (
-              <LiveRow key={`a-${p.name}`} p={p} patch={patch} gameTime={live?.game_time} />
+              <LiveRow key={`a-${p.name}`} p={p} patch={patch} benchmarks={benchmarks}
+                       matchup={edges[p.role]} gameTime={live?.game_time} />
             ))}
           </TeamTable>
           <TeamTable title="ENEMY TEAM" side="enemy" lastCol="Build" className="flex-1">
             {ordered("enemy").map((p) => (
-              <LiveRow key={`e-${p.name}`} p={p} patch={patch} gameTime={live?.game_time} />
+              <LiveRow key={`e-${p.name}`} p={p} patch={patch} benchmarks={benchmarks}
+                       matchup={edges[p.role]} gameTime={live?.game_time} />
             ))}
           </TeamTable>
         </div>
 
         <div className="scroll-thin flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
-          <Callouts enemies={enemies} groups={groups} />
-          <LaneLadder byRole={byRole} patch={patch} />
+          <CalloutList callouts={callouts} />
+          <LaneLadder byRole={byRole} matchups={matchups} patch={patch} />
           {Object.keys(groups).length > 0 && (
             <Panel title="PREMADES" icon={UsersRound} accent="accent" className="gap-1">
               {Object.entries(groups).map(([gi, members]) => (

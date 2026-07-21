@@ -3,8 +3,13 @@ import {
   Crosshair, Eye, Flame, Lock, Radar, Scale, Swords, TrendingUp, Users,
 } from "lucide-react";
 import { useStaticData } from "../api.js";
-import { DAMAGE_COLORS, ROLE_LABELS, ROLE_ORDER, pct } from "../assets.js";
-import { ChampPortrait, Chip, EmptyState, Panel, ThreatBadge } from "./shared.jsx";
+import {
+  DAMAGE_COLORS, ROLE_LABELS, ROLE_ORDER, dyingMoreThanUsual, pct, poolEntryLabel,
+  sampleNote, wrTone,
+} from "../assets.js";
+import {
+  CalloutList, ChampPortrait, Chip, EmptyState, LaneEdge, Panel, PlayerDetail, ThreatBadge,
+} from "./shared.jsx";
 import { NumCell, RankCell, RoleCell, TeamRow, TeamTable } from "./TeamTable.jsx";
 
 /* Playstyle tag → chip tone (mirrors the draft-board scout strip). */
@@ -14,11 +19,16 @@ const TAG_TONE = {
   frontliner: "ally", "vision-control": "accent",
 };
 
-/* A single glanceable flag derived from recent form / comfort. */
+/* A single glanceable flag derived from recent form / comfort. A losing streak
+   alone is reported as a factual "cold streak", not a psychological claim. */
 function playerFlag(p) {
   const f = p.recent_form || {};
   const s = f.streak || 0;
-  if (s <= -3) return { label: "tilt risk", tone: "amber", icon: Flame };
+  if (s <= -3) {
+    return dyingMoreThanUsual(p)
+      ? { label: "tilt risk", tone: "amber", icon: Flame }
+      : { label: `${Math.abs(s)}L cold`, tone: "muted", icon: Flame };
+  }
   if (s >= 3 && (f.win_rate || 0) >= 0.58) return { label: "hot", tone: "good", icon: TrendingUp };
   if (p.comfort && (p.comfort.share || 0) >= 0.55) return { label: "one-trick", tone: "amber", icon: Crosshair };
   return null;
@@ -34,8 +44,9 @@ function scoutTip(p) {
   return bits.join("\n");
 }
 
-/* Scouted (ally or revealed enemy) player as a table row. */
-function ScoutRow({ p, champ, patch }) {
+/* Scouted (ally or revealed enemy) player as a table row. Click / Enter expands
+   the full read (pool, averages, lane reasoning) inline. */
+function ScoutRow({ p, champ, patch, matchup }) {
   if (p.hidden) {
     return (
       <TeamRow dim>
@@ -53,14 +64,14 @@ function ScoutRow({ p, champ, patch }) {
   }
   const f = p.recent_form || {};
   const wr = f.games ? f.win_rate : null;
-  const streak = f.streak || 0;
   const flag = playerFlag(p);
   const tags = (p.playstyle_tags || []).slice(0, 2);
   const kda = p.avg_kda || {};
   const pool = (p.champion_pool || []).slice(0, 4);
 
   return (
-    <TeamRow self={p.is_self} title={scoutTip(p)}>
+    <TeamRow self={p.is_self} title={scoutTip(p)}
+             detail={<PlayerDetail p={p} matchup={matchup} />}>
       <RoleCell role={ROLE_LABELS[p.position || p.main_role]} />
 
       <div className="flex min-w-0 items-center gap-1.5">
@@ -70,6 +81,13 @@ function ScoutRow({ p, champ, patch }) {
           <div className="flex items-center gap-1">
             <span className="truncate text-xs font-bold text-white/90">{p.name}</span>
             {p.is_self && <span className="text-3xs font-bold tracking-widest text-accent">YOU</span>}
+            {p.autofill && (
+              <span className="shrink-0 rounded border border-amber/50 px-1 text-3xs font-bold text-amber"
+                    title={`off-role: mains ${ROLE_LABELS[p.autofill.main_role] || p.autofill.main_role}, `
+                           + `only ${p.autofill.games} of their recent games here`}>
+                AUTOFILL
+              </span>
+            )}
           </div>
           <div className="truncate text-3xs text-white/40">{p.games_analyzed}g scouted</div>
         </div>
@@ -78,9 +96,9 @@ function ScoutRow({ p, champ, patch }) {
       <RankCell rank={p.rank} />
 
       <NumCell value={wr != null ? pct(wr) : null}
-               tone={wr != null ? (wr >= 0.5 ? "text-good" : "text-bad") : "text-white/35"}
-               sub={streak && Math.abs(streak) >= 2 ? `${streak > 0 ? "+" : ""}${streak}` : null}
-               title="recent form win rate · streak" />
+               tone={wrTone(wr, f.games)}
+               sub={f.games ? `${f.games}g` : null}
+               title={`recent form win rate over ${f.games || 0} games${sampleNote(f.games)}`} />
 
       <NumCell value={kda.ratio != null ? kda.ratio.toFixed(1) : null}
                sub={p.avg_cs_per_min != null ? `${p.avg_cs_per_min} cs/m` : null}
@@ -98,7 +116,7 @@ function ScoutRow({ p, champ, patch }) {
       <div className="flex min-w-0 items-center gap-1">
         {pool.map((c) => (
           <ChampPortrait key={c.champion_id} slug={c.slug} patch={patch} size="h-5 w-5" round
-                         title={`${c.champion} · ${c.games}g ${pct(c.win_rate)}`} />
+                         title={poolEntryLabel(c)} />
         ))}
         {p.comfort?.champion && (
           <span className="ml-1 flex min-w-0 items-center gap-1 font-mono text-2xs text-white/45"
@@ -115,7 +133,7 @@ function ScoutRow({ p, champ, patch }) {
 
 /* Pre-game enemy row: only the champion threat profile is known from the draft;
    the player fingerprint resolves in-game (Riot hides enemy identities). */
-function EnemyDraftRow({ e, patch }) {
+function EnemyDraftRow({ e, patch, matchup }) {
   if (!e) {
     return (
       <TeamRow dim>
@@ -129,8 +147,37 @@ function EnemyDraftRow({ e, patch }) {
       </TeamRow>
     );
   }
+  // No player history exists yet (Riot anonymizes enemies in champ select), so
+  // the row leads with what IS known: the champion. The lane edge fills the slot
+  // where a player's flags would go rather than leaving dead "—" cells.
+  const detail = (
+    <div className="flex flex-col gap-1.5 text-2xs text-white/70">
+      <div>
+        <span className="t-label mr-2 text-white/35">CHAMPION</span>
+        {e.name}{e.damage_type && e.damage_type !== "—" ? ` · ${e.damage_type} damage` : ""}
+      </div>
+      {(e.threats || []).length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="t-label mr-1 text-white/35">THREATS</span>
+          {e.threats.map((t) => <ThreatBadge key={t} threat={t} />)}
+        </div>
+      )}
+      {matchup?.reasons?.length > 0 && (
+        <div className="border-t border-white/8 pt-1.5">
+          <div className="t-label mb-1 text-white/35">
+            LANE READ · {Math.round((matchup.confidence || 0) * 100)}% CONFIDENCE
+          </div>
+          {matchup.reasons.map((r) => <div key={r}>• {r}</div>)}
+        </div>
+      )}
+      <span className="text-white/35">
+        Player history unlocks in-game — Riot hides enemy identities during champ select.
+      </span>
+    </div>
+  );
+
   return (
-    <TeamRow>
+    <TeamRow detail={detail}>
       <RoleCell role={ROLE_LABELS[e.role]} />
       <div className="flex min-w-0 items-center gap-1.5">
         <ChampPortrait slug={e.slug} patch={patch} size="h-7 w-7" accent="enemy" title={e.name} />
@@ -145,7 +192,7 @@ function EnemyDraftRow({ e, patch }) {
         <Lock className="h-3 w-3" /> IN-GAME
       </span>
       <NumCell value={null} /><NumCell value={null} />
-      <span />
+      <span className="text-center"><LaneEdge m={matchup} /></span>
       <div className="flex min-w-0 flex-wrap gap-0.5">
         {(e.threats || []).slice(0, 3).map((t) => <ThreatBadge key={t} threat={t} />)}
       </div>
@@ -180,28 +227,23 @@ function EnemyLiveRow({ p, slug, patch }) {
   );
 }
 
-/* Lane-by-lane read. Ally fingerprint is live; the enemy laner's champion is
-   known from the draft / live game, and the edge leans on the ally's recent
-   form (enemy history isn't available). */
-function LaneLadder({ allyByRole, enemyByRole, enemyScoutByRole, patch }) {
+/* Lane-by-lane read. The edge comes from the backend lane-matchup blend
+   (champion counter + form + rank + experience, each confidence-weighted), so a
+   lane with thin evidence honestly reads "low data" instead of guessing. */
+function LaneLadder({ allyByRole, enemyByRole, matchups, patch }) {
+  const byRole = matchups?.by_role || {};
   return (
     <Panel title="LANE MATCHUPS" icon={Swords} accent="white" className="gap-1">
       {ROLE_ORDER.map((role) => {
         const a = allyByRole[role];
         const e = enemyByRole[role];
-        const es = enemyScoutByRole[role];
-        const s = a?.recent_form?.streak || 0;
-        const edge = es ? "even" : s >= 3 ? "ally" : s <= -3 ? "enemy" : "even";
-        const edgeEl = edge === "ally"
-          ? <span className="text-3xs font-bold text-good">◂ edge</span>
-          : edge === "enemy"
-            ? <span className="text-3xs font-bold text-enemy/80">risk ▸</span>
-            : <span className="text-3xs text-white/35">even</span>;
+        const m = byRole[role];
         return (
-          <div key={role} className="flex items-center gap-2 rounded px-1.5 py-1 text-xs even:bg-white/[0.015]">
+          <div key={role} title={m?.reasons?.[0] || ""}
+               className="flex items-center gap-2 rounded px-1.5 py-1 text-xs even:bg-white/[0.015]">
             <span className="w-7 shrink-0 font-bold tracking-widest text-white/40">{ROLE_LABELS[role]}</span>
             <span className={`flex-1 truncate ${a?.is_self ? "text-accent-bright" : "text-ally/90"}`}>{a?.name || "—"}</span>
-            <span className="w-12 shrink-0 text-center">{edgeEl}</span>
+            <span className="w-14 shrink-0 text-center"><LaneEdge m={m} /></span>
             <span className="flex flex-1 items-center justify-end gap-1 truncate text-enemy/85">
               {e && <ChampPortrait slug={e.slug} patch={patch} size="h-4 w-4" round title={e.name} />}
               <span className="truncate">{e?.name || "—"}</span>
@@ -213,22 +255,34 @@ function LaneLadder({ allyByRole, enemyByRole, enemyScoutByRole, patch }) {
   );
 }
 
-function CompareRow({ label, mine, theirs }) {
+/* A single team metric. When only our side is known (enemies aren't scouted in
+   champ select) it shows the ally value against a muted, empty track — never a
+   fabricated split. Once an enemy aggregate exists, the bar splits by the real
+   proportion. `mine`/`theirs` are numbers (nullable); `fmt` formats them. */
+function CompareRow({ label, mine, theirs, fmt = (x) => x }) {
+  const hasBoth = mine != null && theirs != null;
+  const total = hasBoth ? mine + theirs : 0;
+  const minePct = hasBoth && total > 0 ? (mine / total) * 100 : 0;
   return (
     <div>
       <div className="mb-0.5 flex items-center justify-between text-2xs">
-        <span className="font-mono font-bold text-ally">{mine}</span>
+        <span className="font-mono font-bold text-ally">{mine != null ? fmt(mine) : "—"}</span>
         <span className="tracking-widest text-white/40">{label}</span>
-        <span className="font-mono font-bold text-white/45">{theirs}</span>
+        <span className="font-mono font-bold text-white/45">{theirs != null ? fmt(theirs) : "—"}</span>
       </div>
-      <div className="flex h-1 overflow-hidden rounded-full bg-white/10">
-        <div className="bg-ally" style={{ width: "52%" }} />
-      </div>
+      {hasBoth ? (
+        <div className="flex h-1 overflow-hidden rounded-full bg-white/10">
+          <div className="bg-ally" style={{ width: `${minePct}%` }} />
+        </div>
+      ) : (
+        <div className="h-1 rounded-full bg-white/[0.05]" />
+      )}
     </div>
   );
 }
 
-const FLAG_ICON = { good: "text-good", amber: "text-amber", accent: "text-accent" };
+const FLAG_ICON = { good: "text-good", amber: "text-amber", accent: "text-accent",
+                    muted: "text-white/40" };
 
 /* Team-level read from the ally fingerprints (enemy aggregates fill in once
    enemies are scouted) plus the actionable flags. */
@@ -245,17 +299,22 @@ function TeamRead({ allies }) {
   const flags = [];
   for (const p of live) {
     const s = p.recent_form?.streak || 0;
-    if (s <= -3) flags.push({ icon: Flame, tone: "amber", text: `${p.name} is tilted (${Math.abs(s)}L) — play around them safely.` });
-    else if (s >= 3 && (p.recent_form?.win_rate || 0) >= 0.58) flags.push({ icon: TrendingUp, tone: "good", text: `${p.name} is hot (${s}W) — enable them.` });
+    if (s <= -3) {
+      flags.push(dyingMoreThanUsual(p)
+        ? { icon: Flame, tone: "amber",
+            text: `${p.name}: ${Math.abs(s)} losses and dying more than usual (${p.recent_form.avg_deaths} vs ${p.avg_kda?.deaths} avg).` }
+        : { icon: Flame, tone: "muted",
+            text: `${p.name} is on a ${Math.abs(s)}-game losing streak (deaths normal).` });
+    } else if (s >= 3 && (p.recent_form?.win_rate || 0) >= 0.58) flags.push({ icon: TrendingUp, tone: "good", text: `${p.name} is hot (${s}W) — enable them.` });
     if (p.comfort && (p.comfort.share || 0) >= 0.6) flags.push({ icon: Crosshair, tone: "accent", text: `${p.name} one-tricks ${p.comfort.champion} (${pct(p.comfort.share)} of games).` });
   }
 
   return (
     <Panel title="TEAM READ" icon={Scale} accent="accent" className="gap-2">
       <div className="flex flex-col gap-1.5">
-        <CompareRow label="recent form" mine={form != null ? pct(form) : "—"} theirs="—" tone="ally" />
-        <CompareRow label="aggression" mine={aggr != null ? aggr.toFixed(2) : "—"} theirs="—" tone="ally" />
-        <CompareRow label="avg KDA" mine={kda != null ? kda.toFixed(1) : "—"} theirs="—" tone="ally" />
+        <CompareRow label="recent form" mine={form} theirs={null} fmt={pct} />
+        <CompareRow label="aggression" mine={aggr} theirs={null} fmt={(x) => x.toFixed(2)} />
+        <CompareRow label="avg KDA" mine={kda} theirs={null} fmt={(x) => x.toFixed(1)} />
       </div>
       {flags.length > 0 && (
         <div className="flex flex-col gap-1 border-t border-white/8 pt-2">
@@ -346,6 +405,9 @@ export default function PlayersView({ state }) {
     );
   }
 
+  // Per-lane matchup read, shared by the ladder and each row's expanded detail.
+  const edgeByRole = state?.matchups?.by_role || {};
+
   const allyRoster = ROLE_ORDER.map((r) => allyByRole[r]).filter(Boolean);
   // any allies without a normalized position still get shown
   for (const p of allies) if (!p.position && !allyRoster.includes(p)) allyRoster.push(p);
@@ -380,7 +442,8 @@ export default function PlayersView({ state }) {
             {allyRoster.length === 0
               ? <div className="px-3 py-2 text-sm text-white/35">Scouting teammates…</div>
               : allyRoster.map((p) => (
-                  <ScoutRow key={p.name + (p.position || "")} p={p} champ={champByRole[p.position]} patch={patch} />
+                  <ScoutRow key={p.name + (p.position || "")} p={p} champ={champByRole[p.position]}
+                            patch={patch} matchup={edgeByRole[p.position]} />
                 ))}
           </TeamTable>
 
@@ -396,14 +459,16 @@ export default function PlayersView({ state }) {
               : enemyRoster.map((e, i) =>
                   e && enemyScoutByRole[e.role] && !enemyScoutByRole[e.role].hidden && enemyScoutByRole[e.role].games_analyzed > 0
                     ? <ScoutRow key={e.champion_id} p={{ ...enemyScoutByRole[e.role], is_self: false }}
-                                champ={e} patch={patch} />
-                    : <EnemyDraftRow key={e ? e.champion_id : `e-${i}`} e={e} patch={patch} />)}
+                                champ={e} patch={patch} matchup={edgeByRole[e.role]} />
+                    : <EnemyDraftRow key={e ? e.champion_id : `e-${i}`} e={e} patch={patch}
+                                     matchup={e ? edgeByRole[e.role] : null} />)}
           </TeamTable>
         </div>
 
         <div className="scroll-thin flex min-h-0 flex-col gap-2.5 overflow-y-auto pr-0.5">
+          <CalloutList callouts={state?.callouts} />
           <LaneLadder allyByRole={allyByRole} enemyByRole={enemyLadderByRole}
-                      enemyScoutByRole={enemyScoutByRole} patch={patch} />
+                      matchups={state?.matchups} patch={patch} />
           <TeamRead allies={allies} />
           {!inGame && (
             <div className="surface surface-accent flex items-start gap-2.5 p-2.5">

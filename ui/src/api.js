@@ -112,24 +112,27 @@ export function useSylqon() {
 export function useStaticData() {
   const [champions, setChampions] = useState([]);
   const [meta, setMeta] = useState({ positions: {}, patch: "" });
+  const [benchmarks, setBenchmarks] = useState(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [c, m] = await Promise.all([
+        const [c, m, b] = await Promise.all([
           apiFetch("/api/champions"),
           apiFetch("/api/meta"),
+          apiFetch("/api/benchmarks"),
         ]);
         if (cancelled) return;
         setChampions(c.champions || []);
         setMeta(m || { positions: {} });
+        setBenchmarks(b || null);
       } catch (e) {
         logApiError("useStaticData", e); // degrade to empty, but visibly
       }
     })();
     return () => (cancelled = true);
   }, []);
-  return { champions, meta };
+  return { champions, meta, benchmarks };
 }
 
 /** Champion-pool reads + writes (Dashboard editor). */

@@ -150,8 +150,12 @@ export default function App() {
           : <EmptyState icon={Package} label="NINCS LOADOUT"
                         hint="A végleges build a bajnok lockolása után jelenik meg." />;
       case "players":
-        if (isInGame) return <LiveBoard scout={state?.scout} live={state.live} patch={patch} />;
-        return state?.scout?.players?.length
+        if (isInGame) return <LiveBoard scout={state?.scout} live={state.live} matchups={state?.matchups}
+                                       callouts={state?.callouts} patch={patch} />;
+        // The tab carries draft-derived intel (lane matchups, coaching callouts,
+        // enemy picks) even before any player fingerprint resolves, so a live
+        // lobby is enough to render it — PlayersView handles the thinner states.
+        return (state?.scout?.players?.length || state?.lobby)
           ? <PlayersView state={state} />
           : <EmptyState icon={Users} label="NINCS LOBBY ADAT"
                         hint="A 10 játékos scoutja a lobby/meccs során töltődik fel." />;
