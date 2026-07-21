@@ -45,12 +45,23 @@ FARM_CS_DEFAULT = 7.5
 PLAYMAKER_ASSISTS_BY_ROLE = {"top": 7.0, "jungle": 8.0, "middle": 8.0,
                              "bottom": 7.0, "utility": 9.5}
 PLAYMAKER_ASSISTS_DEFAULT = 8.0
+# K+A that saturates "fight involvement" in the aggression score, per role —
+# roughly twice the role's typical K+A (see data/benchmarks). A support racks up
+# assists by design so its bar is highest; solo laners the lowest. This replaces
+# a single global 18 that mislabeled low-K+A roles as passive and vice-versa.
+INVOLVEMENT_KA_BY_ROLE = {"top": 16.0, "jungle": 20.0, "middle": 18.0,
+                          "bottom": 18.0, "utility": 25.0}
+INVOLVEMENT_KA_DEFAULT = 18.0
 
 AGGRO_DEATHS = 6.5         # avg deaths at/above this → high-risk / dies a lot
 CALC_DEATHS = 4.0          # avg deaths at/below this (+ decent KDA) → calculated
 CALC_RATIO = 2.0           # KDA ratio at/above this with low deaths → disciplined
 CARRY_RATIO = 3.0          # high kills + this KDA ratio → carry threat
 ONE_TRICK_SHARE = 0.5      # one champ ≥ this share of games → one-trick
+# Off-role ("autofill") read: below this share of recent games in the role they
+# were assigned, and it isn't their main role → they're out of position.
+AUTOFILL_ROLE_SHARE = 0.25
+AUTOFILL_MIN_GAMES = 5     # need this much history before calling anyone autofilled
 FRONTLINER_DTPM = 1800.0   # avg damage TAKEN per minute → frontliner / tank style
 VISION_CONTROL = 45.0      # avg vision score → macro / map-control oriented
 
@@ -187,8 +198,9 @@ def _aggression_score(avg_kda: dict, avg_cs: float, main_role: str) -> float:
     kills = avg_kda.get("kills", 0.0)
     deaths = avg_kda.get("deaths", 0.0)
     assists = avg_kda.get("assists", 0.0)
-    involvement = min((kills + assists) / 18.0, 1.0)   # ~18 K+A → maxed
-    risk = min(deaths / 9.0, 1.0)                       # ~9 deaths → maxed
+    ka_norm = INVOLVEMENT_KA_BY_ROLE.get(main_role, INVOLVEMENT_KA_DEFAULT)
+    involvement = min((kills + assists) / ka_norm, 1.0)  # role-normalized K+A → maxed
+    risk = min(deaths / 9.0, 1.0)                        # ~9 deaths → maxed
     if main_role == "utility":
         farm_penalty = 0.0
     else:
@@ -229,10 +241,36 @@ def _playstyle_tags(main_role: str, avg_kda: dict, avg_cs: float,
     return tags
 
 
+def autofill_read(roles: dict | None, assigned_role: str,
+                  min_games: int = AUTOFILL_MIN_GAMES) -> dict | None:
+    """Is this player off their main role in this game?
+
+    One of the most useful reads a coach gets pre-game: an autofilled laner is
+    playing an unfamiliar role and is far likelier to be exploitable (or, on your
+    own team, to need help). Returns ``{main_role, share, games}`` when the
+    assigned role is *not* their main and they rarely play it — otherwise
+    ``None`` (including when the history is too thin to make the call).
+    """
+    if not assigned_role or not roles:
+        return None
+    total = sum(roles.values())
+    if total < min_games:
+        return None
+    main_role = max(roles.items(), key=lambda kv: (kv[1], kv[0]))[0]
+    played = roles.get(assigned_role, 0)
+    share = played / total
+    if assigned_role == main_role or share >= AUTOFILL_ROLE_SHARE:
+        return None
+    return {"main_role": main_role, "share": round(share, 3), "games": played}
+
+
 def _recent_form(games: list[dict]) -> dict:
-    """Win rate over the recent window plus the current win/loss streak."""
+    """Win rate over the recent window, the current win/loss streak, and the
+    recent-window death average. ``avg_deaths`` lets a losing streak be read as a
+    genuine tilt/int signal only when deaths are up versus the player's own
+    baseline — evidence, not a psychology guess."""
     if not games:
-        return {"games": 0, "wins": 0, "win_rate": 0.0, "streak": 0}
+        return {"games": 0, "wins": 0, "win_rate": 0.0, "streak": 0, "avg_deaths": 0.0}
     wins = sum(1 for g in games if g.get("result") == "Win")
     # Streak: signed run length from the most recent game (+win / -loss).
     first_win = games[0].get("result") == "Win"
@@ -242,9 +280,11 @@ def _recent_form(games: list[dict]) -> dict:
             streak += 1
         else:
             break
+    avg_deaths = round(sum(g["kda"].get("deaths", 0) for g in games) / len(games), 1)
     return {
         "games": len(games),
         "wins": wins,
         "win_rate": round(wins / len(games), 3),
         "streak": streak if first_win else -streak,
+        "avg_deaths": avg_deaths,
     }

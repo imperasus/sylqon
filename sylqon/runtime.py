@@ -27,8 +27,8 @@ from sylqon.ai.pick_prompt import (
 )
 from sylqon.ai.prompts import compile_prompt
 from sylqon.analysis import (
-    ban_model, build_archetype, core_select, draft_intel, power_curve, role_infer,
-    rune_select,
+    ban_model, build_archetype, core_select, draft_intel, lane_matchup,
+    player_callouts, power_curve, role_infer, rune_select,
 )
 from sylqon.analysis.scoring import ChampionScorer
 from sylqon.cache.store import MetaCache
@@ -322,6 +322,8 @@ class PipelineRunner:
                     self.state.set("draft_intel", None)
                     self.state.set("recommendation", None)
                     self.state.set("draft_clock", None)
+                    self.state.set("matchups", None)
+                    self.state.set("callouts", None)
             elif phase in ("WaitingForStats", "PreEndOfGame", "EndOfGame"):
                 # Post-game: keep the bus alive so the end-of-game stats block push
                 # (and its seed) can trigger the auto-review. The post-game report is
@@ -334,6 +336,8 @@ class PipelineRunner:
                     self.state.set("draft_intel", None)
                     self.state.set("recommendation", None)
                     self.state.set("draft_clock", None)
+                    self.state.set("matchups", None)
+                    self.state.set("callouts", None)
             elif phase in ("Matchmaking", "None"):
                 self._stop_event_bus()
                 self._reset_draft_state()
@@ -343,6 +347,8 @@ class PipelineRunner:
                     self.state.set("draft_intel", None)
                     self.state.set("recommendation", None)
                     self.state.set("draft_clock", None)
+                    self.state.set("matchups", None)
+                    self.state.set("callouts", None)
 
     # ------------------------------------------------- LCU event bus
     def _ensure_event_bus(self) -> None:
@@ -465,7 +471,10 @@ class PipelineRunner:
                         fp = scout_mod.PlayerFingerprint()
                     enriched = self._enrich_fingerprint(fp)
                     self._player_scout_cache[puuid] = enriched
-                out.append({**enriched, **self._player_meta(p)})
+                meta = self._player_meta(p)
+                out.append({**enriched, **meta,
+                            "autofill": scout_mod.autofill_read(
+                                enriched.get("roles"), meta.get("position", ""))})
             self._apply_self_rank(out)
             self.state.set("scout", {"players": out, "ready": True, "at": time.time()})
             scouted = sum(1 for p in out if not p.get("hidden"))
@@ -682,6 +691,8 @@ class PipelineRunner:
         self._mission_engine.tick(LiveGameState.none())  # clear active missions
         self.state.set("live", LiveGameState.none().to_dict())
         self.state.set("overlay", {"active": False, "role": "", "missions": [], "game": {}})
+        self.state.set("matchups", None)
+        self.state.set("callouts", None)
         log.info("Live game poller stopped")
         # The game just ended: generate the next batch of champion missions from
         # its post-game stats (off-thread — a slow Ollama call never blocks polls).
@@ -792,6 +803,7 @@ class PipelineRunner:
                 }
 
             self._on_live_scout(list(cards.values()), premade_groups=0)
+            self._publish_live_matchups()  # early read: matchup + rank + experience
 
             # ---- Phase B: match-history fingerprint, streamed in per player. --
             log.info("Live scout: phase 2 (match history) for %d players", len(puuids))
@@ -830,6 +842,10 @@ class PipelineRunner:
                             cc["mastery_level"] = prev_cc.get("mastery_level")
                         patch.update(deep)
                         patch["current_champ"] = cc
+                        # Off-role read: now that we know what they usually play,
+                        # compare it to the role Spectator says they're on.
+                        patch["autofill"] = scout_mod.autofill_read(
+                            deep.get("roles"), card.get("position", ""))
                     # Stream just this player's deep read onto the board. (The
                     # local `card` is read-only here — Phase A appended its dict
                     # by reference into published state, so mutating it would let
@@ -851,6 +867,7 @@ class PipelineRunner:
                     ]
                 premade_patches[pu] = patch
             self._patch_scout_players(premade_patches, premade_groups=len(groups))
+            self._publish_live_matchups()  # full read: form now folded in too
         except Exception:
             log.exception("_do_live_scout failed")
 
@@ -1297,6 +1314,212 @@ class PipelineRunner:
         except Exception:
             log.debug("Draft-intel computation failed", exc_info=True)
             self.state.set("draft_intel", None)
+        try:
+            ally, enemy = self._champ_select_lane_cards(ctx)
+            self._publish_matchups(ally, enemy, source="draft")
+        except Exception:
+            log.debug("Lane-matchup computation failed", exc_info=True)
+        self._publish_callouts()
+
+    # ------------------------------------------------------- lane matchups
+    # Edge per lane (champion counter + form + rank + experience) published to
+    # ``state["matchups"]``; the Players-tab lane ladders render it directly.
+    _MATCHUP_ROLES = ("top", "jungle", "middle", "bottom", "utility")
+
+    def _publish_matchups(self, ally_by_role: dict, enemy_by_role: dict,
+                          source: str) -> None:
+        """Blend the lane cards into per-role edges (best-effort DB matchup
+        lookup) and publish. A DB failure degrades to a matchup-less blend rather
+        than dropping the read entirely."""
+        if not ally_by_role and not enemy_by_role:
+            self.state.set("matchups", None)
+            return
+        roles = list(self._MATCHUP_ROLES)
+        session = None
+        try:
+            from sylqon.db.session import get_session
+            session = get_session()
+            fn = self._matchup_fn(session)
+            by_role = lane_matchup.compute_lanes(ally_by_role, enemy_by_role, fn, roles)
+        except Exception:
+            log.debug("lane-matchup DB pass failed; blending without matchups",
+                      exc_info=True)
+            by_role = lane_matchup.compute_lanes(
+                ally_by_role, enemy_by_role, lambda a, e, r: None, roles)
+        finally:
+            if session is not None:
+                session.close()
+        self.state.set("matchups",
+                       {"by_role": by_role, "source": source, "at": time.time()})
+
+    def _matchup_fn(self, session):
+        """DB-backed matchup lookup: two Riot champion keys + a role → the stored
+        ``{advantage, games}`` head-to-head (or ``None``). Riot key → DB id
+        resolution is cached across the five lane calls."""
+        from sylqon.db import queries
+        from sylqon.db.schema import Champion
+        id_cache: dict[int, int | None] = {}
+
+        def _db_id(riot_key) -> int | None:
+            key = int(riot_key)
+            if key not in id_cache:
+                row = session.query(Champion).filter_by(riot_key=key).first()
+                id_cache[key] = row.id if row else None
+            return id_cache[key]
+
+        def fn(a_key, e_key, role):
+            a_id, e_id = _db_id(a_key), _db_id(e_key)
+            if not a_id or not e_id:
+                return None
+            adv = queries.counter_map(session, a_id, role, [e_id]).get(e_id)
+            if adv is None:
+                return None
+            games = queries.counter_games_map(session, a_id, role, [e_id]).get(e_id)
+            return {"advantage": adv, "games": games}
+
+        return fn
+
+    @staticmethod
+    def _structured_rank(sp: dict | None) -> dict | None:
+        """Extract ``{tier, division, label}`` from a scout card's solo-queue
+        account block, or ``None`` when the rank isn't known."""
+        solo = ((sp or {}).get("account") or {}).get("solo")
+        if not solo or not solo.get("tier"):
+            return None
+        return {"tier": solo.get("tier"), "division": solo.get("division"),
+                "label": solo.get("label") or (sp or {}).get("rank")}
+
+    def _champ_select_lane_cards(self, ctx: MatchContext) -> tuple[dict, dict]:
+        """Lane cards from the draft: ally picks (with form/rank folded in from the
+        current scout snapshot, matched by role) and locked enemy champions. Enemy
+        fingerprints aren't available in champ select (Riot anonymizes them), so
+        their cards carry the champion only — the matchup signal still works."""
+        scout = self.state.snapshot().get("scout") or {}
+        ally_scout_by_role: dict = {}
+        for p in scout.get("players") or []:
+            if p.get("hidden") or p.get("side") == "enemy":
+                continue
+            if p.get("position"):
+                ally_scout_by_role.setdefault(p["position"], p)
+
+        ally_by_role: dict = {}
+        picks: list[tuple[str, int, str]] = []
+        if ctx.my_champion_id and ctx.my_role:
+            picks.append((ctx.my_role, ctx.my_champion_id, ctx.my_champion))
+        for a in ctx.allies:
+            if a.locked and a.role and a.champion_id:
+                picks.append((a.role, a.champion_id, a.name))
+        for role, cid, cname in picks:
+            sp = ally_scout_by_role.get(role) or {}
+            ally_by_role.setdefault(role, {
+                "champion_id": cid, "champion": cname, "role": role,
+                "name": sp.get("name") or cname,
+                "recent_form": sp.get("recent_form"),
+                "rank": self._structured_rank(sp),
+                "current_champ": sp.get("current_champ"),
+            })
+
+        enemy_by_role: dict = {}
+        for e in ctx.enemies:
+            if e.locked and e.role and e.champion_id:
+                enemy_by_role.setdefault(e.role, {
+                    "champion_id": e.champion_id, "champion": e.name,
+                    "role": e.role, "name": e.name,
+                })
+        return ally_by_role, enemy_by_role
+
+    def _live_lane_cards(self) -> tuple[dict, dict]:
+        """Lane cards from the in-game scout roster, where both teams' champion
+        ids, roles and fingerprints are known (Spectator reveals every puuid)."""
+        scout = self.state.snapshot().get("scout") or {}
+        ally_by_role: dict = {}
+        enemy_by_role: dict = {}
+        for p in scout.get("players") or []:
+            if p.get("hidden"):
+                continue
+            cid = p.get("champion_id")
+            role = p.get("position")
+            if not cid or not role:
+                continue
+            info = self.catalog.champion_by_key(cid) or {}
+            card = {
+                "champion_id": cid, "champion": info.get("name") or "", "role": role,
+                "name": p.get("name") or info.get("name") or "",
+                "recent_form": p.get("recent_form"),
+                "rank": self._structured_rank(p),
+                "current_champ": p.get("current_champ"),
+            }
+            target = enemy_by_role if p.get("side") == "enemy" else ally_by_role
+            target.setdefault(role, card)
+        return ally_by_role, enemy_by_role
+
+    def _publish_live_matchups(self) -> None:
+        """Recompute lane edges from the current in-game scout roster. Best-effort;
+        called as scout phases stream in, so it must never raise."""
+        try:
+            ally, enemy = self._live_lane_cards()
+            self._publish_matchups(ally, enemy, source="live")
+        except Exception:
+            log.debug("live lane-matchup computation failed", exc_info=True)
+        self._publish_callouts()
+
+    # ------------------------------------------------------ coaching callouts
+    def _callout_cards(self) -> list[dict]:
+        """Scout cards enriched with what the callout generators need: the resolved
+        champion name, its damage type and threat tags, plus the live score when a
+        game is running. Champ-select enemies (anonymized, so absent from the
+        scout) are added from the draft picks so champion-driven advice — the
+        itemization read especially — still works pre-game."""
+        from sylqon.lcu.lobby import _damage_type, _threats
+        snap = self.state.snapshot()
+        live_by_name: dict[str, dict] = {}
+        for r in ((snap.get("live") or {}).get("roster") or []):
+            if r.get("name"):
+                live_by_name[r["name"].strip().lower()] = r
+
+        cards: list[dict] = []
+        enemy_roles_seen: set[str] = set()
+        for p in ((snap.get("scout") or {}).get("players") or []):
+            if p.get("hidden"):
+                continue
+            info = self.catalog.champion_by_key(p.get("champion_id") or 0) or {}
+            champ = info.get("name") or ""
+            live = live_by_name.get((p.get("name") or "").strip().lower(), {})
+            role = p.get("position") or ""
+            if (p.get("side") or "ally") == "enemy" and role:
+                enemy_roles_seen.add(role)
+            cards.append({
+                **p, "role": role, "champion": champ,
+                "damage_type": _damage_type(info) if info else "",
+                "threats": _threats(champ) if champ else [],
+                "kills": live.get("kills"), "deaths": live.get("deaths"),
+                "assists": live.get("assists"),
+            })
+
+        # Champ select: the enemy roster exists only as draft picks.
+        for e in ((snap.get("lobby") or {}).get("enemies") or []):
+            role, name = e.get("role") or "", e.get("name") or ""
+            if not name or (role and role in enemy_roles_seen):
+                continue
+            info = self.catalog.champion_by_name(name) or {}
+            cards.append({
+                "name": name, "champion": name, "role": role, "side": "enemy",
+                "champion_id": e.get("champion_id"),
+                "damage_type": _damage_type(info) if info else "",
+                "threats": _threats(name),
+            })
+        return cards
+
+    def _publish_callouts(self) -> None:
+        """Deterministic, evidence-bearing coaching callouts for the Players tab.
+        Best-effort — a failure here must never disturb scouting."""
+        try:
+            my_role = self.last_ctx.my_role if self.last_ctx else ""
+            cards = self._callout_cards()
+            items = player_callouts.build_callouts(cards, my_role=my_role)
+            self.state.set("callouts", {"items": items, "at": time.time()})
+        except Exception:
+            log.debug("callout computation failed", exc_info=True)
 
     def _pick_intel(self, ctx: MatchContext) -> tuple[dict, dict]:
         """Per-locked-pick Top-3 lists: counters for each revealed enemy and
@@ -2532,6 +2755,8 @@ class PipelineRunner:
         self.state.set("recommendation", None)
         self.state.set("build", None)
         self.state.set("draft_clock", None)
+        self.state.set("matchups", None)
+        self.state.set("callouts", None)
         self.last_ctx = None
         self._reset_draft_state()
         return {"ok": True, "detail": "demo cleared"}

@@ -570,6 +570,16 @@ def list_champions() -> dict:
     return {"champions": runner.catalog.all_champions()}
 
 
+@app.get("/api/benchmarks")
+def performance_benchmarks() -> dict:
+    """Rank-band × role performance benchmarks (CS/min, K+A, deaths, vision) so
+    the Players tab can grade each scouted player against their own rank band
+    instead of a single high-elo constant. Static-ish; fetched once with the
+    other static data."""
+    from sylqon.data import benchmarks
+    return benchmarks.as_dict()
+
+
 @app.get("/api/meta")
 def meta_report() -> dict:
     """Current-patch strongest champions per role (cached from op.gg), enriched
